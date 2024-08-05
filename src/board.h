@@ -1,5 +1,70 @@
 #include <string>
 
+using llu = unsigned long long;
+
+#define GET_SQUARE(X) _tzcnt_u64(X)
+
+namespace Lookup {
+    static llu InitFile(int p) {
+        return (0x0101010101010101ull << (p % 8));
+    }
+
+    static llu InitRank(int p) {
+        return (0xFFull << ((p>>3) << 3)); // Truncate the first 3 bits
+    }
+
+    static llu InitDiagonal(int p) {
+        int s = 8*(p % 8) - ((p >> 3) << 3);
+        return s > 0 ? 0x8040201008040201 >> (s) : 0x8040201008040201 << (-s);
+    }
+
+    static llu InitAntiDiagonal(int p) {
+        int s = 56 - 8 * (p % 8) - ((p >> 3) << 3);
+        return s > 0 ? 0x0102040810204080 >> (s) : 0x0102040810204080 << (-s);
+    }
+
+    static int CoordToPos(int x, int y) {
+        if (x <= 0 || y <= 0 || x >= 8 || y >= 8) return -1;
+        return (y - 1) * 8 + (8 - x);
+
+    }
+
+    static llu AddToMap(llu map, int x, int y) {
+        int pos = CoordToPos(x, y);
+        if (pos == -1) return map;
+        else return map | (1ull << pos);
+    }
+
+    static llu lines[64 * 4] = {}; // Lookup table for all slider lines
+    static llu knight_attacks[64] = {}; // Lookup table for all knight attack 
+
+    static void Init() {
+        for (int i = 0; i < 64; i++) {
+            lines[i * 4] = InitFile(i);
+            lines[i * 4 + 1] = InitRank(i);
+            lines[i * 4 + 2] = InitDiagonal(i);
+            lines[i * 4 + 3] = InitAntiDiagonal(i);
+        }
+
+        for (int x = 1; x <= 8; x++) {
+            for (int y = 1; y <= 8; y++) {
+                llu N_Attack = 0;
+                N_Attack = AddToMap(N_Attack, x + 2, y + 1);
+                N_Attack = AddToMap(N_Attack, x - 2, y + 1);
+                N_Attack = AddToMap(N_Attack, x + 2, y - 1);
+                N_Attack = AddToMap(N_Attack, x - 2, y - 1);
+                N_Attack = AddToMap(N_Attack, x + 1, y + 2);
+                N_Attack = AddToMap(N_Attack, x - 1, y + 2);
+                N_Attack = AddToMap(N_Attack, x + 1, y - 2);
+                N_Attack = AddToMap(N_Attack, x - 1, y - 2);
+                knight_attacks[CoordToPos(x, y)] = N_Attack;
+            }
+        }
+    }
+
+    
+}
+
 using uint64 = unsigned long long;
 
 static uint64 FenToMap(const std::string& FEN, char p) {
@@ -115,13 +180,36 @@ static BoardInfo FenInfo(const std::string& FEN) {
     return info;
 }
 
+static void PrintMap(uint64 map) {
+    for (int i = 63; i >= 0; i--) {
+        if ((map & (1ull << i)) > 0) {
+            printf("X ");
+        }
+        else {
+            printf("O ");
+        }
+        if (i % 8 == 0) printf("\n");
+    }
+}
+
 struct Move {
     uint64 m_From;
     uint64 m_To;
 };
 
+/*
+    Boards start from bottom right and go right to left
+
+    64 63 ... 57 56
+    .
+    .
+    .
+    8 7 ... 3 2 1
+
+*/
+
 class Board {
-public:
+public: // TODO: make bitboard private and use constructors and move functions for changing them
     uint64 m_WhitePawn;
     uint64 m_WhiteKnight;
     uint64 m_WhiteBishop;
@@ -145,7 +233,13 @@ public:
 
     Board(const std::string& FEN);
 
-    
+    uint64 Slide(uint64 pos, uint64 line, uint64 blocked);
+
+    uint64 Rook(int pos, uint64 occ);
+    uint64 Bishop(int pos, uint64 occ);
+    uint64 Queen(int pos, uint64 occ);
+
+    bool Validate();
 
     void MoveWhitePawn(uint64 from, uint64 to);
     void MoveBlackPawn(uint64 from, uint64 to);
@@ -170,6 +264,7 @@ static std::string BoardtoFen(const Board& board) {
 
         if (!(board.m_Board & pos)) {
             skip++;
+            continue;
         }
 
         if ((board.m_BlackPawn & pos) > 0) {
