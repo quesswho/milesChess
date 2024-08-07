@@ -1,69 +1,10 @@
 #include <string>
+#include <array>
+#include "LookupTables.h"
 
 using llu = unsigned long long;
 
-#define GET_SQUARE(X) _tzcnt_u64(X)
-
-namespace Lookup {
-    static llu InitFile(int p) {
-        return (0x0101010101010101ull << (p % 8));
-    }
-
-    static llu InitRank(int p) {
-        return (0xFFull << ((p>>3) << 3)); // Truncate the first 3 bits
-    }
-
-    static llu InitDiagonal(int p) {
-        int s = 8*(p % 8) - ((p >> 3) << 3);
-        return s > 0 ? 0x8040201008040201 >> (s) : 0x8040201008040201 << (-s);
-    }
-
-    static llu InitAntiDiagonal(int p) {
-        int s = 56 - 8 * (p % 8) - ((p >> 3) << 3);
-        return s > 0 ? 0x0102040810204080 >> (s) : 0x0102040810204080 << (-s);
-    }
-
-    static int CoordToPos(int x, int y) {
-        if (x <= 0 || y <= 0 || x >= 8 || y >= 8) return -1;
-        return (y - 1) * 8 + (8 - x);
-
-    }
-
-    static llu AddToMap(llu map, int x, int y) {
-        int pos = CoordToPos(x, y);
-        if (pos == -1) return map;
-        else return map | (1ull << pos);
-    }
-
-    static llu lines[64 * 4] = {}; // Lookup table for all slider lines
-    static llu knight_attacks[64] = {}; // Lookup table for all knight attack 
-
-    static void Init() {
-        for (int i = 0; i < 64; i++) {
-            lines[i * 4] = InitFile(i);
-            lines[i * 4 + 1] = InitRank(i);
-            lines[i * 4 + 2] = InitDiagonal(i);
-            lines[i * 4 + 3] = InitAntiDiagonal(i);
-        }
-
-        for (int x = 1; x <= 8; x++) {
-            for (int y = 1; y <= 8; y++) {
-                llu N_Attack = 0;
-                N_Attack = AddToMap(N_Attack, x + 2, y + 1);
-                N_Attack = AddToMap(N_Attack, x - 2, y + 1);
-                N_Attack = AddToMap(N_Attack, x + 2, y - 1);
-                N_Attack = AddToMap(N_Attack, x - 2, y - 1);
-                N_Attack = AddToMap(N_Attack, x + 1, y + 2);
-                N_Attack = AddToMap(N_Attack, x - 1, y + 2);
-                N_Attack = AddToMap(N_Attack, x + 1, y - 2);
-                N_Attack = AddToMap(N_Attack, x - 1, y - 2);
-                knight_attacks[CoordToPos(x, y)] = N_Attack;
-            }
-        }
-    }
-
-    
-}
+#define TO_SQUARE(X) _tzcnt_u64(X)
 
 using uint64 = unsigned long long;
 
@@ -77,7 +18,7 @@ static uint64 FenToMap(const std::string& FEN, char p) {
         uint64 P = 1ull << pos;
         switch (c) {
         case '/': pos += 1; break;
-        case '1': break;
+        case '1': break; 
         case '2': pos -= 1; break;
         case '3': pos -= 2; break;
         case '4': pos -= 3; break;
@@ -238,6 +179,11 @@ public: // TODO: make bitboard private and use constructors and move functions f
     uint64 Rook(int pos, uint64 occ);
     uint64 Bishop(int pos, uint64 occ);
     uint64 Queen(int pos, uint64 occ);
+
+
+    uint64 PawnRight(bool white);
+    uint64 PawnLeft(bool white);
+    uint64 PawnAttack(bool white);
 
     bool Validate();
 

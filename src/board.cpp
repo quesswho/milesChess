@@ -42,6 +42,27 @@ uint64 Board::Queen(int pos, uint64 occ) {
         | Slide(boardpos, Lookup::lines[4 * pos + 2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1 + 3], occ));
 }
 
+uint64 Board::PawnRight(bool white) {
+    if (white) {
+        return (m_WhitePawn & (~Lookup::lines[0])) << 7; // Remove pawns at rank 8
+    } else {
+        return (m_BlackPawn & (~Lookup::lines[0])) >> 9;
+    }
+}
+
+uint64 Board::PawnLeft(bool white) {
+    if (white) {
+        return (m_WhitePawn & (~Lookup::lines[7 * 4])) << 9; // Remove pawns at rank 1
+    }
+    else {
+        return (m_BlackPawn & (~Lookup::lines[7 * 4])) << 7;
+    }
+}
+
+uint64 Board::PawnAttack(bool white) {
+    return PawnLeft(white) | PawnRight(white);
+}
+
 bool Board::Validate() {
     if (m_BoardInfo.m_WhiteMove) {
         uint64 danger = m_BlackPawn & ~Lookup::lines[7];
