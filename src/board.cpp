@@ -64,8 +64,10 @@ uint64 Board::PawnAttack(bool white) {
 }
 
 bool Board::Validate() {
+    uint64 danger = PawnAttack(m_BoardInfo.m_WhiteMove);
     if (m_BoardInfo.m_WhiteMove) {
-        uint64 danger = m_BlackPawn & ~Lookup::lines[7];
+        // TODO: Function to iterate every active bit in a bit map needed here
+        //danger |= m_BlackKnight;
     }
     return true;
 }
