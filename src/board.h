@@ -176,9 +176,11 @@ public: // TODO: make bitboard private and use constructors and move functions f
 
     uint64 Slide(uint64 pos, uint64 line, uint64 blocked);
 
-    uint64 Rook(int pos, uint64 occ);
-    uint64 Bishop(int pos, uint64 occ);
-    uint64 Queen(int pos, uint64 occ);
+    
+
+    uint64 RookAttack(int pos, uint64 occ);
+    uint64 BishopAttack(int pos, uint64 occ);
+    uint64 QueenAttack(int pos, uint64 occ);
 
 
     uint64 PawnRight(bool white);
@@ -187,8 +189,29 @@ public: // TODO: make bitboard private and use constructors and move functions f
 
     bool Validate();
 
-    void MoveWhitePawn(uint64 from, uint64 to);
-    void MoveBlackPawn(uint64 from, uint64 to);
+    inline uint64 Pawn(bool white) {
+        return white ? m_WhitePawn : m_BlackPawn;
+    }
+
+    inline uint64 Knight(bool white) {
+        return white ? m_WhiteKnight : m_BlackKnight;
+    }
+
+    inline uint64 Bishop(bool white) {
+        return white ? m_WhiteBishop : m_BlackBishop;
+    }
+
+    inline uint64 Rook(bool white) {
+        return white ? m_WhiteRook : m_BlackRook;
+    }
+
+    inline uint64 Queen(bool white) {
+        return white ? m_WhiteQueen : m_BlackQueen;
+    }
+
+    inline uint64 King(bool white) {
+        return white ? m_WhiteKing : m_BlackKing;
+    }
 };
 
 static std::string BoardtoFen(const Board& board) {

@@ -26,17 +26,17 @@ uint64 Board::Slide(uint64 pos, uint64 line, uint64 block) {
     return (block_up ^ block_down) & line;
 }
 
-uint64 Board::Rook(int pos, uint64 occ) {
+uint64 Board::RookAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
     return (Slide(boardpos, Lookup::lines[4 * pos], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1], occ));
 }
 
-uint64 Board::Bishop(int pos, uint64 occ) {
+uint64 Board::BishopAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
     return (Slide(boardpos, Lookup::lines[4 * pos+2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1+3], occ));
 }
 
-uint64 Board::Queen(int pos, uint64 occ) {
+uint64 Board::QueenAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
     return (Slide(boardpos, Lookup::lines[4 * pos], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1], occ)
         | Slide(boardpos, Lookup::lines[4 * pos + 2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1 + 3], occ));
