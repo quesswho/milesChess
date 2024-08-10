@@ -1,12 +1,27 @@
 #include <string>
 #include <array>
+#include <vector>
+#include <bit>
+
 #include "LookupTables.h"
 
 using llu = unsigned long long;
 
-#define TO_SQUARE(X) _tzcnt_u64(X)
+#define GET_SQUARE(X) _tzcnt_u64(X)
 
 using uint64 = unsigned long long;
+
+static uint64 PopBit(uint64& val) {
+    uint64 result = (val & -val);
+    val &= (val - 1);
+    return result;
+}
+
+static int PopPos(uint64& val) {
+    int index = int(_tzcnt_u64(val));
+    val &= val - 1;
+    return index;
+}
 
 static uint64 FenToMap(const std::string& FEN, char p) {
     int i = 0;
@@ -133,9 +148,17 @@ static void PrintMap(uint64 map) {
     }
 }
 
+enum class Piece {
+    PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
+};
+
 struct Move {
+    Move(uint64 from, uint64 to, Piece piece)
+        : m_From(from), m_To(to), m_Piece(piece)
+    {}
     uint64 m_From;
     uint64 m_To;
+    Piece m_Piece;
 };
 
 /*
@@ -182,12 +205,26 @@ public: // TODO: make bitboard private and use constructors and move functions f
     uint64 BishopAttack(int pos, uint64 occ);
     uint64 QueenAttack(int pos, uint64 occ);
 
-
+    uint64 PawnForward(uint64 pawns, bool white);
+    uint64 Pawn2Forward(uint64 pawns, bool white);
     uint64 PawnRight(bool white);
     uint64 PawnLeft(bool white);
     uint64 PawnAttack(bool white);
+    uint64 PawnAttackRight(uint64 pawns, bool white);
+    uint64 PawnAttackLeft(uint64 pawns, bool white);
 
     bool Validate();
+    uint64 Check();
+
+    std::vector<Move> GenerateMoves();
+
+    inline uint64 Player(bool white) {
+        return white ? m_White : m_Black;
+    }
+
+    inline uint64 Enemy(bool white) {
+        return white ? m_Black : m_White;
+    }
 
     inline uint64 Pawn(bool white) {
         return white ? m_WhitePawn : m_BlackPawn;

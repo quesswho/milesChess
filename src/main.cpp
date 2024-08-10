@@ -9,7 +9,9 @@ const char* g_StartingFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq 
 int main() {
 	//Lookup::PrintLineTable();
 	//Lookup::PrintKnightTable();
-	Board board("rnbqkbnr/pppppppp/P7/8/8/8/RPPPPPPP/1NBQKBNR w KQkq - 0 1");
+	//Lookup::PrintKingTable();
+	//Board board("rnbqkbnr/pppppppp/P7/8/8/8/RPPPPPPP/1NBQKBNR w KQkq - 0 1");
+	Board board(g_StartingFEN);
 	//Board board("P7/1P6/2P5/3P4/4P3/5P2/6P1/7P w KQkq - 0 1");
 	//printf("%s\n", BoardtoFen(board).c_str());
 	
@@ -29,12 +31,15 @@ int main() {
 	}
 
 	*/
-	//PrintMap((board.m_BlackPawn & (~Lookup::lines[0])));
-	printf("\n");
-	PrintMap(board.m_WhitePawn);
+	//PrintMap(Lookup::StartingPawnRank(true));
+	//PrintMap(Lookup::StartingPawnRank(false));
+	//printf("\n");
+	/*PrintMap(board.m_WhitePawn);
 	printf("\n");
 	PrintMap(board.PawnAttack(true));
-	
+	*/
 	//printf("%i, %i, %i\n", board.m_BoardInfo.m_BlackCastleKing, board.m_BoardInfo.m_BlackCastleQueen, board.m_BoardInfo.m_WhiteCastleKing);
+	std::vector<Move> moves = board.GenerateMoves();
+	printf("%llu\n", moves.size());
 	scanf("%i");
 }
