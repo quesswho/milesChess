@@ -1,7 +1,7 @@
 #include "board.h"
 
 #include <immintrin.h> // _lzcnt_u64(x)
-
+#include <cassert>
 #include <stdio.h>
 
 Board::Board(const std::string& FEN) 
@@ -35,13 +35,13 @@ uint64 Board::RookAttack(int pos, uint64 occ) {
 
 uint64 Board::BishopAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
-    return (Slide(boardpos, Lookup::lines[4 * pos+2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1+3], occ));
+    return (Slide(boardpos, Lookup::lines[4 * pos + 2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 3], occ));
 }
 
 uint64 Board::QueenAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
     return (Slide(boardpos, Lookup::lines[4 * pos], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1], occ)
-        | Slide(boardpos, Lookup::lines[4 * pos + 2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1 + 3], occ));
+        | Slide(boardpos, Lookup::lines[4 * pos + 2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 3], occ));
 }
 
 uint64 Board::PawnForward(uint64 pawns, bool white) {
@@ -120,6 +120,52 @@ uint64 Board::Check() {
     return knightPawnCheck;
 }
 
+Board Board::MovePiece(const Move& move) {
+    const uint64 re = ~move.m_From;
+    const uint64 swp = move.m_From | move.m_To;
+    bool white = m_BoardInfo.m_WhiteMove;
+    const uint64 wp = m_WhitePawn, wkn = m_WhiteKnight, wb = m_WhiteBishop, wr = m_WhiteRook, wq = m_WhiteQueen, wk = m_WhiteKing,
+                 bp = m_BlackPawn, bkn = m_BlackKnight, bb = m_BlackBishop, br = m_BlackRook, bq = m_BlackQueen, bk = m_BlackKing;
+
+    BoardInfo info = m_BoardInfo;
+    info.m_WhiteMove = !info.m_WhiteMove;
+
+    if (m_BoardInfo.m_WhiteMove) {
+        assert("Cant move to same color piece", move.m_To & m_White);
+        switch (move.m_Piece) {
+        case Piece::PAWN:
+            return Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk, info);
+        case Piece::KNIGHT:
+            return Board(wp, wkn ^ swp, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk, info);
+        case Piece::BISHOP:
+            return Board(wp, wkn, wb ^ swp, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk, info);
+        case Piece::ROOK:
+            return Board(wp, wkn, wb, wr ^ swp, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk, info);
+        case Piece::QUEEN:
+            return Board(wp, wkn, wb, wr, wq ^ swp, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk, info);
+        case Piece::KING:
+            return Board(wp, wkn, wb, wr, wq, wk ^ swp, bp & re, bkn & re, bb & re, br & re, bq & re, bk, info);
+        }
+    }
+    else {
+        assert("Cant move to same color piece", move.m_To & m_Black);
+        switch (move.m_Piece) {
+        case Piece::PAWN:
+            return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp ^ swp, bkn, bb, br, bq, bk, info);
+        case Piece::KNIGHT:
+            return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn ^ swp, bb, br, bq, bk, info);
+        case Piece::BISHOP:
+            return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb ^ swp, br, bq, bk, info);
+        case Piece::ROOK:
+            return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb, br ^ swp, bq, bk, info);
+        case Piece::QUEEN:
+            return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb, br, bq ^ swp, bk, info);
+        case Piece::KING:
+            return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb, br, bq, bk ^ swp, info);
+        }
+    }
+}
+
 std::vector<Move> Board::GenerateMoves() {
     std::vector<Move> result;
 
@@ -141,6 +187,17 @@ std::vector<Move> Board::GenerateMoves() {
         result.push_back({ Pawn2Forward(bit, enemy), bit, Piece::PAWN });
     }
 
+    uint64 RPawns = PawnRight(white) & Enemy(white);
+    uint64 LPawns = PawnLeft(white) & Enemy(white);
+
+    for (; uint64 bit = PopBit(RPawns); RPawns > 0) { // Loop each bit
+        result.push_back({ PawnAttackRight(bit, enemy), bit, Piece::PAWN });
+    }
+
+    for (; uint64 bit = PopBit(LPawns); LPawns > 0) { // Loop each bit
+        result.push_back({ PawnAttackLeft(bit, enemy), bit, Piece::PAWN });
+    }
+
     // Kinghts
 
     uint64 knights = Knight(white);
@@ -152,6 +209,49 @@ std::vector<Move> Board::GenerateMoves() {
             result.push_back({ 1ull << pos, bit, Piece::KNIGHT });
         }
     }
+
+    // Bishops
+
+    uint64 bishops = Bishop(white);
+
+    while (bishops > 0) {
+        int pos = PopPos(bishops);
+        uint64 moves = BishopAttack(pos, m_Board) & ~Player(white);
+        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
+            result.push_back({ 1ull << pos, bit, Piece::BISHOP });
+        }
+    }
+
+    // Rooks
+    uint64 rooks = Rook(white);
+
+    while (rooks > 0) {
+        int pos = PopPos(rooks);
+        uint64 moves = RookAttack(pos, m_Board) & ~Player(white);
+        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
+            result.push_back({ 1ull << pos, bit, Piece::ROOK });
+        }
+    }
+
+    // Queens
+    uint64 queens = Queen(white);
+
+    while (queens > 0) {
+        int pos = PopPos(queens);
+        uint64 moves = QueenAttack(pos, m_Board) & ~Player(white);
+        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
+            result.push_back({ 1ull << pos, bit, Piece::QUEEN });
+        }
+    }
+
+     // Loop each bit
+    int kingpos = GET_SQUARE(King(white));
+    uint64 moves = Lookup::king_attacks[kingpos] & ~Player(white);
+    for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
+        //PrintMap(m_Board);
+        result.push_back({ 1ull << kingpos, bit, Piece::KING });
+    }
+    
 
     return result;
 }

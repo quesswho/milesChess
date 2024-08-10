@@ -197,9 +197,14 @@ public: // TODO: make bitboard private and use constructors and move functions f
 
     Board(const std::string& FEN);
 
-    uint64 Slide(uint64 pos, uint64 line, uint64 blocked);
+    Board(uint64 wp, uint64 wkn, uint64 wb, uint64 wr, uint64 wq, uint64 wk, uint64 bp, uint64 bkn, uint64 bb, uint64 br, uint64 bq, uint64 bk, BoardInfo info)
+        : m_WhitePawn(wp), m_WhiteKnight(wkn), m_WhiteBishop(wb), m_WhiteRook(wr), m_WhiteQueen(wq), m_WhiteKing(wk), 
+          m_BlackPawn(bp), m_BlackKnight(bkn), m_BlackBishop(bb), m_BlackRook(br), m_BlackQueen(bq), m_BlackKing(bk),
+          m_White(wp | wkn | wb | wr | wq | wk), m_Black(bp | bkn | bb | br | bq | bk), m_Board(m_White | m_Black),
+          m_BoardInfo(info)
+    {}
 
-    
+    uint64 Slide(uint64 pos, uint64 line, uint64 blocked);
 
     uint64 RookAttack(int pos, uint64 occ);
     uint64 BishopAttack(int pos, uint64 occ);
@@ -212,6 +217,8 @@ public: // TODO: make bitboard private and use constructors and move functions f
     uint64 PawnAttack(bool white);
     uint64 PawnAttackRight(uint64 pawns, bool white);
     uint64 PawnAttackLeft(uint64 pawns, bool white);
+
+    Board MovePiece(const Move& move);
 
     bool Validate();
     uint64 Check();

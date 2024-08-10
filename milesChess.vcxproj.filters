@@ -29,5 +29,8 @@
     <ClInclude Include="src\LookupTables.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Move.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

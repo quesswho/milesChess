@@ -1,5 +1,5 @@
 #include<stdio.h>
-#include "board.h"
+#include "Move.h"
 
 
 const char* g_StartingFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -39,7 +39,7 @@ int main() {
 	PrintMap(board.PawnAttack(true));
 	*/
 	//printf("%i, %i, %i\n", board.m_BoardInfo.m_BlackCastleKing, board.m_BoardInfo.m_BlackCastleQueen, board.m_BoardInfo.m_WhiteCastleKing);
-	std::vector<Move> moves = board.GenerateMoves();
-	printf("%llu\n", moves.size());
+	
+	printf("%llu\n", Perft(3));
 	scanf("%i");
 }

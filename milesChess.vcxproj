@@ -117,6 +117,7 @@
   <ItemGroup>
     <ClInclude Include="src\board.h" />
     <ClInclude Include="src\LookupTables.h" />
+    <ClInclude Include="src\Move.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
