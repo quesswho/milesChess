@@ -1,53 +1,12 @@
 #include <string>
 #include <array>
 #include <vector>
-#include <bit>
+
 
 #include "LookupTables.h"
 
-using llu = unsigned long long;
 
 #define GET_SQUARE(X) _tzcnt_u64(X)
-
-using uint64 = unsigned long long;
-
-static uint64 PopBit(uint64& val) {
-    uint64 result = (val & -val);
-    val &= (val - 1);
-    return result;
-}
-
-static int PopPos(uint64& val) {
-    int index = int(_tzcnt_u64(val));
-    val &= val - 1;
-    return index;
-}
-
-static uint64 FenToMap(const std::string& FEN, char p) {
-    int i = 0;
-    char c = {};
-    int pos = 63;
-
-    uint64 result = 0;
-    while ((c = FEN[i++]) != ' ') {
-        uint64 P = 1ull << pos;
-        switch (c) {
-        case '/': pos += 1; break;
-        case '1': break; 
-        case '2': pos -= 1; break;
-        case '3': pos -= 2; break;
-        case '4': pos -= 3; break;
-        case '5': pos -= 4; break;
-        case '6': pos -= 5; break;
-        case '7': pos -= 6; break;
-        case '8': pos -= 7; break;
-        default:
-            if (c == p) result |= P;
-        }
-        pos--;
-    }
-    return result;
-}
 
 struct BoardInfo {
     bool m_WhiteMove;
@@ -136,18 +95,6 @@ static BoardInfo FenInfo(const std::string& FEN) {
     return info;
 }
 
-static void PrintMap(uint64 map) {
-    for (int i = 63; i >= 0; i--) {
-        if ((map & (1ull << i)) > 0) {
-            printf("X ");
-        }
-        else {
-            printf("O ");
-        }
-        if (i % 8 == 0) printf("\n");
-    }
-}
-
 enum class Piece {
     PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
 };
@@ -204,11 +151,12 @@ public: // TODO: make bitboard private and use constructors and move functions f
           m_BoardInfo(info)
     {}
 
-    uint64 Slide(uint64 pos, uint64 line, uint64 blocked);
-
     uint64 RookAttack(int pos, uint64 occ);
     uint64 BishopAttack(int pos, uint64 occ);
     uint64 QueenAttack(int pos, uint64 occ);
+
+    uint64_t RookXray(int pos, uint64_t occ);
+    uint64_t BishopXray(int pos, uint64_t occ);
 
     uint64 PawnForward(uint64 pawns, bool white);
     uint64 Pawn2Forward(uint64 pawns, bool white);
@@ -221,7 +169,7 @@ public: // TODO: make bitboard private and use constructors and move functions f
     Board MovePiece(const Move& move);
 
     bool Validate();
-    uint64 Check();
+    uint64 Check(uint64& danger, uint64& check, uint64& rookPin, uint64& bishopPin);
 
     std::vector<Move> GenerateMoves();
 

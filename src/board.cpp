@@ -13,21 +13,6 @@ Board::Board(const std::string& FEN)
 
 }
 
-
-uint64 Board::Slide(uint64 pos, uint64 line, uint64 block) {
-    block = block & ~pos & line;
-
-    uint64 bottom = pos - 1ull;
-
-    uint64 mask_up = block & ~bottom;
-    uint64 block_up = (mask_up ^ (mask_up - 1ull));
-
-    uint64 mask_down = block & bottom;
-    uint64 block_down = (0x7FFFFFFFFFFFFFFF) >> _lzcnt_u64(mask_down | 1);
-
-    return (block_up ^ block_down) & line;
-}
-
 uint64 Board::RookAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
     return (Slide(boardpos, Lookup::lines[4 * pos], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1], occ));
@@ -42,6 +27,16 @@ uint64 Board::QueenAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
     return (Slide(boardpos, Lookup::lines[4 * pos], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1], occ)
         | Slide(boardpos, Lookup::lines[4 * pos + 2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 3], occ));
+}
+
+uint64_t Board::RookXray(int pos, uint64_t occ) {
+    uint64_t attacks = RookAttack(pos, occ);
+    return attacks ^ RookAttack(pos, occ ^ (attacks & occ));
+}
+
+uint64_t Board::BishopXray(int pos, uint64_t occ) {
+    uint64_t attacks = BishopAttack(pos, occ);
+    return attacks ^ BishopAttack(pos, occ ^ (attacks & occ));
 }
 
 uint64 Board::PawnForward(uint64 pawns, bool white) {
@@ -100,7 +95,7 @@ bool Board::Validate() {
     return true;
 }
 
-uint64 Board::Check() {
+uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bishopPin) {
     bool white = m_BoardInfo.m_WhiteMove;
     bool enemy = !white;
 
@@ -116,6 +111,59 @@ uint64 Board::Check() {
     if(pl > 0) {
         knightPawnCheck |= PawnAttackRight(pl, white);
     }
+
+    // Active moves, mask for checks
+    active = 0xFFFFFFFFFFFFFFFFull;
+    uint64 rookcheck = RookAttack(kingsq, m_Board) & (Rook(enemy) | Queen(enemy));
+    if (rookcheck > 0) { // If a rook piece is attacking the king
+        active = Lookup::active_moves[kingsq * 64 + GET_SQUARE(rookcheck)];
+    }
+    rookPin = 0;
+    uint64 rookpinner = RookXray(kingsq, m_Board) & (Rook(enemy) | Queen(enemy));
+    while (rookpinner > 0) {
+        uint64 mask = Lookup::active_moves[kingsq * 64 + PopPos(rookpinner)];
+        if (mask & Player(white)) rookPin |= mask;
+    }
+
+    uint64 bishopcheck = BishopAttack(kingsq, m_Board) & (Bishop(enemy) | Queen(enemy));
+    if (bishopcheck > 0) { // If a rook piece is attacking the king
+        active = Lookup::active_moves[kingsq * 64 + GET_SQUARE(bishopcheck)];
+    }
+
+    bishopPin = 0;
+    uint64 bishoppinner = BishopXray(kingsq, m_Board) & (Bishop(enemy) | Queen(enemy));
+    if (bishoppinner) {
+        uint64 mask = Lookup::active_moves[kingsq * 64 + PopPos(bishoppinner)];
+        if (mask & Player(white)) bishopPin |= mask;
+    }
+    
+    if (knightPawnCheck && active) { // If double checked we have to move the king
+        active = Lookup::king_attacks[kingsq];
+    }
+
+    danger = PawnAttack(enemy);
+
+    uint64 knights = Knight(enemy);
+
+    while (knights > 0) { // Loop each bit
+        danger |= Lookup::knight_attacks[PopPos(knights)];
+    }
+
+    uint64 bishops = Bishop(enemy) | Queen(enemy);
+
+    while (bishops > 0) { // Loop each bit
+        int pos = PopPos(bishops);
+        danger |= (BishopAttack(pos, m_Board) & ~(1ull << pos));
+    }
+
+    uint64 rooks = Rook(enemy) | Queen(enemy);
+
+    while (rooks > 0) { // Loop each bit
+        int pos = PopPos(rooks);
+        danger |= (RookAttack(pos, m_Board) & ~(1ull << pos));
+    }
+
+    danger |= Lookup::king_attacks[GET_SQUARE(King(enemy))];
 
     return knightPawnCheck;
 }
@@ -171,13 +219,16 @@ std::vector<Move> Board::GenerateMoves() {
 
     bool white = m_BoardInfo.m_WhiteMove;
     bool enemy = !white;
+    uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0;
+    uint64 check = Check(danger, active, rookPin, bishopPin);
+    uint64 moveable = ~Player(white) & active;
 
     // Pawns
 
     uint64 pawns = Pawn(white);
-    uint64 FPawns = PawnForward(pawns, white) & (~m_Board);
+    uint64 FPawns = PawnForward(pawns & ~rookPin, white) & (~m_Board) & active;
     uint64 F2Pawns = PawnForward(pawns & Lookup::StartingPawnRank(white), white) & ~m_Board;
-    F2Pawns = PawnForward(F2Pawns, white) & ~m_Board;
+    F2Pawns = PawnForward(F2Pawns, white) & (~m_Board) & active;
 
     for (; uint64 bit = PopBit(FPawns); FPawns > 0) { // Loop each bit
         result.push_back({ PawnForward(bit, enemy), bit, Piece::PAWN });
@@ -204,7 +255,7 @@ std::vector<Move> Board::GenerateMoves() {
 
     while (knights > 0) { // Loop each bit
         int pos = PopPos(knights);
-        uint64 moves = Lookup::knight_attacks[pos] & ~Player(white);
+        uint64 moves = Lookup::knight_attacks[pos] & moveable;
         for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
             result.push_back({ 1ull << pos, bit, Piece::KNIGHT });
         }
@@ -216,7 +267,7 @@ std::vector<Move> Board::GenerateMoves() {
 
     while (bishops > 0) {
         int pos = PopPos(bishops);
-        uint64 moves = BishopAttack(pos, m_Board) & ~Player(white);
+        uint64 moves = BishopAttack(pos, m_Board) & moveable;
         for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
             result.push_back({ 1ull << pos, bit, Piece::BISHOP });
         }
@@ -227,7 +278,7 @@ std::vector<Move> Board::GenerateMoves() {
 
     while (rooks > 0) {
         int pos = PopPos(rooks);
-        uint64 moves = RookAttack(pos, m_Board) & ~Player(white);
+        uint64 moves = RookAttack(pos, m_Board) & moveable;
         for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
             result.push_back({ 1ull << pos, bit, Piece::ROOK });
         }
@@ -238,7 +289,7 @@ std::vector<Move> Board::GenerateMoves() {
 
     while (queens > 0) {
         int pos = PopPos(queens);
-        uint64 moves = QueenAttack(pos, m_Board) & ~Player(white);
+        uint64 moves = QueenAttack(pos, m_Board) & moveable;
         for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
             result.push_back({ 1ull << pos, bit, Piece::QUEEN });
         }
@@ -247,6 +298,7 @@ std::vector<Move> Board::GenerateMoves() {
      // Loop each bit
     int kingpos = GET_SQUARE(King(white));
     uint64 moves = Lookup::king_attacks[kingpos] & ~Player(white);
+    moves &= ~danger;
     for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
         //PrintMap(m_Board);
         result.push_back({ 1ull << kingpos, bit, Piece::KING });
