@@ -53,30 +53,45 @@ static void PrintMap(uint64 map) {
     }
 }
 
-static uint64 Slide(uint64 pos, uint64 line, uint64 block) {
-    block = block & ~pos & line;
+#define GetLower(S) ((1ull << S) - 1)
+#define GetUpper(S) (0xFFFFFFFFFFFFFFFF << (S))
 
-    uint64 bottom = pos - 1ull;
+struct lineEx {
+    uint64_t lower;
+    uint64_t upper;
+    uint64_t uni;
 
-    uint64 mask_up = block & ~bottom;
-    uint64 block_up = (mask_up ^ (mask_up - 1ull));
+    constexpr uint64_t init_low(int sq, uint64_t line) {
+        uint64_t lineEx = line ^ (1ull << sq);
+        return GetLower(sq) & lineEx;
+    }
 
-    uint64 mask_down = block & bottom;
-    uint64 block_down = (0x7FFFFFFFFFFFFFFF) >> _lzcnt_u64(mask_down | 1);
+    constexpr uint64_t init_up(int sq, uint64_t line) {
+        uint64_t lineEx = line ^ (1ull << sq);
+        return GetUpper(sq) & lineEx;
+    }
 
-    return (block_up ^ block_down) & line;
+    constexpr lineEx() : lower(0), upper(0), uni(0) {
+
+    }
+
+    constexpr lineEx(int sq, uint64_t line) : lower(init_low(sq, line)), upper(init_up(sq, line)), uni(init_low(sq, line) | init_up(sq, line))
+    {}
+};
+
+#undef GetLower
+#undef GetUpper
+
+/*
+ * @author Michael Hoffmann, Daniel Infuehr
+ * Obstruction difference slider algorithm
+ */
+static uint64 Slide(uint64 pos, lineEx line, uint64 block) {
+    uint64_t lower = (line.lower & block) | 1;
+    uint64_t upper = line.upper & block;
+    uint64_t msb = (0x8000000000000000) >> std::countl_zero(lower);
+    uint64_t lsb = upper & -upper;
+    uint64_t oDif = lsb * 2 - msb;
+    return line.uni & oDif;
 }
 
-static uint64 SpecialSlide(uint64 pos, uint64 line, uint64 block) { // Allows us to block with the pos
-    block = block & line;
-
-    uint64 bottom = pos - 1ull;
-
-    uint64 mask_up = block & ~bottom;
-    uint64 block_up = (mask_up ^ (mask_up - 1ull));
-
-    uint64 mask_down = block & bottom;
-    uint64 block_down = (0x7FFFFFFFFFFFFFFF) >> _lzcnt_u64(mask_down | 1);
-
-    return (block_up ^ block_down) & line;
-}

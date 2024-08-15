@@ -36,8 +36,9 @@ static BoardInfo FenInfo(const std::string& FEN) {
         break;
     case 'b':
         info.m_WhiteMove = false;
+        break;
     default:
-        printf("Invalid FEN at active color");
+        printf("Invalid FEN for active color\n");
         return info;
     }
 

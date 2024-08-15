@@ -134,6 +134,11 @@ namespace Lookup {
         }
     }
 
+
+
+    
+
+
     // 0: File, 1: Rank, 2: Diagonal, 3: AntiDiagonal
     static constexpr std::array<llu, 64 * 4> lines = {
         0x0101010101010101, 0x00000000000000ff, 0x8040201008040201, 0x0000000000000001,
@@ -201,6 +206,17 @@ namespace Lookup {
         0x4040404040404040, 0xff00000000000000, 0x4020100804020100, 0x4080000000000000,
         0x8080808080808080, 0xff00000000000000, 0x8040201008040201, 0x8000000000000000
     };
+
+    consteval std::array<lineEx, 64 * 4> Init()
+    {
+        std::array<lineEx, 64 * 4> linesex{};
+        for (int i = 0; i < 256; i++) {
+            linesex[i] = lineEx(i / 4, lines[i]);
+        }
+        return linesex;
+    }
+
+    static constexpr std::array<lineEx, 256> linesEx = Init();
 
     static constexpr std::array<llu, 64> knight_attacks = {
         0x0000000000020400, 0x0000000000050800, 0x00000000000a1100, 0x0000000000142200,

@@ -15,18 +15,18 @@ Board::Board(const std::string& FEN)
 
 uint64 Board::RookAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
-    return (Slide(boardpos, Lookup::lines[4 * pos], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1], occ));
+    return (Slide(boardpos, Lookup::linesEx[4 * pos], occ) | Slide(boardpos, Lookup::linesEx[4 * pos + 1], occ));
 }
 
 uint64 Board::BishopAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
-    return (Slide(boardpos, Lookup::lines[4 * pos + 2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 3], occ));
+    return (Slide(boardpos, Lookup::linesEx[4 * pos + 2], occ) | Slide(boardpos, Lookup::linesEx[4 * pos + 3], occ));
 }
 
 uint64 Board::QueenAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
-    return (Slide(boardpos, Lookup::lines[4 * pos], occ) | Slide(boardpos, Lookup::lines[4 * pos + 1], occ)
-        | Slide(boardpos, Lookup::lines[4 * pos + 2], occ) | Slide(boardpos, Lookup::lines[4 * pos + 3], occ));
+    return (Slide(boardpos, Lookup::linesEx[4 * pos], occ) | Slide(boardpos, Lookup::linesEx[4 * pos + 1], occ)
+        | Slide(boardpos, Lookup::linesEx[4 * pos + 2], occ) | Slide(boardpos, Lookup::linesEx[4 * pos + 3], occ));
 }
 
 uint64_t Board::RookXray(int pos, uint64_t occ) {
@@ -61,7 +61,7 @@ uint64 Board::PawnLeft(bool white) {
         return (m_WhitePawn & (~Lookup::lines[7 * 4])) << 9; // Remove pawns at rank 1
     }
     else {
-        return (m_BlackPawn & (~Lookup::lines[7 * 4])) << 7;
+        return (m_BlackPawn & (~Lookup::lines[7 * 4])) >> 7;
     }
 }
 
@@ -82,7 +82,7 @@ uint64 Board::PawnAttackLeft(uint64 pawns, bool white) {
         return (pawns & (~Lookup::lines[7 * 4])) << 9; // Remove pawns at rank 1
     }
     else {
-        return (pawns & (~Lookup::lines[7 * 4])) << 7;
+        return (pawns & (~Lookup::lines[7 * 4])) >> 7;
     }
 }
 
@@ -226,9 +226,19 @@ std::vector<Move> Board::GenerateMoves() {
     // Pawns
 
     uint64 pawns = Pawn(white);
-    uint64 FPawns = PawnForward(pawns & ~rookPin, white) & (~m_Board) & active;
-    uint64 F2Pawns = PawnForward(pawns & Lookup::StartingPawnRank(white), white) & ~m_Board;
-    F2Pawns = PawnForward(F2Pawns, white) & (~m_Board) & active;
+    uint64 nonBishopPawn = pawns & ~bishopPin;
+
+    uint64 FPawns = PawnForward(nonBishopPawn, white) & (~m_Board) & active; // No diagonally pinned pawn can move forward
+
+    uint64 F2Pawns = PawnForward(nonBishopPawn & Lookup::StartingPawnRank(white), white) & ~m_Board;
+    F2Pawns = PawnForward(F2Pawns, white) & (~m_Board) & active; // TODO: Use Fpawns to save calculation
+
+    uint64 pinnedFPawns = FPawns & PawnForward(rookPin, white);
+    uint64 pinnedF2Pawns = F2Pawns & Pawn2Forward(rookPin, white);
+    uint64 notVertFPawns = FPawns & ~rookPin; // Not vertically pinned pieces
+    uint64 notVertF2Pawns = F2Pawns & ~rookPin;
+    FPawns = (pinnedFPawns ^ notVertFPawns);
+    F2Pawns = (pinnedF2Pawns ^ notVertF2Pawns);
 
     for (; uint64 bit = PopBit(FPawns); FPawns > 0) { // Loop each bit
         result.push_back({ PawnForward(bit, enemy), bit, Piece::PAWN });
@@ -238,8 +248,18 @@ std::vector<Move> Board::GenerateMoves() {
         result.push_back({ Pawn2Forward(bit, enemy), bit, Piece::PAWN });
     }
 
-    uint64 RPawns = PawnRight(white) & Enemy(white);
-    uint64 LPawns = PawnLeft(white) & Enemy(white);
+
+    uint64 nonRookPawns = pawns & ~rookPin;
+    uint64 RPawns = PawnAttackRight(nonRookPawns, white) & Enemy(white);
+    uint64 LPawns = PawnAttackLeft(nonRookPawns, white) & Enemy(white);
+
+    uint64 pinnedRPawns = RPawns & PawnAttackRight(bishopPin, white);
+    uint64 pinnedLPawns = LPawns & PawnAttackLeft(bishopPin, white);
+    uint64 susRPawns = RPawns & ~bishopPin; // sussly pinned pieces
+    uint64 susLPawns = LPawns & ~bishopPin;
+
+    RPawns = (pinnedRPawns ^ susRPawns);
+    LPawns = (pinnedLPawns ^ susLPawns);
 
     for (; uint64 bit = PopBit(RPawns); RPawns > 0) { // Loop each bit
         result.push_back({ PawnAttackRight(bit, enemy), bit, Piece::PAWN });
@@ -251,7 +271,7 @@ std::vector<Move> Board::GenerateMoves() {
 
     // Kinghts
 
-    uint64 knights = Knight(white);
+    uint64 knights = Knight(white) & ~(rookPin | bishopPin); // Pinned knights can not move
 
     while (knights > 0) { // Loop each bit
         int pos = PopPos(knights);
@@ -263,10 +283,21 @@ std::vector<Move> Board::GenerateMoves() {
 
     // Bishops
 
-    uint64 bishops = Bishop(white);
+    uint64 bishops = Bishop(white) & ~rookPin; // A rook pinned bishop can not move
 
-    while (bishops > 0) {
-        int pos = PopPos(bishops);
+    uint64 pinnedBishop = bishopPin & bishops;
+    uint64 notPinnedBishop = bishops ^ pinnedBishop;
+
+    while (pinnedBishop > 0) {
+        int pos = PopPos(pinnedBishop);
+        uint64 moves = BishopAttack(pos, m_Board) & moveable & bishopPin;
+        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
+            result.push_back({ 1ull << pos, bit, Piece::BISHOP });
+        }
+    }
+
+    while (notPinnedBishop > 0) {
+        int pos = PopPos(notPinnedBishop);
         uint64 moves = BishopAttack(pos, m_Board) & moveable;
         for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
             result.push_back({ 1ull << pos, bit, Piece::BISHOP });
@@ -274,10 +305,21 @@ std::vector<Move> Board::GenerateMoves() {
     }
 
     // Rooks
-    uint64 rooks = Rook(white);
+    uint64 rooks = Rook(white) & ~bishopPin; // A bishop pinned rook can not move
 
-    while (rooks > 0) {
-        int pos = PopPos(rooks);
+    uint64 pinnedRook = rookPin & rooks;
+    uint64 notPinnedRook = rooks ^ pinnedRook;
+
+    while (pinnedRook > 0) {
+        int pos = PopPos(pinnedRook);
+        uint64 moves = RookAttack(pos, m_Board) & moveable & rookPin;
+        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
+            result.push_back({ 1ull << pos, bit, Piece::ROOK });
+        }
+    }
+
+    while (notPinnedRook > 0) {
+        int pos = PopPos(notPinnedRook);
         uint64 moves = RookAttack(pos, m_Board) & moveable;
         for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
             result.push_back({ 1ull << pos, bit, Piece::ROOK });
@@ -286,6 +328,13 @@ std::vector<Move> Board::GenerateMoves() {
 
     // Queens
     uint64 queens = Queen(white);
+
+    uint64 pinnedStraightQueen = rookPin & queens;
+    uint64 pinnedDiagonalQueen = bishopPin & queens;
+
+    if (pinnedStraightQueen || pinnedDiagonalQueen) {
+        //printf("yes");
+    }
 
     while (queens > 0) {
         int pos = PopPos(queens);
@@ -303,7 +352,6 @@ std::vector<Move> Board::GenerateMoves() {
         //PrintMap(m_Board);
         result.push_back({ 1ull << kingpos, bit, Piece::KING });
     }
-    
 
     return result;
 }
