@@ -153,7 +153,7 @@ public: // TODO: make bitboard private and use constructors and move functions f
     const uint64 m_Black;
     const uint64 m_Board;
 
-    BoardInfo m_BoardInfo;
+    BoardInfo m_BoardInfo; // TODO: Move this somewhere else so Board can be constant
 
     Board(const std::string& FEN);
 
@@ -171,13 +171,13 @@ public: // TODO: make bitboard private and use constructors and move functions f
     uint64_t RookXray(int pos, uint64_t occ);
     uint64_t BishopXray(int pos, uint64_t occ);
 
-    uint64 PawnForward(uint64 pawns, bool white);
-    uint64 Pawn2Forward(uint64 pawns, bool white);
-    uint64 PawnRight(bool white);
-    uint64 PawnLeft(bool white);
-    uint64 PawnAttack(bool white);
-    uint64 PawnAttackRight(uint64 pawns, bool white);
-    uint64 PawnAttackLeft(uint64 pawns, bool white);
+    uint64 PawnForward(uint64 pawns, const bool white);
+    uint64 Pawn2Forward(uint64 pawns, const bool white);
+    uint64 PawnRight(const bool white);
+    uint64 PawnLeft(const bool white);
+    uint64 PawnAttack(const bool white);
+    uint64 PawnAttackRight(uint64 pawns, const bool white);
+    uint64 PawnAttackLeft(uint64 pawns, const bool white);
 
     Board MovePiece(const Move& move);
 
@@ -186,43 +186,43 @@ public: // TODO: make bitboard private and use constructors and move functions f
 
     std::vector<Move> GenerateMoves();
 
-    inline uint64 Player(bool white) {
+    inline uint64 Player(const bool white) {
         return white ? m_White : m_Black;
     }
 
-    inline uint64 Enemy(bool white) {
+    inline uint64 Enemy(const bool white) {
         return white ? m_Black : m_White;
     }
 
-    inline uint64 Pawn(bool white) {
+    inline uint64 Pawn(const bool white) {
         return white ? m_WhitePawn : m_BlackPawn;
     }
 
-    inline uint64 Knight(bool white) {
+    inline uint64 Knight(const bool white) {
         return white ? m_WhiteKnight : m_BlackKnight;
     }
 
-    inline uint64 Bishop(bool white) {
+    inline uint64 Bishop(const bool white) {
         return white ? m_WhiteBishop : m_BlackBishop;
     }
 
-    inline uint64 Rook(bool white) {
+    inline uint64 Rook(const bool white) {
         return white ? m_WhiteRook : m_BlackRook;
     }
 
-    inline uint64 Queen(bool white) {
+    inline uint64 Queen(const bool white) {
         return white ? m_WhiteQueen : m_BlackQueen;
     }
 
-    inline uint64 King(bool white) {
+    inline uint64 King(const bool white) {
         return white ? m_WhiteKing : m_BlackKing;
     }
 
-    inline uint64 CastleKing(uint64 danger, bool white) {
+    inline uint64 CastleKing(uint64 danger, const bool white) {
         return white ? ((m_BoardInfo.m_WhiteCastleKing && (m_Board & 0b110) == 0 && (danger & 0b1110) == 0) && (m_WhiteRook & 0b1) > 0) * (1ull << 1) : (m_BoardInfo.m_BlackCastleKing && ((m_Board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0) && (m_BlackRook & 0b1ull << 56) > 0) * (1ull << 57);
     }
 
-    inline uint64 CastleQueen(uint64 danger, bool white) {
+    inline uint64 CastleQueen(uint64 danger, const bool white) {
         return white ? ((m_BoardInfo.m_WhiteCastleQueen && (m_Board & 0b01110000) == 0 && (danger & 0b00111000) == 0) && (m_WhiteRook & 0b10000000) > 0) * (1ull << 5) : (m_BoardInfo.m_BlackCastleQueen && ((m_Board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0) && (m_BlackRook & (0b10000000ull << 56)) > 0) * (1ull << 61);
     }
 };

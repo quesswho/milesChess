@@ -208,7 +208,7 @@ namespace Lookup {
         0x8080808080808080, 0xff00000000000000, 0x8040201008040201, 0x8000000000000000
     };
 
-    static llu FirstRank(bool white) {
+    static llu FirstRank(const bool white) {
         return white ? lines[1] : lines[4 * 56 + 1];
     }
 

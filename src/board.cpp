@@ -9,9 +9,7 @@ Board::Board(const std::string& FEN)
     m_BlackPawn(FenToMap(FEN, 'p')), m_BlackKnight(FenToMap(FEN, 'n')), m_BlackBishop(FenToMap(FEN, 'b')), m_BlackRook(FenToMap(FEN, 'r')), m_BlackQueen(FenToMap(FEN, 'q')), m_BlackKing(FenToMap(FEN, 'k')),
     m_BoardInfo(FenInfo(FEN)), m_Black(m_BlackPawn | m_BlackKnight | m_BlackBishop | m_BlackRook | m_BlackQueen | m_BlackKing), m_White(m_WhitePawn | m_WhiteKnight | m_WhiteBishop | m_WhiteRook | m_WhiteQueen | m_WhiteKing),
     m_Board(m_White | m_Black)
-{
-
-}
+{}
 
 uint64 Board::RookAttack(int pos, uint64 occ) {
     uint64 boardpos = 1ull << pos;
@@ -39,16 +37,16 @@ uint64_t Board::BishopXray(int pos, uint64_t occ) {
     return attacks ^ BishopAttack(pos, occ ^ (attacks & occ));
 }
 
-uint64 Board::PawnForward(uint64 pawns, bool white) {
+uint64 Board::PawnForward(uint64 pawns, const bool white) {
     return white ? pawns << 8 : pawns >> 8;
 }
 
-uint64 Board::Pawn2Forward(uint64 pawns, bool white) {
+uint64 Board::Pawn2Forward(uint64 pawns, const bool white) {
     return white ? pawns << 16 : pawns >> 16;
 }
 
 
-uint64 Board::PawnRight(bool white) {
+uint64 Board::PawnRight(const bool white) {
     if (white) {
         return (m_WhitePawn & (~Lookup::lines[0])) << 7; // Remove pawns at rank 8
     } else {
@@ -56,7 +54,7 @@ uint64 Board::PawnRight(bool white) {
     }
 }
 
-uint64 Board::PawnLeft(bool white) {
+uint64 Board::PawnLeft(const bool white) {
     if (white) {
         return (m_WhitePawn & (~Lookup::lines[7 * 4])) << 9; // Remove pawns at rank 1
     }
@@ -65,11 +63,11 @@ uint64 Board::PawnLeft(bool white) {
     }
 }
 
-uint64 Board::PawnAttack(bool white) {
+uint64 Board::PawnAttack(const bool white) {
     return PawnLeft(white) | PawnRight(white);
 }
 
-uint64 Board::PawnAttackRight(uint64 pawns, bool white) {
+uint64 Board::PawnAttackRight(uint64 pawns, const bool white) {
     if (white) {
         return (pawns & (~Lookup::lines[0])) << 7; // Remove pawns at rank 8
     }
@@ -77,7 +75,7 @@ uint64 Board::PawnAttackRight(uint64 pawns, bool white) {
         return (pawns & (~Lookup::lines[0])) >> 9;
     }
 }
-uint64 Board::PawnAttackLeft(uint64 pawns, bool white) {
+uint64 Board::PawnAttackLeft(uint64 pawns, const bool white) {
     if (white) {
         return (pawns & (~Lookup::lines[7 * 4])) << 9; // Remove pawns at rank 1
     }
@@ -96,7 +94,7 @@ bool Board::Validate() {
 }
 
 uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bishopPin) {
-    bool white = m_BoardInfo.m_WhiteMove;
+    const bool white = m_BoardInfo.m_WhiteMove;
     bool enemy = !white;
 
     int kingsq = GET_SQUARE(King(white));
@@ -198,13 +196,13 @@ uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bis
 Board Board::MovePiece(const Move& move) {
     const uint64 re = ~move.m_To;
     const uint64 swp = move.m_From | move.m_To;
-    bool white = m_BoardInfo.m_WhiteMove;
+    const bool white = m_BoardInfo.m_WhiteMove;
     const uint64 wp = m_WhitePawn, wkn = m_WhiteKnight, wb = m_WhiteBishop, wr = m_WhiteRook, wq = m_WhiteQueen, wk = m_WhiteKing,
                  bp = m_BlackPawn, bkn = m_BlackKnight, bb = m_BlackBishop, br = m_BlackRook, bq = m_BlackQueen, bk = m_BlackKing;
 
     BoardInfo info = m_BoardInfo;
     info.m_HalfMoves++;
-    if (!info.m_WhiteMove) info.m_FullMoves++;
+    if (!white) info.m_FullMoves++;
     info.m_WhiteMove = !info.m_WhiteMove;
     info.m_EnPassant = 0;
 
@@ -298,8 +296,8 @@ Board Board::MovePiece(const Move& move) {
 std::vector<Move> Board::GenerateMoves() {
     std::vector<Move> result;
 
-    bool white = m_BoardInfo.m_WhiteMove;
-    bool enemy = !white;
+    const bool white = m_BoardInfo.m_WhiteMove;
+    const bool enemy = !white;
     uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0;
     uint64 enPassantCheck = Check(danger, active, rookPin, bishopPin);
     uint64 moveable = ~Player(white) & active;
@@ -321,7 +319,7 @@ std::vector<Move> Board::GenerateMoves() {
     FPawns = FPawns & (~pinnedFPawns | movePinFPawns);
     F2Pawns = F2Pawns & (~pinnedF2Pawns | movePinF2Pawns);
 
-    for (; uint64 bit = PopBit(FPawns); FPawns > 0) { // Loop each bit
+    for (; const uint64 bit = PopBit(FPawns); FPawns > 0) { // Loop each bit
         if ((bit & Lookup::FirstRank(enemy)) > 0) { // If promote
             result.push_back({ PawnForward(bit, enemy), bit, MoveType::P_KNIGHT });
             result.push_back({ PawnForward(bit, enemy), bit, MoveType::P_BISHOP });
@@ -333,7 +331,7 @@ std::vector<Move> Board::GenerateMoves() {
         }
     }
 
-    for (; uint64 bit = PopBit(F2Pawns); F2Pawns > 0) { // Loop each bit
+    for (; const uint64 bit = PopBit(F2Pawns); F2Pawns > 0) { // Loop each bit
         result.push_back({ Pawn2Forward(bit, enemy), bit, MoveType::PAWN2 });
     }
 
@@ -464,7 +462,7 @@ std::vector<Move> Board::GenerateMoves() {
 
     while (pinnedStraightQueen > 0) {
         int pos = PopPos(pinnedStraightQueen);
-        uint64 moves = QueenAttack(pos, m_Board) & moveable & rookPin;
+        uint64 moves = RookAttack(pos, m_Board) & moveable & rookPin;
         for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
             result.push_back({ 1ull << pos, bit, MoveType::QUEEN });
         }
@@ -472,7 +470,7 @@ std::vector<Move> Board::GenerateMoves() {
 
     while (pinnedDiagonalQueen > 0) {
         int pos = PopPos(pinnedDiagonalQueen);
-        uint64 moves = QueenAttack(pos, m_Board) & moveable & bishopPin;
+        uint64 moves = BishopAttack(pos, m_Board) & moveable & bishopPin;
         for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
             result.push_back({ 1ull << pos, bit, MoveType::QUEEN });
         }
