@@ -5,6 +5,7 @@
 using llu = unsigned long long;
 
 namespace Lookup {
+
     constexpr llu InitFile(int p) {
         return (0x0101010101010101ull << (p % 8));
     }
@@ -206,6 +207,10 @@ namespace Lookup {
         0x4040404040404040, 0xff00000000000000, 0x4020100804020100, 0x4080000000000000,
         0x8080808080808080, 0xff00000000000000, 0x8040201008040201, 0x8000000000000000
     };
+
+    static llu FirstRank(bool white) {
+        return white ? lines[1] : lines[4 * 56 + 1];
+    }
 
     consteval std::array<lineEx, 64 * 4> Init()
     {

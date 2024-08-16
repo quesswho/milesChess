@@ -96,17 +96,18 @@ static BoardInfo FenInfo(const std::string& FEN) {
     return info;
 }
 
-enum class Piece {
-    PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
+enum class MoveType {
+    PAWN, PAWN2, KNIGHT, BISHOP, ROOK, QUEEN, KING, EPASSANT,
+    KCASTLE, QCASTLE, P_KNIGHT, P_BISHOP, P_ROOK, P_QUEEN
 };
 
 struct Move {
-    Move(uint64 from, uint64 to, Piece piece)
-        : m_From(from), m_To(to), m_Piece(piece)
+    Move(uint64 from, uint64 to, MoveType movetype)
+        : m_From(from), m_To(to), m_Type(movetype)
     {}
     uint64 m_From;
     uint64 m_To;
-    Piece m_Piece;
+    MoveType m_Type;
 };
 
 /*
@@ -204,6 +205,14 @@ public: // TODO: make bitboard private and use constructors and move functions f
 
     inline uint64 King(bool white) {
         return white ? m_WhiteKing : m_BlackKing;
+    }
+
+    inline bool CastleKing(uint64 danger, bool white) {
+        return white ? (m_BoardInfo.m_WhiteCastleKing && (m_Board & 0b110) == 0 && (danger & 0b1110) == 0) : (m_BoardInfo.m_BlackCastleKing && (m_Board & (0b110ull << 56)) == 0 && (danger & (0b1110ull << 56)) == 0);
+    }
+
+    inline bool CastleQueen(uint64 danger, bool white) {
+        return white ? (m_BoardInfo.m_WhiteCastleQueen && (m_Board & 0b01110000) == 0 && (danger & 0b00111000) == 0) : (m_BoardInfo.m_BlackCastleQueen && (m_Board & (0b01110000ull << 56)) == 0 && (danger & (0b00111000ull << 56)) == 0);
     }
 };
 

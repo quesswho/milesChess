@@ -10,7 +10,7 @@ int main() {
 	//Lookup::PrintLineTable();
 	//Lookup::PrintKnightTable();
 	//Lookup::PrintKingTable();
-	Board board("rnbqkbnr/pppppppp/P7/8/8/8/RPPPPPPP/1NBQKBNR w KQkq - 0 1");
+//	Board board("rnbqkbnr/pppppppp/P7/8/8/8/RPPPPPPP/1NBQKBNR w KQkq - 0 1");
 	//Board board(g_StartingFEN);
 	//Board board("P7/1P6/2P5/3P4/4P3/5P2/6P1/7P w KQkq - 0 1");
 	//printf("%s\n", BoardtoFen(board).c_str());
@@ -45,8 +45,13 @@ int main() {
 	//printf("%llu\n", Perft("8/8/8/1r3P1K/8/8/1k6/8 w - - 0 1", 1));
 	//printf("%llu\n", Perft("8/1r6/8/8/3P2k1/1P6/1KP3r1/8 w - - 0 1", 1));
 	//printf("%llu\n", Perft("8/8/6k1/1p2p3/3pP3/2pK1b2/4P3/5b2 w - - 0 1", 1));
-	printf("%llu\n", Perft("8/2p5/3p4/KP5r/5R1k/8/4P1P1/8 b - - 0 1", 1));
-	//printf("%llu\n", Perft(g_StartingFEN, 4)); // Perft(4)
+	//printf("%llu\n", Perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 2));
+	//printf("%llu\n", Perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1R1K b kq - 1 1", 1));
+	
+	//printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/6P1/4P3/8 b - - 0 1", 1));
+	printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 2));
+
+	printf("%llu\n", Perft(g_StartingFEN, 4)); // Perft(4)
 
 
 	//Slide(1 << 38, Lookup::lines[], uint64 block) {
