@@ -8,7 +8,11 @@ static uint64 Perft_r(Board board, int depth, int maxdepth) {
 
 	uint64 result = 0;
 	for (const Move& move : moves) {
-		result += Perft_r(board.MovePiece(move), depth + 1, maxdepth);
+		uint64 count = Perft_r(board.MovePiece(move), depth + 1, maxdepth);
+		result += count;
+		if (depth == 0) {
+			printf("%s: %llu: %s\n", move.toString().c_str(), count, BoardtoFen(board.MovePiece(move)).c_str());
+		}
 	}
 	return result;
 }

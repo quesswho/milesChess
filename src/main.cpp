@@ -40,18 +40,22 @@ int main() {
 	PrintMap(board.PawnAttack(true));
 	*/
 	//printf("%i, %i, %i\n", board.m_BoardInfo.m_BlackCastleKing, board.m_BoardInfo.m_BlackCastleQueen, board.m_BoardInfo.m_WhiteCastleKing);
-	//Lookup::PrintActiveMoves();
+	//Lookup::PrintCheckMoves();
 	//printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 1)); 
 	//printf("%llu\n", Perft("8/8/8/1r3P1K/8/8/1k6/8 w - - 0 1", 1));
 	//printf("%llu\n", Perft("8/1r6/8/8/3P2k1/1P6/1KP3r1/8 w - - 0 1", 1));
 	//printf("%llu\n", Perft("8/8/6k1/1p2p3/3pP3/2pK1b2/4P3/5b2 w - - 0 1", 1));
 	//printf("%llu\n", Perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 2));
-	//printf("%llu\n", Perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1R1K b kq - 1 1", 1));
 	
-	//printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/6P1/4P3/8 b - - 0 1", 1));
-	printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 2));
+	
+	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pQp1/3PN3/1p2P3/2N4p/PPPBBPPP/R3K2R b KQkq - 0 1", 2));
+	//printf("%llu\n", Perft("r3k3/p1ppqpb1/bn2pQp1/3PN3/1p2P2r/2N4p/PPPBBPPP/R3K2R w KQq - 1 2", 1));
+	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3));
 
-	printf("%llu\n", Perft(g_StartingFEN, 4)); // Perft(4)
+	//printf("%llu\n", Perft("rnbqkbnr/1ppppppp/p7/1B6/4P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 2", 1));
+	//printf("%llu\n", Perft("rnb1kbnr/pp1ppppp/8/q1p5/1P1P4/8/P1P1PPPP/RNBQKBNR w KQkq - 1 3", 1));
+	//printf("%llu\n", Perft("rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2", 1));
+	printf("%llu\n", Perft(g_StartingFEN, 5)); // Wrong up till Perft(5)
 
 
 	//Slide(1 << 38, Lookup::lines[], uint64 block) {

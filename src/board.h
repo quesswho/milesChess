@@ -69,6 +69,7 @@ static BoardInfo FenInfo(const std::string& FEN) {
         }
     }
 
+    while ((c = FEN[i]) == ' ') i++;
     char a = FEN[i++];
     
     if(a != '-') {
@@ -108,6 +109,17 @@ struct Move {
     uint64 m_From;
     uint64 m_To;
     MoveType m_Type;
+
+    inline std::string toString() const {
+        std::string result = "";
+        int f = GET_SQUARE(m_From);
+        result += 'h' - (f % 8);
+        result += '1' + (f / 8);
+        int t = GET_SQUARE(m_To);
+        result += 'h' - (t % 8);
+        result += '1' + (t / 8);
+        return result;
+    }
 };
 
 /*
@@ -123,24 +135,23 @@ struct Move {
 
 class Board {
 public: // TODO: make bitboard private and use constructors and move functions for changing them
-    uint64 m_WhitePawn;
-    uint64 m_WhiteKnight;
-    uint64 m_WhiteBishop;
-    uint64 m_WhiteRook;
-    uint64 m_WhiteQueen;
-    uint64 m_WhiteKing;
+    const uint64 m_WhitePawn;
+    const uint64 m_WhiteKnight;
+    const uint64 m_WhiteBishop;
+    const uint64 m_WhiteRook;
+    const uint64 m_WhiteQueen;
+    const uint64 m_WhiteKing;
 
-    uint64 m_BlackPawn;
-    uint64 m_BlackKnight;
-    uint64 m_BlackBishop;
-    uint64 m_BlackRook;
-    uint64 m_BlackQueen;
-    uint64 m_BlackKing;
+    const uint64 m_BlackPawn;
+    const uint64 m_BlackKnight;
+    const uint64 m_BlackBishop;
+    const uint64 m_BlackRook;
+    const uint64 m_BlackQueen;
+    const uint64 m_BlackKing;
 
-    uint64 m_White;
-    uint64 m_Black;
-
-    uint64 m_Board;
+    const uint64 m_White;
+    const uint64 m_Black;
+    const uint64 m_Board;
 
     BoardInfo m_BoardInfo;
 
@@ -207,12 +218,12 @@ public: // TODO: make bitboard private and use constructors and move functions f
         return white ? m_WhiteKing : m_BlackKing;
     }
 
-    inline bool CastleKing(uint64 danger, bool white) {
-        return white ? (m_BoardInfo.m_WhiteCastleKing && (m_Board & 0b110) == 0 && (danger & 0b1110) == 0) : (m_BoardInfo.m_BlackCastleKing && (m_Board & (0b110ull << 56)) == 0 && (danger & (0b1110ull << 56)) == 0);
+    inline uint64 CastleKing(uint64 danger, bool white) {
+        return white ? ((m_BoardInfo.m_WhiteCastleKing && (m_Board & 0b110) == 0 && (danger & 0b1110) == 0)) * (1ull << 1) : (m_BoardInfo.m_BlackCastleKing && ((m_Board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0)) * (1ull << 57);
     }
 
-    inline bool CastleQueen(uint64 danger, bool white) {
-        return white ? (m_BoardInfo.m_WhiteCastleQueen && (m_Board & 0b01110000) == 0 && (danger & 0b00111000) == 0) : (m_BoardInfo.m_BlackCastleQueen && (m_Board & (0b01110000ull << 56)) == 0 && (danger & (0b00111000ull << 56)) == 0);
+    inline uint64 CastleQueen(uint64 danger, bool white) {
+        return white ? ((m_BoardInfo.m_WhiteCastleQueen && (m_Board & 0b01110000) == 0 && (danger & 0b00111000) == 0)) * (1ull << 5) : (m_BoardInfo.m_BlackCastleQueen && ((m_Board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0)) * (1ull << 61);
     }
 };
 
@@ -236,6 +247,10 @@ static std::string BoardtoFen(const Board& board) {
         if (!(board.m_Board & pos)) {
             skip++;
             continue;
+        }
+        else if (skip > 0) {
+            FEN += (char)('0' + skip);
+            skip = 0;
         }
 
         if ((board.m_BlackPawn & pos) > 0) {
