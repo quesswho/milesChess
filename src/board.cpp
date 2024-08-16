@@ -103,6 +103,7 @@ uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bis
 
     uint64 knightPawnCheck = Lookup::knight_attacks[kingsq] & Knight(enemy);
 
+
     uint64 pr = PawnRight(enemy) & King(white);
     uint64 pl = PawnLeft(enemy) & King(white);
     if (pr > 0) {
@@ -111,6 +112,8 @@ uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bis
     if(pl > 0) {
         knightPawnCheck |= PawnAttackRight(pl, white);
     }
+
+    uint64 enPassantCheck = PawnForward((PawnAttackLeft(pr, white) | PawnAttackRight(pl, white)), white) & m_BoardInfo.m_EnPassant;
 
     danger = PawnAttack(enemy);
 
@@ -137,7 +140,7 @@ uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bis
 
     bishopPin = 0;
     uint64 bishoppinner = BishopXray(kingsq, m_Board) & (Bishop(enemy) | Queen(enemy));
-    if (bishoppinner) {
+    while (bishoppinner > 0) {
         int pos = PopPos(bishoppinner);
         uint64 mask = Lookup::active_moves[kingsq * 64 + pos];
         if (mask & Player(white)) {
@@ -189,7 +192,7 @@ uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bis
 
     danger |= Lookup::king_attacks[GET_SQUARE(King(enemy))];
 
-    return knightPawnCheck;
+    return enPassantCheck;
 }
 
 Board Board::MovePiece(const Move& move) {
@@ -298,7 +301,7 @@ std::vector<Move> Board::GenerateMoves() {
     bool white = m_BoardInfo.m_WhiteMove;
     bool enemy = !white;
     uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0;
-    uint64 check = Check(danger, active, rookPin, bishopPin);
+    uint64 enPassantCheck = Check(danger, active, rookPin, bishopPin);
     uint64 moveable = ~Player(white) & active;
 
     // Pawns
@@ -373,21 +376,20 @@ std::vector<Move> Board::GenerateMoves() {
 
     // En passant
     
-    uint64 REPawns = PawnAttackRight(nonRookPawns, white) & m_BoardInfo.m_EnPassant & active;
-    uint64 LEPawns = PawnAttackLeft(nonRookPawns, white) & m_BoardInfo.m_EnPassant & active;
+    uint64 REPawns = PawnAttackRight(nonRookPawns, white) & m_BoardInfo.m_EnPassant & (active | enPassantCheck);
+    uint64 LEPawns = PawnAttackLeft(nonRookPawns, white) & m_BoardInfo.m_EnPassant & (active | enPassantCheck);
+    uint64 pinnedREPawns = REPawns & PawnAttackRight(bishopPin, white);
+    uint64 stillPinREPawns = REPawns & bishopPin;
+    REPawns = REPawns & (~pinnedREPawns | stillPinREPawns);
     if (REPawns > 0) {
-        uint64 pinnedREPawns = REPawns & PawnAttackRight(bishopPin, white);
-        uint64 stillPinREPawns = REPawns & bishopPin;
-        REPawns = REPawns & (~pinnedREPawns | stillPinREPawns);
         uint64 bit = PopBit(REPawns);
         result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::EPASSANT });
     }
 
+    uint64 pinnedLEPawns = LEPawns & PawnAttackLeft(bishopPin, white);
+    uint64 stillPinLEPawns = LEPawns & bishopPin;
+    LEPawns = LEPawns & (~pinnedLEPawns | stillPinLEPawns);
     if (LEPawns > 0) {
-        uint64 pinnedLEPawns = LEPawns & PawnAttackLeft(bishopPin, white);
-    
-        uint64 stillPinLEPawns = LEPawns & bishopPin;
-        LEPawns = LEPawns & (~pinnedLEPawns | stillPinLEPawns);
         uint64 bit = PopBit(LEPawns);
         result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::EPASSANT });
     }

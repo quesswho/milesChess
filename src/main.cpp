@@ -50,16 +50,16 @@ int main() {
 	
 	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pQp1/3PN3/1p2P3/2N4p/PPPBBPPP/R3K2R b KQkq - 0 1", 2));
 	//printf("%llu\n", Perft("r3k3/p1ppqpb1/bn2pQp1/3PN3/1p2P2r/2N4p/PPPBBPPP/R3K2R w KQq - 1 2", 1));
-	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3));
+	
 
 	//printf("%llu\n", Perft("rnbqkbnr/1ppppppp/p7/1B6/4P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 2", 1));
 	
-	//printf("%llu\n", Perft("8/8/3p4/1Pp4r/KR3p1k/8/4P1P1/8 w - c6 0 2", 2));
+	//printf("%llu\n", Perft("r3k2r/Pppp1ppp/1b3nbN/nPP5/BB2P3/q4N2/Pp1P2PP/R2Q1RK1 b kq - 0 1", 2));
 
-
-	printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 2", 4));
+	//printf("%llu\n", Perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 4));
+	//printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 6));
 	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 4));
-	//printf("%llu\n", Perft(g_StartingFEN, 5));
+	printf("%llu\n", Perft(g_StartingFEN, 6));
 
 
 	//Slide(1 << 38, Lookup::lines[], uint64 block) {
