@@ -3,8 +3,8 @@
 #include "board.h"
 
 static uint64 Perft_r(Board board, int depth, int maxdepth) {
-	if (depth == maxdepth) return 1;
 	const std::vector<Move> moves = board.GenerateMoves();
+	if (depth == maxdepth-1) return moves.size();
 
 	uint64 result = 0;
 	for (const Move& move : moves) {

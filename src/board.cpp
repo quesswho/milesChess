@@ -119,7 +119,7 @@ uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bis
     uint64 rookcheck = RookAttack(kingsq, m_Board) & (Rook(enemy) | Queen(enemy));
     if (rookcheck > 0) { // If a rook piece is attacking the king
         active = Lookup::active_moves[kingsq * 64 + GET_SQUARE(rookcheck)];
-        danger |= Lookup::check_mask[kingsq * 64 + GET_SQUARE(rookcheck)];
+        danger |= Lookup::check_mask[kingsq * 64 + GET_SQUARE(rookcheck)] & ~rookcheck;
     }
     rookPin = 0;
     uint64 rookpinner = RookXray(kingsq, m_Board) & (Rook(enemy) | Queen(enemy));
@@ -130,9 +130,9 @@ uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bis
     }
 
     uint64 bishopcheck = BishopAttack(kingsq, m_Board) & (Bishop(enemy) | Queen(enemy));
-    if (bishopcheck > 0) { // If a rook piece is attacking the king
+    if (bishopcheck > 0) { // If a bishop piece is attacking the king
         active = Lookup::active_moves[kingsq * 64 + GET_SQUARE(bishopcheck)];
-        danger |= Lookup::check_mask[kingsq * 64 + GET_SQUARE(bishopcheck)];
+        danger |= Lookup::check_mask[kingsq * 64 + GET_SQUARE(bishopcheck)] & ~bishopcheck;
     }
 
     bishopPin = 0;
@@ -176,12 +176,10 @@ uint64 Board::Check(uint64& danger, uint64& active, uint64& rookPin, uint64& bis
     }
 
     uint64 bishops = Bishop(enemy) | Queen(enemy);
-
     while (bishops > 0) { // Loop each bit
         int pos = PopPos(bishops);
         danger |= (BishopAttack(pos, m_Board) & ~(1ull << pos));
     }
-
     uint64 rooks = Rook(enemy) | Queen(enemy);
 
     while (rooks > 0) { // Loop each bit
@@ -230,7 +228,7 @@ Board Board::MovePiece(const Move& move) {
             info.m_WhiteCastleQueen = false;
             return Board(wp, wkn, wb, wr, wq, wk ^ swp, bp & re, bkn & re, bb & re, br & re, bq & re, bk, info);
         case MoveType::EPASSANT:
-            return Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & ~(move.m_To << 8), bkn, bb, br, bq, bk, info);
+            return Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & ~(move.m_To >> 8), bkn, bb, br, bq, bk, info);
         case MoveType::KCASTLE:
             info.m_WhiteCastleKing = false;
             info.m_WhiteCastleQueen = false;
@@ -272,7 +270,7 @@ Board Board::MovePiece(const Move& move) {
             info.m_BlackCastleQueen = false;
             return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb, br, bq, bk ^ swp, info);
         case MoveType::EPASSANT:
-            return Board(wp & ~(move.m_To >> 8), wkn, wb, wr, wq, wk, bp ^ swp, bkn, bb, br, bq, bk, info);
+            return Board(wp & ~(move.m_To << 8), wkn, wb, wr, wq, wk, bp ^ swp, bkn, bb, br, bq, bk, info);
         case MoveType::KCASTLE:
             info.m_BlackCastleKing = false;
             info.m_BlackCastleQueen = false;
@@ -315,10 +313,10 @@ std::vector<Move> Board::GenerateMoves() {
 
     uint64 pinnedFPawns = FPawns & PawnForward(rookPin, white);
     uint64 pinnedF2Pawns = F2Pawns & Pawn2Forward(rookPin, white);
-    uint64 notVertFPawns = FPawns & ~rookPin; // Not vertically pinned pieces
-    uint64 notVertF2Pawns = F2Pawns & ~rookPin;
-    FPawns = (pinnedFPawns ^ notVertFPawns);
-    F2Pawns = (pinnedF2Pawns ^ notVertF2Pawns);
+    uint64 movePinFPawns = FPawns & rookPin; // Pinned after moving
+    uint64 movePinF2Pawns = F2Pawns & rookPin;
+    FPawns = FPawns & (~pinnedFPawns | movePinFPawns);
+    F2Pawns = F2Pawns & (~pinnedF2Pawns | movePinF2Pawns);
 
     for (; uint64 bit = PopBit(FPawns); FPawns > 0) { // Loop each bit
         if ((bit & Lookup::FirstRank(enemy)) > 0) { // If promote
@@ -343,10 +341,10 @@ std::vector<Move> Board::GenerateMoves() {
 
     uint64 pinnedRPawns = RPawns & PawnAttackRight(bishopPin, white);
     uint64 pinnedLPawns = LPawns & PawnAttackLeft(bishopPin, white);
-    uint64 stillPinRPawns = RPawns & bishopPin; // is it still pinned after move
-    uint64 stillPinLPawns = LPawns & bishopPin;
-    RPawns = RPawns & (~pinnedRPawns | stillPinRPawns);
-    LPawns = LPawns & (~pinnedLPawns | stillPinLPawns);
+    uint64 movePinRPawns = RPawns & bishopPin; // is it pinned after move
+    uint64 movePinLPawns = LPawns & bishopPin;
+    RPawns = RPawns & (~pinnedRPawns | movePinRPawns);
+    LPawns = LPawns & (~pinnedLPawns | movePinLPawns);
 
     for (; uint64 bit = PopBit(RPawns); RPawns > 0) { // Loop each bit
         if ((bit & Lookup::FirstRank(enemy)) > 0) { // If promote
@@ -490,8 +488,8 @@ std::vector<Move> Board::GenerateMoves() {
     int kingpos = GET_SQUARE(King(white));
     uint64 moves = Lookup::king_attacks[kingpos] & ~Player(white);
     moves &= ~danger;
+    
     for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-        //PrintMap(m_Board);
         result.push_back({ 1ull << kingpos, bit, MoveType::KING });
     }
 

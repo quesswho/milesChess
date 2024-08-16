@@ -74,10 +74,10 @@ static BoardInfo FenInfo(const std::string& FEN) {
     
     if(a != '-') {
         if (info.m_WhiteMove) {
-            info.m_EnPassant = 1ull << (32 + ('h' - a)); // TODO: need to be tested
+            info.m_EnPassant = 1ull << (40 + ('h' - a)); // TODO: need to be tested
         }
         else {
-            info.m_EnPassant = 1ull << (24 + ('h' - a)); // TODO: need to be tested
+            info.m_EnPassant = 1ull << (16 + ('h' - a)); // TODO: need to be tested
         }
     }
     else {
@@ -219,11 +219,11 @@ public: // TODO: make bitboard private and use constructors and move functions f
     }
 
     inline uint64 CastleKing(uint64 danger, bool white) {
-        return white ? ((m_BoardInfo.m_WhiteCastleKing && (m_Board & 0b110) == 0 && (danger & 0b1110) == 0)) * (1ull << 1) : (m_BoardInfo.m_BlackCastleKing && ((m_Board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0)) * (1ull << 57);
+        return white ? ((m_BoardInfo.m_WhiteCastleKing && (m_Board & 0b110) == 0 && (danger & 0b1110) == 0) && (m_WhiteRook & 0b1) > 0) * (1ull << 1) : (m_BoardInfo.m_BlackCastleKing && ((m_Board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0) && (m_BlackRook & 0b1ull << 56) > 0) * (1ull << 57);
     }
 
     inline uint64 CastleQueen(uint64 danger, bool white) {
-        return white ? ((m_BoardInfo.m_WhiteCastleQueen && (m_Board & 0b01110000) == 0 && (danger & 0b00111000) == 0)) * (1ull << 5) : (m_BoardInfo.m_BlackCastleQueen && ((m_Board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0)) * (1ull << 61);
+        return white ? ((m_BoardInfo.m_WhiteCastleQueen && (m_Board & 0b01110000) == 0 && (danger & 0b00111000) == 0) && (m_WhiteRook & 0b10000000) > 0) * (1ull << 5) : (m_BoardInfo.m_BlackCastleQueen && ((m_Board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0) && (m_BlackRook & (0b10000000ull << 56)) > 0) * (1ull << 61);
     }
 };
 

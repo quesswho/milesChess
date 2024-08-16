@@ -53,9 +53,13 @@ int main() {
 	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3));
 
 	//printf("%llu\n", Perft("rnbqkbnr/1ppppppp/p7/1B6/4P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 2", 1));
-	//printf("%llu\n", Perft("rnb1kbnr/pp1ppppp/8/q1p5/1P1P4/8/P1P1PPPP/RNBQKBNR w KQkq - 1 3", 1));
-	//printf("%llu\n", Perft("rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2", 1));
-	printf("%llu\n", Perft(g_StartingFEN, 5)); // Wrong up till Perft(5)
+	
+	//printf("%llu\n", Perft("8/8/3p4/1Pp4r/KR3p1k/8/4P1P1/8 w - c6 0 2", 2));
+
+
+	printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 2", 4));
+	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 4));
+	//printf("%llu\n", Perft(g_StartingFEN, 5));
 
 
 	//Slide(1 << 38, Lookup::lines[], uint64 block) {
