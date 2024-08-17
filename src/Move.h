@@ -68,13 +68,13 @@ static int64 Evaluate(const Board& board) {
 	return centipawns;
 }
 
-static uint64 Perft_r(Board board, int depth, int maxdepth) {
+static uint64 Perft_r(Board board, int depth) {
 	const std::vector<Move> moves = board.GenerateMoves();
-	if (depth == maxdepth-1) return moves.size();
+	if (depth == 1) return moves.size();
 
 	int64 result = 0;
 	for (const Move& move : moves) {
-		int64 count = Perft_r(board.MovePiece(move), depth + 1, maxdepth);
+		int64 count = Perft_r(board.MovePiece(move), depth - 1);
 		result += count;
 		if (depth == 0) {
 			printf("%s: %llu: %s\n", move.toString().c_str(), count, BoardtoFen(board.MovePiece(move)).c_str());
@@ -83,26 +83,32 @@ static uint64 Perft_r(Board board, int depth, int maxdepth) {
 	return result;
 }
 
-static uint64 Perft(std::string str, int i) {
+static uint64 Perft(std::string str, int depth) {
 	Board board(str);
-	return Perft_r(board, 0, i);
+	return Perft_r(board, depth);
 }
 
-static int64 BestMove_r(Board board, int depth) {
+static int64 AlphaBeta_r(Board board, int64 alpha, int64 beta, int depth) {
 	int64 sgn = board.m_BoardInfo.m_WhiteMove ? 1 : -1;
 	if (depth == 0) return sgn * Evaluate(board);
 	const std::vector<Move> moves = board.GenerateMoves();
 	if (moves.size() == 0) {
 		return -sgn * 10000; // Mate is 10000 centipawns worth
 	}
-	int64 bestscore = 0;
+	int64 bestScore = -10000;
 	for (const Move& move : moves) {
-		int64 score = -BestMove_r(board.MovePiece(move), depth - 1);
-		if (score > bestscore) {
-			bestscore = score;
+		int64 score = -AlphaBeta_r(board.MovePiece(move), -beta, -alpha, depth - 1);
+		if (score > bestScore) {
+			bestScore = score;
+			if (score > alpha) {
+				alpha = score;
+			}
+		}
+		if (score >= beta) { // Exit out early
+			return bestScore;
 		}
 	}
-	return bestscore;
+	return bestScore;
 }
 
 static Move BestMove(Board board, int depth) {
@@ -111,7 +117,7 @@ static Move BestMove(Board board, int depth) {
 	Move best = moves[0];
 	int64 bestscore = -10000;
 	for (const Move& move : moves) {
-		int64 score = -BestMove_r(board.MovePiece(move), depth - 1);
+		int64 score = -AlphaBeta_r(board.MovePiece(move), -1000, 1000, depth - 1);
 		if (score > bestscore) {
 			bestscore = score;
 			best = move;
