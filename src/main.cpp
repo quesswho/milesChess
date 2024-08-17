@@ -1,4 +1,6 @@
 #include<stdio.h>
+#include <memory>
+
 #include "Move.h"
 
 
@@ -8,30 +10,11 @@ const char* g_StartingFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq 
 
 int main() {
 
+	// First game 2024-08-17 (Lost against me)
+	// 1. h3 d5 2. g3 e5 3. e3 e4 4. c3 Nf6 5. f3 Nc6 6. d3 Bd6 7. f4 O - O 8. b3 a5 9. a3 Ne7 10. h4 Ng4 11. d4(11. dxe4 dxe4 12. c4 Bc5 13. Qe2 h5 14. Nh3 Nf5 15. Qg2 Re8 16. b4 axb4 17. axb4 Rxa1 18. Qb2 Rxb1 19. Qxb1 Bxe3 20. Bxe3 Ngxe3 21. Rg1 Nxf1 22. Rxf1 Nxg3 23. Rg1 Bxh3 24. Qc2 Qxh4 25. f5 Bg4 26. c5 Ne2 + 27. Rg3 Qxg3 + 28. Kf1 Qg1#)
 
-	//Board board("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-	//Board board("rnbqkbnr/ppp1pppp/8/3p4/8/7P/PPPPPPP1/RNBQKBNR w KQkq - 0 2");
-	//Board board("rnbqkbnr/ppp2ppp/8/3pp3/8/6PP/PPPPPP2/RNBQKBNR w KQkq - 0 3");
-	//Board board("r1bqkbnr/ppp2ppp/2n5/3pp3/8/5PPP/PPPPP3/RNBQKBNR w KQkq - 1 4");
-	//Board board("r1b1kbnr/ppp2ppp/2n5/3pp1q1/8/4PPPP/PPPP4/RNBQKBNR w KQkq - 1 5");
-	//Board board("r1b1kbnr/ppp2ppp/2n5/3pp3/8/3PPPqP/PPP5/RNBQKBNR w KQkq - 0 6");
-	//Board board("r1b1k1nr/ppp2ppp/2n5/2bpp3/8/3PPPqP/PPP1K3/RNBQ1BNR w kq - 2 7");
-	//Board board("r1b1k2r/ppp2ppp/2n2n2/2bpp3/8/2PPPPqP/PP2K3/RNBQ1BNR w kq - 1 8");
-	//Board board("r1b1k2r/ppp2ppp/2n2n2/2bp4/4p3/1PPPPPqP/P3K3/RNBQ1BNR w kq - 0 9");
-	//Board board("r1b1k2r/ppp2ppp/2n2n2/2bp4/8/PPPpPPqP/4K3/RNBQ1BNR w kq - 0 10");
-	//Board board("r1b2rk1/ppp2ppp/2n2n2/2bp4/8/PPPQPPqP/4K3/RNB2BNR w - - 1 11");
-	//Board board("r1b1r1k1/ppp2ppp/2n2n2/2bp4/7P/PPPQPPq1/4K3/RNB2BNR w - - 1 12");
-	//Board board("r1b1r1k1/ppp2ppp/2n5/2bp4/5PnP/PPPQP1q1/4K3/RNB2BNR w - - 1 13");
-	//Board board("r1b1r1k1/ppp2ppp/2n5/2bp4/4PPnP/PPPQ4/4Kq2/RNB2BNR w - - 1 14");
-	//Board board("r1b1r1k1/ppp2ppp/2n5/2bp4/4PP1P/PPPQn3/5q2/RNBK1BNR w - - 3 15");
-	//Board board("r1b1r1k1/ppp2ppp/2n5/3p4/4PP1P/PPPQb3/5q2/RN1K1BNR w - - 0 16");
-	//Board board("r1b1r1k1/ppp2ppp/8/3p4/2PnPP1P/PP1Qb3/5q2/RN1K1BNR w - - 1 17");
-	Board board("r1b1r1k1/ppp2ppp/8/8/1PPnpP1P/P2Qb3/5q2/RN1K1BNR w - - 0 18");
-	//Board board("r1b1r1k1/ppp2ppp/8/8/PPPn1P1P/3pb3/5q2/RN1K1BNR w - - 0 19");
-	//Board board("r1b1r1k1/ppp2ppp/8/8/PPPn1P1P/4b3/4pq2/RN1K1B1R w - - 0 20");
-	//Board board("r1b1r1k1/ppp2ppp/8/8/PPPn1P1P/4b3/4q3/RN1K3R w - - 0 21");
-
-
+	// Second game with piece tables (Draw by repetition)
+	// 1. Nc3 e5 2. e3 d5 3. Qh5 Nc6 4. Bb5 d4 5. Qxe5+ Be6 6. exd4 Bd6 (6... Nf6 7. Nf3 Bd6 8. Qe2 O-O 9. Bxc6 bxc6 10. h3 Re8 11. Kf1 c5 12. dxc5 Bxc5 13. Qb5 Qd6 14. a3 Bf5 15. d3 Bd4 16. Qxf5 Bxc3 17. bxc3 Qe7 18. Bg5 Qe2+ 19. Kg1 Qxc2 20. Bxf6 gxf6 21. Qxf6 Re2 22. Ne5 Rf8 23. Qg5+ Kh8 24. Qf6+ Kg8 25. Qg5+ Kh8)
 	
 	//printf("%llu\n", Perft("3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/3Q4/1Q4Rp/1K1BBNNk w - - 0 1", 1));
 	//printf("%llu\n", Perft("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 5));
@@ -39,9 +22,27 @@ int main() {
 	//printf("%llu\n", Perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 6));
 	//printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 7));
 	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 5));
-	printf("%llu\n", Perft(g_StartingFEN, 5));
+	//printf("%llu\n", Perft(g_StartingFEN, 5));
 
-	printf("%s\n", BestMove(board, 6).toString().c_str());
+	char str[1000];
+	//fgets(str, 100, stdin);
+	//std::unique_ptr<Board> board = std::make_unique<Board>(str);
+	//std::unique_ptr<Board> board = std::make_unique<Board>(g_StartingFEN);
+	std::unique_ptr<Board> board = std::make_unique<Board>("r2q4/pp1k1p1p/2pP4/8/3p1p2/3P4/PP1P3n/RNB2R1K w - - 0 21");
+	while (true) {
+		Move move = BestMove(*board, 6);
+		if (move.m_Type == MoveType::NONE) {
+			printf("You won!\n");
+			scanf("");
+			break;
+		}
 
-	scanf("%i");
+		board = std::make_unique<Board>(board->MovePiece(move));
+		printf("%s, %s\n", move.toString().c_str(), BoardtoFen(*board).c_str());
+		scanf("%s", &str);
+		if (str[0] == 'q') break;
+
+		move = GetMove(str, *board);
+		board = std::make_unique<Board>(board->MovePiece(move));
+	}
 }

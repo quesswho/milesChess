@@ -1,5 +1,6 @@
 #pragma once
 #include <bit>
+#include <cassert>
 
 using uint64 = unsigned long long;
 using int64 = long long;

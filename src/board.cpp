@@ -1,7 +1,6 @@
 #include "board.h"
 
 #include <immintrin.h> // _lzcnt_u64(x)
-#include <cassert>
 #include <stdio.h>
 
 Board::Board(const std::string& FEN) 

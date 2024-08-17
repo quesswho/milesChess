@@ -103,6 +103,7 @@ enum class MoveType {
 };
 
 struct Move {
+
     Move(uint64 from, uint64 to, MoveType movetype)
         : m_From(from), m_To(to), m_Type(movetype)
     {}
@@ -162,6 +163,13 @@ public: // TODO: make bitboard private and use constructors and move functions f
           m_BlackPawn(bp), m_BlackKnight(bkn), m_BlackBishop(bb), m_BlackRook(br), m_BlackQueen(bq), m_BlackKing(bk),
           m_White(wp | wkn | wb | wr | wq | wk), m_Black(bp | bkn | bb | br | bq | bk), m_Board(m_White | m_Black),
           m_BoardInfo(info)
+    {}
+
+    Board(const Board& other)
+        : m_WhitePawn(other.m_WhitePawn),m_WhiteKnight(other.m_WhiteKnight),m_WhiteBishop(other.m_WhiteBishop),m_WhiteRook(other.m_WhiteRook),
+        m_WhiteQueen(other.m_WhiteQueen),m_WhiteKing(other.m_WhiteKing),m_BlackPawn(other.m_BlackPawn),m_BlackKnight(other.m_BlackKnight),
+        m_BlackBishop(other.m_BlackBishop),m_BlackRook(other.m_BlackRook),m_BlackQueen(other.m_BlackQueen),m_BlackKing(other.m_BlackKing),
+        m_White(other.m_White),m_Black(other.m_Black), m_Board(other.m_Board), m_BoardInfo(other.m_BoardInfo)
     {}
 
     uint64 RookAttack(int pos, uint64 occ) const;
@@ -342,4 +350,68 @@ static std::string BoardtoFen(const Board& board) {
     FEN += ' ' + std::to_string(board.m_BoardInfo.m_FullMoves);
 
     return FEN;
+}
+
+static Move GetMove(std::string str, const Board& board) {
+    const bool white = board.m_BoardInfo.m_WhiteMove;
+    const uint64 from = 1ull << ('h' - str[0] + (str[1] - '1') * 8);
+    const int posTo = ('h' - str[2] + (str[3] - '1') * 8);
+    const uint64 to = 1ull << posTo;
+
+    MoveType type = MoveType::NONE;
+    if (str.size() > 4) {
+        switch (str[4]) {
+        case 'k':
+            type = MoveType::P_KNIGHT;
+            break;
+        case 'b':
+            type = MoveType::P_BISHOP;
+            break;
+        case 'r':
+            type = MoveType::P_ROOK;
+            break;
+        case 'q':
+            type = MoveType::P_ROOK;
+            break;
+        }
+    }
+    else {
+        if (board.Pawn(white) & from) {
+            if (board.Pawn2Forward(board.Pawn(white) & from, white) == to) {
+                type = MoveType::PAWN2;
+            }
+            else if (board.m_BoardInfo.m_EnPassant & to) {
+                type = MoveType::EPASSANT;
+            }
+            else {
+                type = MoveType::PAWN;
+            }
+        }
+        else if (board.Knight(white) & from) {
+            type = MoveType::KNIGHT;
+        }
+        else if (board.Bishop(white) & from) {
+            type = MoveType::BISHOP;
+        }
+        else if (board.Rook(white) & from) {
+            type = MoveType::ROOK;
+        }
+        else if (board.Queen(white) & from) {
+            type = MoveType::QUEEN;
+        }
+        else if (board.King(white) & from) {
+            uint64 danger, a, b, c,d;
+            board.Check(danger,a,b,c,d);
+            if (board.CastleKing(danger, white) && !(Lookup::king_attacks[posTo] & from)) {
+                type = MoveType::KCASTLE;
+            } else if (board.CastleQueen(danger, white) && !(Lookup::king_attacks[posTo] & from)) {
+                type = MoveType::QCASTLE;
+            } else {
+                type = MoveType::KING;
+            }
+        }
+    }
+
+    assert("Could not read move", type == MoveType::NONE);
+    return Move(from, to, type);
 }
