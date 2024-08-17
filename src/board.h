@@ -98,7 +98,7 @@ static BoardInfo FenInfo(const std::string& FEN) {
 }
 
 enum class MoveType {
-    PAWN, PAWN2, KNIGHT, BISHOP, ROOK, QUEEN, KING, EPASSANT,
+    NONE, PAWN, PAWN2, KNIGHT, BISHOP, ROOK, QUEEN, KING, EPASSANT,
     KCASTLE, QCASTLE, P_KNIGHT, P_BISHOP, P_ROOK, P_QUEEN
 };
 
@@ -164,65 +164,64 @@ public: // TODO: make bitboard private and use constructors and move functions f
           m_BoardInfo(info)
     {}
 
-    uint64 RookAttack(int pos, uint64 occ);
-    uint64 BishopAttack(int pos, uint64 occ);
-    uint64 QueenAttack(int pos, uint64 occ);
+    uint64 RookAttack(int pos, uint64 occ) const;
+    uint64 BishopAttack(int pos, uint64 occ) const;
+    uint64 QueenAttack(int pos, uint64 occ) const;
 
-    uint64_t RookXray(int pos, uint64_t occ);
-    uint64_t BishopXray(int pos, uint64_t occ);
+    uint64_t RookXray(int pos, uint64_t occ) const;
+    uint64_t BishopXray(int pos, uint64_t occ) const;
 
-    uint64 PawnForward(uint64 pawns, const bool white);
-    uint64 Pawn2Forward(uint64 pawns, const bool white);
-    uint64 PawnRight(const bool white);
-    uint64 PawnLeft(const bool white);
-    uint64 PawnAttack(const bool white);
-    uint64 PawnAttackRight(uint64 pawns, const bool white);
-    uint64 PawnAttackLeft(uint64 pawns, const bool white);
+    uint64 PawnForward(uint64 pawns, const bool white) const;
+    uint64 Pawn2Forward(uint64 pawns, const bool white) const;
+    uint64 PawnRight(const bool white) const;
+    uint64 PawnLeft(const bool white) const;
+    uint64 PawnAttack(const bool white) const;
+    uint64 PawnAttackRight(uint64 pawns, const bool white) const;
+    uint64 PawnAttackLeft(uint64 pawns, const bool white) const;
 
-    Board MovePiece(const Move& move);
+    Board MovePiece(const Move& move) const;
 
-    bool Validate();
-    uint64 Check(uint64& danger, uint64& check, uint64& rookPin, uint64& bishopPin);
+    uint64 Check(uint64& danger, uint64& check, uint64& rookPin, uint64& bishopPin, uint64& enPassant) const;
 
-    std::vector<Move> GenerateMoves();
+    std::vector<Move> GenerateMoves() const;
 
-    inline uint64 Player(const bool white) {
+    inline uint64 Player(const bool white) const {
         return white ? m_White : m_Black;
     }
 
-    inline uint64 Enemy(const bool white) {
+    inline uint64 Enemy(const bool white) const {
         return white ? m_Black : m_White;
     }
 
-    inline uint64 Pawn(const bool white) {
+    inline uint64 Pawn(const bool white) const {
         return white ? m_WhitePawn : m_BlackPawn;
     }
 
-    inline uint64 Knight(const bool white) {
+    inline uint64 Knight(const bool white) const {
         return white ? m_WhiteKnight : m_BlackKnight;
     }
 
-    inline uint64 Bishop(const bool white) {
+    inline uint64 Bishop(const bool white) const {
         return white ? m_WhiteBishop : m_BlackBishop;
     }
 
-    inline uint64 Rook(const bool white) {
+    inline uint64 Rook(const bool white) const {
         return white ? m_WhiteRook : m_BlackRook;
     }
 
-    inline uint64 Queen(const bool white) {
+    inline uint64 Queen(const bool white) const {
         return white ? m_WhiteQueen : m_BlackQueen;
     }
 
-    inline uint64 King(const bool white) {
+    inline uint64 King(const bool white) const {
         return white ? m_WhiteKing : m_BlackKing;
     }
 
-    inline uint64 CastleKing(uint64 danger, const bool white) {
+    inline uint64 CastleKing(uint64 danger, const bool white) const {
         return white ? ((m_BoardInfo.m_WhiteCastleKing && (m_Board & 0b110) == 0 && (danger & 0b1110) == 0) && (m_WhiteRook & 0b1) > 0) * (1ull << 1) : (m_BoardInfo.m_BlackCastleKing && ((m_Board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0) && (m_BlackRook & 0b1ull << 56) > 0) * (1ull << 57);
     }
 
-    inline uint64 CastleQueen(uint64 danger, const bool white) {
+    inline uint64 CastleQueen(uint64 danger, const bool white) const {
         return white ? ((m_BoardInfo.m_WhiteCastleQueen && (m_Board & 0b01110000) == 0 && (danger & 0b00111000) == 0) && (m_WhiteRook & 0b10000000) > 0) * (1ull << 5) : (m_BoardInfo.m_BlackCastleQueen && ((m_Board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0) && (m_BlackRook & (0b10000000ull << 56)) > 0) * (1ull << 61);
     }
 };

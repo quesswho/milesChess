@@ -2,6 +2,7 @@
 #include <bit>
 
 using uint64 = unsigned long long;
+using int64 = long long;
 
 static uint64 PopBit(uint64& val) {
     uint64 result = (val & -val);
