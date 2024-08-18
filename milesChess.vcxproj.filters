@@ -32,7 +32,7 @@
     <ClInclude Include="src\LookupTables.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Move.h">
+    <ClInclude Include="src\Search.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Utils.h">

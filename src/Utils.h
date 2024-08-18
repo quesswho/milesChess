@@ -1,17 +1,18 @@
 #pragma once
 #include <bit>
 #include <cassert>
+#include <chrono>
 
 using uint64 = unsigned long long;
 using int64 = long long;
 
-static uint64 PopBit(uint64& val) {
+static inline uint64 PopBit(uint64& val) {
     uint64 result = (val & -val);
     val &= (val - 1);
     return result;
 }
 
-static int PopPos(uint64& val) {
+static inline int PopPos(uint64& val) {
     int index = int(_tzcnt_u64(val));
     val &= val - 1;
     return index;
@@ -54,6 +55,20 @@ static void PrintMap(uint64 map) {
         if (i % 8 == 0) printf("\n");
     }
 }
+
+class Timer {
+private:
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_Start;
+
+    float m_LastElapsed;
+public:
+    Timer()
+        : m_LastElapsed(0.0f)
+    {}
+
+    void Start() { m_Start = std::chrono::high_resolution_clock::now(); }
+    float End() { return std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - m_Start).count(); } // Returns x seconds after Start() was called
+};
 
 #define GetLower(S) ((1ull << S) - 1)
 #define GetUpper(S) (0xFFFFFFFFFFFFFFFF << (S))

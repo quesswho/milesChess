@@ -78,15 +78,15 @@ static int64 Evaluate(const Board& board) {
 	return centipawns;
 }
 
-static uint64 Perft_r(Board board, int depth) {
+static uint64 Perft_r(const Board& board, int depth, int maxdepth) {
 	const std::vector<Move> moves = board.GenerateMoves();
 	if (depth == 1) return moves.size();
 
 	int64 result = 0;
 	for (const Move& move : moves) {
-		int64 count = Perft_r(board.MovePiece(move), depth - 1);
+		int64 count = Perft_r(board.MovePiece(move), depth - 1, maxdepth);
 		result += count;
-		if (depth == 0) {
+		if (depth == maxdepth) {
 			printf("%s: %llu: %s\n", move.toString().c_str(), count, BoardtoFen(board.MovePiece(move)).c_str());
 		}
 	}
@@ -94,8 +94,13 @@ static uint64 Perft_r(Board board, int depth) {
 }
 
 static uint64 Perft(std::string str, int depth) {
+	Timer time;
 	Board board(str);
-	return Perft_r(board, depth);
+	time.Start();
+	uint64 result = Perft_r(board, depth, depth) / 1000000.0f;
+	float t = time.End();
+	printf("%.3fMNodes/s\n", result / t);
+	return result;
 }
 
 static int64 AlphaBeta_r(Board board, int64 alpha, int64 beta, int depth) {

@@ -2,7 +2,7 @@
 #include <memory>
 #include "UCI.h"
 
-#include "Move.h"
+#include "Search.h"
 
 
 const char* g_StartingFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -20,8 +20,8 @@ int main() {
 	// Third game against stockfish 16
 	// 1. Nc3 d5 2. e3 e6 3. Bb5+ c6 4. Bf1 e5 5. e4 d4 6. Nb1 Nf6 7. Bd3 Nbd7 8. Nf3 Bd6 9. O-O Nc5 10. h3 Nxd3 11. cxd3 g5 12. Nxg5 Rg8 13. f4 exf4 14. e5 Rxg5 15. exd6 Bxh3 16. Qe1+ Kd7 17. Qh4 Rxg2+ 18. Kh1 Ng4 19. Qxh3 Rh2+ 20. Qxh2 Nxh2 21. Kxh2 Qh4+ 22. Kg2 Qg3+ 23. Kh1 Rg8 24. b3 Qg2#
 
-	UCI uci;
-	uci.Start();
+	//UCI uci;
+	//uci.Start();
 
 	//printf("%llu\n", Perft("3Q4/1Q4Q1/4Q3/2Q4Q/Q4Q2/3Q4/1Q4Rp/1K1BBNNk w - - 0 1", 1));
 	//printf("%llu\n", Perft("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 5));
@@ -29,13 +29,13 @@ int main() {
 	//printf("%llu\n", Perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 6));
 	//printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 7));
 	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 5));
-	//printf("%llu\n", Perft(g_StartingFEN, 5));
+	printf("%llu\n", Perft(g_StartingFEN, 6));
 
-	/*char str[1000];
+	char str[1000];
 	//fgets(str, 100, stdin);
 	//std::unique_ptr<Board> board = std::make_unique<Board>(str);
-	//std::unique_ptr<Board> board = std::make_unique<Board>(g_StartingFEN);
-	std::unique_ptr<Board> board = std::make_unique<Board>("r2q4/pp1k1p1p/2pP4/8/3p1p2/3P4/PP1P3n/RNB2R1K w - - 0 21");
+	std::unique_ptr<Board> board = std::make_unique<Board>(g_StartingFEN);
+	//std::unique_ptr<Board> board = std::make_unique<Board>("r2q4/pp1k1p1p/2pP4/8/3p1p2/3P4/PP1P3n/RNB2R1K w - - 0 21");
 	while (true) {
 		Move move = BestMove(*board, 6);
 		if (move.m_Type == MoveType::NONE) {
@@ -51,5 +51,5 @@ int main() {
 
 		move = GetMove(str, *board);
 		board = std::make_unique<Board>(board->MovePiece(move));
-	}*/
+	}
 }

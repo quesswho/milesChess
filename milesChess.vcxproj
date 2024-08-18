@@ -108,6 +108,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -118,7 +119,7 @@
   <ItemGroup>
     <ClInclude Include="src\board.h" />
     <ClInclude Include="src\LookupTables.h" />
-    <ClInclude Include="src\Move.h" />
+    <ClInclude Include="src\Search.h" />
     <ClInclude Include="src\UCI.h" />
     <ClInclude Include="src\Utils.h" />
   </ItemGroup>
