@@ -31,10 +31,9 @@ int main() {
 	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 5));
 	//printf("%llu\n", Perft(g_StartingFEN, 6));
 
-	Lookup::PrintZobristConstants();
 	char str[1000];
-	fgets(str, 100, stdin);
-	/*//std::unique_ptr<Board> board = std::make_unique<Board>(str);
+	//fgets(str, 100, stdin);
+	//std::unique_ptr<Board> board = std::make_unique<Board>(str);
 	//std::unique_ptr<Board> board = std::make_unique<Board>(g_StartingFEN);
 	std::unique_ptr<Board> board = std::make_unique<Board>("rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR b KQkq - 1 1");
 	while (true) {
@@ -52,6 +51,5 @@ int main() {
 
 		move = GetMove(str, *board);
 		board = std::make_unique<Board>(board->MovePiece(move));
-	}*/
-
+	}
 }

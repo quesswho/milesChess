@@ -193,40 +193,6 @@ public: // TODO: make bitboard private and use constructors and move functions f
 
     Board MovePiece(const Move& move) const;
 
-    uint64 Check(uint64& danger, uint64& check, uint64& rookPin, uint64& bishopPin, uint64& enPassant) const;
-
-    inline uint64 Player(const bool white) const {
-        return white ? m_White : m_Black;
-    }
-
-    inline uint64 Enemy(const bool white) const {
-        return white ? m_Black : m_White;
-    }
-
-    inline uint64 Pawn(const bool white) const {
-        return white ? m_WhitePawn : m_BlackPawn;
-    }
-
-    inline uint64 Knight(const bool white) const {
-        return white ? m_WhiteKnight : m_BlackKnight;
-    }
-
-    inline uint64 Bishop(const bool white) const {
-        return white ? m_WhiteBishop : m_BlackBishop;
-    }
-
-    inline uint64 Rook(const bool white) const {
-        return white ? m_WhiteRook : m_BlackRook;
-    }
-
-    inline uint64 Queen(const bool white) const {
-        return white ? m_WhiteQueen : m_BlackQueen;
-    }
-
-    inline uint64 King(const bool white) const {
-        return white ? m_WhiteKing : m_BlackKing;
-    }
-
     inline uint64 CastleKing(uint64 danger, const bool white) const {
         return white ? ((m_BoardInfo.m_WhiteCastleKing && (m_Board & 0b110) == 0 && (danger & 0b1110) == 0) && (m_WhiteRook & 0b1) > 0) * (1ull << 1) : (m_BoardInfo.m_BlackCastleKing && ((m_Board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0) && (m_BlackRook & 0b1ull << 56) > 0) * (1ull << 57);
     }
@@ -352,68 +318,4 @@ static std::string BoardtoFen(const Board& board) {
     FEN += ' ' + std::to_string(board.m_BoardInfo.m_FullMoves);
 
     return FEN;
-}
-
-static Move GetMove(std::string str, const Board& board) {
-    const bool white = board.m_BoardInfo.m_WhiteMove;
-    const uint64 from = 1ull << ('h' - str[0] + (str[1] - '1') * 8);
-    const int posTo = ('h' - str[2] + (str[3] - '1') * 8);
-    const uint64 to = 1ull << posTo;
-
-    MoveType type = MoveType::NONE;
-    if (str.size() > 4) {
-        switch (str[4]) {
-        case 'k':
-            type = MoveType::P_KNIGHT;
-            break;
-        case 'b':
-            type = MoveType::P_BISHOP;
-            break;
-        case 'r':
-            type = MoveType::P_ROOK;
-            break;
-        case 'q':
-            type = MoveType::P_ROOK;
-            break;
-        }
-    }
-    else {
-        if (board.Pawn(white) & from) {
-            if (board.Pawn2Forward(board.Pawn(white) & from, white) == to) {
-                type = MoveType::PAWN2;
-            }
-            else if (board.m_BoardInfo.m_EnPassant & to) {
-                type = MoveType::EPASSANT;
-            }
-            else {
-                type = MoveType::PAWN;
-            }
-        }
-        else if (board.Knight(white) & from) {
-            type = MoveType::KNIGHT;
-        }
-        else if (board.Bishop(white) & from) {
-            type = MoveType::BISHOP;
-        }
-        else if (board.Rook(white) & from) {
-            type = MoveType::ROOK;
-        }
-        else if (board.Queen(white) & from) {
-            type = MoveType::QUEEN;
-        }
-        else if (board.King(white) & from) {
-            uint64 danger, a, b, c,d;
-            board.Check(danger,a,b,c,d);
-            if (board.CastleKing(danger, white) && !(Lookup::king_attacks[posTo] & from)) {
-                type = MoveType::KCASTLE;
-            } else if (board.CastleQueen(danger, white) && !(Lookup::king_attacks[posTo] & from)) {
-                type = MoveType::QCASTLE;
-            } else {
-                type = MoveType::KING;
-            }
-        }
-    }
-
-    assert("Could not read move", type == MoveType::NONE);
-    return Move(from, to, type);
 }

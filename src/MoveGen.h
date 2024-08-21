@@ -2,11 +2,102 @@
 
 #include "Movelist.h"
 
+static uint64 Danger(bool white, const Board& board) {
+    bool enemy = !white;
+    uint64 danger = PawnAttack(board, enemy);
+
+    uint64 knights = Knight(board, enemy);
+
+    while (knights > 0) { // Loop each bit
+        danger |= Lookup::knight_attacks[PopPos(knights)];
+    }
+
+    uint64 bishops = Bishop(board, enemy) | Queen(board, enemy);
+    while (bishops > 0) { // Loop each bit
+        int pos = PopPos(bishops);
+        danger |= (board.BishopAttack(pos, board.m_Board) & ~(1ull << pos));
+    }
+    uint64 rooks = Rook(board, enemy) | Queen(board, enemy);
+
+    while (rooks > 0) { // Loop each bit
+        int pos = PopPos(rooks);
+        danger |= (board.RookAttack(pos, board.m_Board) & ~(1ull << pos));
+    }
+
+    danger |= Lookup::king_attacks[GET_SQUARE(King(board, enemy))];
+
+    return danger;
+}
+
+Move GetMove(std::string str, const Board& board) {
+    const bool white = board.m_BoardInfo.m_WhiteMove;
+    const uint64 from = 1ull << ('h' - str[0] + (str[1] - '1') * 8);
+    const int posTo = ('h' - str[2] + (str[3] - '1') * 8);
+    const uint64 to = 1ull << posTo;
+
+    MoveType type = MoveType::NONE;
+    if (str.size() > 4) {
+        switch (str[4]) {
+        case 'k':
+            type = MoveType::P_KNIGHT;
+            break;
+        case 'b':
+            type = MoveType::P_BISHOP;
+            break;
+        case 'r':
+            type = MoveType::P_ROOK;
+            break;
+        case 'q':
+            type = MoveType::P_ROOK;
+            break;
+        }
+    }
+    else {
+        if (Pawn(board, white) & from) {
+            if (board.Pawn2Forward(Pawn(board, white) & from, white) == to) {
+                type = MoveType::PAWN2;
+            }
+            else if (board.m_BoardInfo.m_EnPassant & to) {
+                type = MoveType::EPASSANT;
+            }
+            else {
+                type = MoveType::PAWN;
+            }
+        }
+        else if (Knight(board, white) & from) {
+            type = MoveType::KNIGHT;
+        }
+        else if (Bishop(board, white) & from) {
+            type = MoveType::BISHOP;
+        }
+        else if (Rook(board, white) & from) {
+            type = MoveType::ROOK;
+        }
+        else if (Queen(board, white) & from) {
+            type = MoveType::QUEEN;
+        }
+        else if (King(board, white) & from) {
+            uint64 danger = Danger(white, board);
+            if (board.CastleKing(danger, white) && !(Lookup::king_attacks[posTo] & from)) {
+                type = MoveType::KCASTLE;
+            }
+            else if (board.CastleQueen(danger, white) && !(Lookup::king_attacks[posTo] & from)) {
+                type = MoveType::QCASTLE;
+            }
+            else {
+                type = MoveType::KING;
+            }
+        }
+    }
+
+    assert("Could not read move", type == MoveType::NONE);
+    return Move(from, to, type);
+}
+
 class MoveGen {
 public:
     
-    uint64 Check(const Board& board, uint64& danger, uint64& active, uint64& rookPin, uint64& bishopPin, uint64& enPassant) const {
-        const bool white = board.m_BoardInfo.m_WhiteMove;
+    uint64 Check(bool white, const Board& board, uint64& danger, uint64& active, uint64& rookPin, uint64& bishopPin, uint64& enPassant) const {
         bool enemy = !white;
 
         int kingsq = GET_SQUARE(King(board, white));
@@ -111,7 +202,7 @@ public:
         const bool white = board.m_BoardInfo.m_WhiteMove;
         const bool enemy = !white;
         uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = board.m_BoardInfo.m_EnPassant;
-        uint64 enPassantCheck = Check(board, danger, active, rookPin, bishopPin, enPassant);
+        uint64 enPassantCheck = Check(white, board, danger, active, rookPin, bishopPin, enPassant);
         uint64 moveable = ~Player(board, white) & active;
 
         // Pawns
