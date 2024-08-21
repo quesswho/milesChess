@@ -29,13 +29,14 @@ int main() {
 	//printf("%llu\n", Perft("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 6));
 	//printf("%llu\n", Perft("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 7));
 	//printf("%llu\n", Perft("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 5));
-	printf("%llu\n", Perft(g_StartingFEN, 6));
+	//printf("%llu\n", Perft(g_StartingFEN, 6));
 
+	Lookup::PrintZobristConstants();
 	char str[1000];
-	//fgets(str, 100, stdin);
-	//std::unique_ptr<Board> board = std::make_unique<Board>(str);
-	std::unique_ptr<Board> board = std::make_unique<Board>(g_StartingFEN);
-	//std::unique_ptr<Board> board = std::make_unique<Board>("r2q4/pp1k1p1p/2pP4/8/3p1p2/3P4/PP1P3n/RNB2R1K w - - 0 21");
+	fgets(str, 100, stdin);
+	/*//std::unique_ptr<Board> board = std::make_unique<Board>(str);
+	//std::unique_ptr<Board> board = std::make_unique<Board>(g_StartingFEN);
+	std::unique_ptr<Board> board = std::make_unique<Board>("rnbqkbnr/pppppppp/8/8/8/2N5/PPPPPPPP/R1BQKBNR b KQkq - 1 1");
 	while (true) {
 		Move move = BestMove(*board, 6);
 		if (move.m_Type == MoveType::NONE) {
@@ -51,5 +52,6 @@ int main() {
 
 		move = GetMove(str, *board);
 		board = std::make_unique<Board>(board->MovePiece(move));
-	}
+	}*/
+
 }

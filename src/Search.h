@@ -1,6 +1,6 @@
 #pragma once
 
-#include "board.h"
+#include "MoveGen.h"
 
 static int64 Evaluate(const Board& board) {
 
@@ -79,7 +79,8 @@ static int64 Evaluate(const Board& board) {
 }
 
 static uint64 Perft_r(const Board& board, int depth, int maxdepth) {
-	const std::vector<Move> moves = board.GenerateMoves();
+	MoveGen gen;
+	const std::vector<Move> moves = gen.GenerateMoves(board);
 	if (depth == 1) return moves.size();
 
 	int64 result = 0;
@@ -97,26 +98,44 @@ static uint64 Perft(std::string str, int depth) {
 	Timer time;
 	Board board(str);
 	time.Start();
-	uint64 result = Perft_r(board, depth, depth) / 1000000.0f;
+	uint64 result = Perft_r(board, depth, depth);
 	float t = time.End();
-	printf("%.3fMNodes/s\n", result / t);
+	printf("%.3fMNodes/s\n", (result / 1000000.0f) / t);
 	return result;
 }
 
-static int64 AlphaBeta_r(Board board, int64 alpha, int64 beta, int depth) {
+struct Line {
+	Line() 
+		: count(0), moves()
+	{
+	}
+
+	int count; // Number of moves
+	Move moves[64];
+};
+
+static int64 AlphaBeta_r(Board board, int64 alpha, int64 beta, int depth, Line* pline) {
 	int64 sgn = board.m_BoardInfo.m_WhiteMove ? 1 : -1;
-	if (depth == 0) return sgn * Evaluate(board);
-	const std::vector<Move> moves = board.GenerateMoves();
+	if (depth == 0) {
+		return sgn * Evaluate(board);
+	}
+	MoveGen gen;
+	const std::vector<Move> moves = gen.GenerateMoves(board);
 	if (moves.size() == 0) {
+		
 		return -sgn * (10000+depth); // Mate in 0 is 10000 centipawns worth
 	}
+	Line line;
 	int64 bestScore = -110000;
 	for (const Move& move : moves) {
-		int64 score = -AlphaBeta_r(board.MovePiece(move), -beta, -alpha, depth - 1);
+		int64 score = -AlphaBeta_r(board.MovePiece(move), -beta, -alpha, depth - 1, &line);
 		if (score > bestScore) {
 			bestScore = score;
 			if (score > alpha) {
 				alpha = score;
+				pline->moves[0] = move;
+				memcpy(pline->moves + 1, line.moves, line.count * sizeof(Move));
+				pline->count = line.count + 1;
 			}
 		}
 		if (score >= beta) { // Exit out early
@@ -127,12 +146,14 @@ static int64 AlphaBeta_r(Board board, int64 alpha, int64 beta, int depth) {
 }
 
 static Move BestMove(Board board, int depth) {
-	const std::vector<Move> moves = board.GenerateMoves();
+	Line* line = new Line();
+	MoveGen gen;
+	const std::vector<Move> moves = gen.GenerateMoves(board);
 	if (moves.size() == 0) return Move(0, 0, MoveType::NONE);
 	Move best = moves[0];
 	int64 bestscore = -110000;
 	for (const Move& move : moves) {
-		int64 score = -AlphaBeta_r(board.MovePiece(move), -110000, 110000, depth - 1);
+		int64 score = -AlphaBeta_r(board.MovePiece(move), -110000, 110000, depth - 1, line);
 		if (score > bestscore) {
 			bestscore = score;
 			best = move;

@@ -1,5 +1,4 @@
 #include "board.h"
-
 #include <immintrin.h> // _lzcnt_u64(x)
 #include <stdio.h>
 
@@ -35,6 +34,7 @@ uint64_t Board::BishopXray(int pos, uint64_t occ) const {
     uint64_t attacks = BishopAttack(pos, occ);
     return attacks ^ BishopAttack(pos, occ ^ (attacks & occ));
 }
+
 
 uint64 Board::PawnForward(uint64 pawns, const bool white) const {
     return white ? pawns << 8 : pawns >> 8;
@@ -236,6 +236,9 @@ Board Board::MovePiece(const Move& move) const {
             return Board(wp & (~move.m_From), wkn, wb, wr | move.m_To, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk, info);
         case MoveType::P_QUEEN:
             return Board(wp & (~move.m_From), wkn, wb, wr, wq | move.m_To, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk, info);
+        case MoveType::NONE:
+            assert("Invalid move!");
+            break;
         }
     }
     else {
@@ -278,221 +281,9 @@ Board Board::MovePiece(const Move& move) const {
             return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp & (~move.m_From), bkn, bb, br | move.m_To, bq, bk, info);
         case MoveType::P_QUEEN:
             return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp & (~move.m_From), bkn, bb, br, bq | move.m_To, bk, info);
+        case MoveType::NONE:
+            assert("Invalid move!");
+            break;
         }
     }
-}
-
-
-std::vector<Move> Board::GenerateMoves() const {
-    std::vector<Move> result;
-
-    const bool white = m_BoardInfo.m_WhiteMove;
-    const bool enemy = !white;
-    uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_BoardInfo.m_EnPassant;
-    uint64 enPassantCheck = Check(danger, active, rookPin, bishopPin, enPassant);
-    uint64 moveable = ~Player(white) & active;
-
-    // Pawns
-
-    uint64 pawns = Pawn(white);
-    uint64 nonBishopPawn = pawns & ~bishopPin;
-
-    uint64 FPawns = PawnForward(nonBishopPawn, white) & (~m_Board) & active; // No diagonally pinned pawn can move forward
-
-    uint64 F2Pawns = PawnForward(nonBishopPawn & Lookup::StartingPawnRank(white), white) & ~m_Board;
-    F2Pawns = PawnForward(F2Pawns, white) & (~m_Board) & active; // TODO: Use Fpawns to save calculation
-
-    uint64 pinnedFPawns = FPawns & PawnForward(rookPin, white);
-    uint64 pinnedF2Pawns = F2Pawns & Pawn2Forward(rookPin, white);
-    uint64 movePinFPawns = FPawns & rookPin; // Pinned after moving
-    uint64 movePinF2Pawns = F2Pawns & rookPin;
-    FPawns = FPawns & (~pinnedFPawns | movePinFPawns);
-    F2Pawns = F2Pawns & (~pinnedF2Pawns | movePinF2Pawns);
-
-    for (; const uint64 bit = PopBit(FPawns); FPawns > 0) { // Loop each bit
-        if ((bit & Lookup::FirstRank(enemy)) > 0) { // If promote
-            result.push_back({ PawnForward(bit, enemy), bit, MoveType::P_KNIGHT });
-            result.push_back({ PawnForward(bit, enemy), bit, MoveType::P_BISHOP });
-            result.push_back({ PawnForward(bit, enemy), bit, MoveType::P_ROOK });
-            result.push_back({ PawnForward(bit, enemy), bit, MoveType::P_QUEEN });
-        }
-        else {
-            result.push_back({ PawnForward(bit, enemy), bit, MoveType::PAWN });
-        }
-    }
-
-    for (; const uint64 bit = PopBit(F2Pawns); F2Pawns > 0) { // Loop each bit
-        result.push_back({ Pawn2Forward(bit, enemy), bit, MoveType::PAWN2 });
-    }
-
-
-    const uint64 nonRookPawns = pawns & ~rookPin;
-    uint64 RPawns = PawnAttackRight(nonRookPawns, white) & Enemy(white) & active;
-    uint64 LPawns = PawnAttackLeft(nonRookPawns, white) & Enemy(white) & active;
-
-    uint64 pinnedRPawns = RPawns & PawnAttackRight(bishopPin, white);
-    uint64 pinnedLPawns = LPawns & PawnAttackLeft(bishopPin, white);
-    uint64 movePinRPawns = RPawns & bishopPin; // is it pinned after move
-    uint64 movePinLPawns = LPawns & bishopPin;
-    RPawns = RPawns & (~pinnedRPawns | movePinRPawns);
-    LPawns = LPawns & (~pinnedLPawns | movePinLPawns);
-
-    for (; uint64 bit = PopBit(RPawns); RPawns > 0) { // Loop each bit
-        if ((bit & Lookup::FirstRank(enemy)) > 0) { // If promote
-            result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_KNIGHT });
-            result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_BISHOP });
-            result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_ROOK });
-            result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_QUEEN });
-        }
-        else {
-            result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::PAWN });
-        }
-    }
-
-    for (; uint64 bit = PopBit(LPawns); LPawns > 0) { // Loop each bit
-        if ((bit & Lookup::FirstRank(enemy)) > 0) { // If promote
-            result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_KNIGHT });
-            result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_BISHOP });
-            result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_ROOK });
-            result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_QUEEN });
-        }
-        else {
-            result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::PAWN });
-        }
-    }
-
-
-    // En passant
-    
-    uint64 REPawns = PawnAttackRight(nonRookPawns, white) & enPassant & (active | enPassantCheck);
-    uint64 LEPawns = PawnAttackLeft(nonRookPawns, white) & enPassant & (active | enPassantCheck);
-    uint64 pinnedREPawns = REPawns & PawnAttackRight(bishopPin, white);
-    uint64 stillPinREPawns = REPawns & bishopPin;
-    REPawns = REPawns & (~pinnedREPawns | stillPinREPawns);
-    if (REPawns > 0) {
-        uint64 bit = PopBit(REPawns);
-        result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::EPASSANT });
-    }
-
-    uint64 pinnedLEPawns = LEPawns & PawnAttackLeft(bishopPin, white);
-    uint64 stillPinLEPawns = LEPawns & bishopPin;
-    LEPawns = LEPawns & (~pinnedLEPawns | stillPinLEPawns);
-    if (LEPawns > 0) {
-        uint64 bit = PopBit(LEPawns);
-        result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::EPASSANT });
-    }
-    
-    
-
-    // Kinghts
-
-    uint64 knights = Knight(white) & ~(rookPin | bishopPin); // Pinned knights can not move
-
-    while (knights > 0) { // Loop each bit
-        int pos = PopPos(knights);
-        uint64 moves = Lookup::knight_attacks[pos] & moveable;
-        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-            result.push_back({ 1ull << pos, bit, MoveType::KNIGHT });
-        }
-    }
-
-    // Bishops
-
-    uint64 bishops = Bishop(white) & ~rookPin; // A rook pinned bishop can not move
-
-    uint64 pinnedBishop = bishopPin & bishops;
-    uint64 notPinnedBishop = bishops ^ pinnedBishop;
-
-    while (pinnedBishop > 0) {
-        int pos = PopPos(pinnedBishop);
-        uint64 moves = BishopAttack(pos, m_Board) & moveable & bishopPin;
-        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-            result.push_back({ 1ull << pos, bit, MoveType::BISHOP });
-        }
-    }
-
-    while (notPinnedBishop > 0) {
-        int pos = PopPos(notPinnedBishop);
-        uint64 moves = BishopAttack(pos, m_Board) & moveable;
-        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-            result.push_back({ 1ull << pos, bit, MoveType::BISHOP });
-        }
-    }
-
-    // Rooks
-    uint64 rooks = Rook(white) & ~bishopPin; // A bishop pinned rook can not move
-
-    uint64 pinnedRook = rookPin & rooks;
-    uint64 notPinnedRook = rooks ^ pinnedRook;
-
-    while (pinnedRook > 0) {
-        int pos = PopPos(pinnedRook);
-        uint64 moves = RookAttack(pos, m_Board) & moveable & rookPin;
-        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-            result.push_back({ 1ull << pos, bit, MoveType::ROOK });
-        }
-    }
-
-    while (notPinnedRook > 0) {
-        int pos = PopPos(notPinnedRook);
-        uint64 moves = RookAttack(pos, m_Board) & moveable;
-        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-            result.push_back({ 1ull << pos, bit, MoveType::ROOK });
-        }
-    }
-
-    // Queens
-    uint64 queens = Queen(white);
-
-    uint64 pinnedStraightQueen = rookPin & queens;
-    uint64 pinnedDiagonalQueen = bishopPin & queens;
-
-    uint64 notPinnedQueen = queens ^ (pinnedStraightQueen | pinnedDiagonalQueen);
-    
-
-    while (pinnedStraightQueen > 0) {
-        int pos = PopPos(pinnedStraightQueen);
-        uint64 moves = RookAttack(pos, m_Board) & moveable & rookPin;
-        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-            result.push_back({ 1ull << pos, bit, MoveType::QUEEN });
-        }
-    }
-
-    while (pinnedDiagonalQueen > 0) {
-        int pos = PopPos(pinnedDiagonalQueen);
-        uint64 moves = BishopAttack(pos, m_Board) & moveable & bishopPin;
-        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-            result.push_back({ 1ull << pos, bit, MoveType::QUEEN });
-        }
-    }
-
-    while (notPinnedQueen > 0) {
-        int pos = PopPos(notPinnedQueen);
-        uint64 moves = QueenAttack(pos, m_Board) & moveable;
-        for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-            result.push_back({ 1ull << pos, bit, MoveType::QUEEN });
-        }
-    }
-
-     // King
-    int kingpos = GET_SQUARE(King(white));
-    uint64 moves = Lookup::king_attacks[kingpos] & ~Player(white);
-    moves &= ~danger;
-    
-    for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-        result.push_back({ 1ull << kingpos, bit, MoveType::KING });
-    }
-
-    // Castles
-    uint64 CK = CastleKing(danger, white);
-    uint64 CQ = CastleQueen(danger, white);
-    if (CK) {
-        result.push_back({ King(white), CK, MoveType::KCASTLE });
-    }
-    if (CQ) {
-        result.push_back({ King(white), CQ, MoveType::QCASTLE });
-    }
-
-
-    return result;
 }

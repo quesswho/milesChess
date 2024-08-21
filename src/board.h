@@ -104,6 +104,10 @@ enum class MoveType {
 
 struct Move {
 
+    Move()
+        : m_From(0), m_To(0), m_Type(MoveType::NONE)
+    {}
+
     Move(uint64 from, uint64 to, MoveType movetype)
         : m_From(from), m_To(to), m_Type(movetype)
     {}
@@ -190,8 +194,6 @@ public: // TODO: make bitboard private and use constructors and move functions f
     Board MovePiece(const Move& move) const;
 
     uint64 Check(uint64& danger, uint64& check, uint64& rookPin, uint64& bishopPin, uint64& enPassant) const;
-
-    std::vector<Move> GenerateMoves() const;
 
     inline uint64 Player(const bool white) const {
         return white ? m_White : m_Black;
