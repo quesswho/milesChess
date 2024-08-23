@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 #include <array>
 #include <vector>
@@ -9,6 +11,10 @@
 #define GET_SQUARE(X) _tzcnt_u64(X)
 
 struct BoardInfo {
+    BoardInfo()
+        : m_WhiteMove(true), m_EnPassant(0), m_WhiteCastleKing(true), m_WhiteCastleQueen(true), m_BlackCastleKing(true), m_BlackCastleQueen(true), m_HalfMoves(0), m_FullMoves(0)
+    {}
+
     bool m_WhiteMove;
     uint64 m_EnPassant;
 
@@ -139,7 +145,7 @@ struct Move {
 */
 
 class Board {
-public: // TODO: make bitboard private and use constructors and move functions for changing them
+public:
     const uint64 m_WhitePawn;
     const uint64 m_WhiteKnight;
     const uint64 m_WhiteBishop;
@@ -158,22 +164,19 @@ public: // TODO: make bitboard private and use constructors and move functions f
     const uint64 m_Black;
     const uint64 m_Board;
 
-    BoardInfo m_BoardInfo; // TODO: Move this somewhere else so Board can be constant
-
     Board(const std::string& FEN);
 
-    Board(uint64 wp, uint64 wkn, uint64 wb, uint64 wr, uint64 wq, uint64 wk, uint64 bp, uint64 bkn, uint64 bb, uint64 br, uint64 bq, uint64 bk, BoardInfo info)
+    Board(uint64 wp, uint64 wkn, uint64 wb, uint64 wr, uint64 wq, uint64 wk, uint64 bp, uint64 bkn, uint64 bb, uint64 br, uint64 bq, uint64 bk)
         : m_WhitePawn(wp), m_WhiteKnight(wkn), m_WhiteBishop(wb), m_WhiteRook(wr), m_WhiteQueen(wq), m_WhiteKing(wk), 
           m_BlackPawn(bp), m_BlackKnight(bkn), m_BlackBishop(bb), m_BlackRook(br), m_BlackQueen(bq), m_BlackKing(bk),
-          m_White(wp | wkn | wb | wr | wq | wk), m_Black(bp | bkn | bb | br | bq | bk), m_Board(m_White | m_Black),
-          m_BoardInfo(info)
+          m_White(wp | wkn | wb | wr | wq | wk), m_Black(bp | bkn | bb | br | bq | bk), m_Board(m_White | m_Black)
     {}
 
     Board(const Board& other)
         : m_WhitePawn(other.m_WhitePawn),m_WhiteKnight(other.m_WhiteKnight),m_WhiteBishop(other.m_WhiteBishop),m_WhiteRook(other.m_WhiteRook),
         m_WhiteQueen(other.m_WhiteQueen),m_WhiteKing(other.m_WhiteKing),m_BlackPawn(other.m_BlackPawn),m_BlackKnight(other.m_BlackKnight),
         m_BlackBishop(other.m_BlackBishop),m_BlackRook(other.m_BlackRook),m_BlackQueen(other.m_BlackQueen),m_BlackKing(other.m_BlackKing),
-        m_White(other.m_White),m_Black(other.m_Black), m_Board(other.m_Board), m_BoardInfo(other.m_BoardInfo)
+        m_White(other.m_White),m_Black(other.m_Black), m_Board(other.m_Board)
     {}
 
     uint64 RookAttack(int pos, uint64 occ) const;
@@ -182,27 +185,9 @@ public: // TODO: make bitboard private and use constructors and move functions f
 
     uint64_t RookXray(int pos, uint64_t occ) const;
     uint64_t BishopXray(int pos, uint64_t occ) const;
-
-    uint64 PawnForward(uint64 pawns, const bool white) const;
-    uint64 Pawn2Forward(uint64 pawns, const bool white) const;
-    uint64 PawnRight(const bool white) const;
-    uint64 PawnLeft(const bool white) const;
-    uint64 PawnAttack(const bool white) const;
-    uint64 PawnAttackRight(uint64 pawns, const bool white) const;
-    uint64 PawnAttackLeft(uint64 pawns, const bool white) const;
-
-    Board MovePiece(const Move& move) const;
-
-    inline uint64 CastleKing(uint64 danger, const bool white) const {
-        return white ? ((m_BoardInfo.m_WhiteCastleKing && (m_Board & 0b110) == 0 && (danger & 0b1110) == 0) && (m_WhiteRook & 0b1) > 0) * (1ull << 1) : (m_BoardInfo.m_BlackCastleKing && ((m_Board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0) && (m_BlackRook & 0b1ull << 56) > 0) * (1ull << 57);
-    }
-
-    inline uint64 CastleQueen(uint64 danger, const bool white) const {
-        return white ? ((m_BoardInfo.m_WhiteCastleQueen && (m_Board & 0b01110000) == 0 && (danger & 0b00111000) == 0) && (m_WhiteRook & 0b10000000) > 0) * (1ull << 5) : (m_BoardInfo.m_BlackCastleQueen && ((m_Board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0) && (m_BlackRook & (0b10000000ull << 56)) > 0) * (1ull << 61);
-    }
 };
 
-static std::string BoardtoFen(const Board& board) {
+static std::string BoardtoFen(const Board& board, const BoardInfo& info) {
     std::string FEN;
     FEN.reserve(27); // Shortest FEN could be: k7/8/8/8/8/8/8/7K w - - 0 1
     // Board
@@ -278,33 +263,33 @@ static std::string BoardtoFen(const Board& board) {
         }
     }
 
-    if (board.m_BoardInfo.m_WhiteMove) {
+    if (info.m_WhiteMove) {
         FEN += " w ";
     } else {
         FEN += " b ";
     }
 
     // Castle rights
-    if (board.m_BoardInfo.m_WhiteCastleKing) {
+    if (info.m_WhiteCastleKing) {
         FEN += "K";
     }
-    if (board.m_BoardInfo.m_WhiteCastleQueen) {
+    if (info.m_WhiteCastleQueen) {
         FEN += "Q";
     }
-    if (board.m_BoardInfo.m_BlackCastleKing) {
+    if (info.m_BlackCastleKing) {
         FEN += "k";
     }
-    if (board.m_BoardInfo.m_BlackCastleQueen) {
+    if (info.m_BlackCastleQueen) {
         FEN += "q";
     }
-    if (!(board.m_BoardInfo.m_WhiteCastleKing || board.m_BoardInfo.m_WhiteCastleQueen || board.m_BoardInfo.m_BlackCastleKing || board.m_BoardInfo.m_BlackCastleQueen)) {
+    if (!(info.m_WhiteCastleKing || info.m_WhiteCastleQueen || info.m_BlackCastleKing || info.m_BlackCastleQueen)) {
         FEN += '-';
     }
 
     FEN += ' ';
-    if (board.m_BoardInfo.m_EnPassant > 0) {
-        char pos = 'h' - ((int)(log2(board.m_BoardInfo.m_EnPassant)) % 8);
-        if (board.m_BoardInfo.m_WhiteMove) {
+    if (info.m_EnPassant > 0) {
+        char pos = 'h' - ((int)(log2(info.m_EnPassant)) % 8);
+        if (info.m_WhiteMove) {
             FEN += pos + std::to_string(6);
         }
         else {
@@ -314,8 +299,87 @@ static std::string BoardtoFen(const Board& board) {
         FEN += '-';
     }
 
-    FEN += ' ' + std::to_string(board.m_BoardInfo.m_HalfMoves);
-    FEN += ' ' + std::to_string(board.m_BoardInfo.m_FullMoves);
+    FEN += ' ' + std::to_string(info.m_HalfMoves);
+    FEN += ' ' + std::to_string(info.m_FullMoves);
 
     return FEN;
+}
+
+static uint64 Zobrist_Hash(const Board& board, const BoardInfo& info) {
+    uint64 result = 0;
+
+    uint64 wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
+        bp = board.m_BlackPawn, bkn = board.m_BlackKnight, bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
+
+    while (wp > 0) {
+        int pos = PopPos(wp);
+        result ^= Lookup::zobrist[pos];
+    }
+
+    while (bp > 0) {
+        int pos = PopPos(bp);
+        result ^= Lookup::zobrist[pos+64];
+    }
+
+    // Knights
+    while (wkn > 0) {
+        int pos = 63 - PopPos(wkn);
+        result ^= Lookup::zobrist[pos + 64 * 2];
+    }
+
+    while (bkn > 0) {
+        int pos = PopPos(bkn);
+        result ^= Lookup::zobrist[pos + 64 * 3];
+    }
+
+    // Bishops
+    while (wb > 0) {
+        int pos = 63 - PopPos(wb);
+        result ^= Lookup::zobrist[pos + 64 * 4];
+    }
+
+    while (bb > 0) {
+        int pos = PopPos(bb);
+        result ^= Lookup::zobrist[pos + 64 * 5];
+    }
+
+    // Rooks
+    while (wr > 0) {
+        int pos = 63 - PopPos(wr);
+        result ^= Lookup::zobrist[pos + 64 * 6];
+    }
+
+    while (br > 0) {
+        int pos = PopPos(br);
+        result ^= Lookup::zobrist[pos + 64 * 7];
+    }
+
+    while (wq > 0) {
+        int pos = 63 - PopPos(wq);
+        result ^= Lookup::zobrist[pos + 64 * 8];
+    }
+
+    while (bq > 0) {
+        int pos = PopPos(bq);
+        result ^= Lookup::zobrist[pos + 64 * 9];
+    }
+
+    while (wk > 0) {
+        int pos = 63 - PopPos(wk);
+        result ^= Lookup::zobrist[pos + 64 * 10];
+    }
+
+    while (bk > 0) {
+        int pos = PopPos(bk);
+        result ^= Lookup::zobrist[pos + 64 * 11];
+    }
+
+    if(info.m_WhiteMove) result ^= Lookup::zobrist[64 * 12];
+    if (info.m_WhiteCastleKing) result ^= Lookup::zobrist[64 * 12 + 1];
+    if (info.m_WhiteCastleQueen) result ^= Lookup::zobrist[64 * 12 + 2];
+    if (info.m_BlackCastleKing) result ^= Lookup::zobrist[64 * 12 + 3];
+    if (info.m_BlackCastleQueen) result ^= Lookup::zobrist[64 * 12 + 4];
+    if (info.m_EnPassant) result ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(info.m_EnPassant) % 8)];
+
+    return result;
 }

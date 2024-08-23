@@ -37,15 +37,15 @@ void UCI::Start() {
         else if (token == "position") {
             GetToken(istream, token);
             if (token == "startpos") {
-
-            }
-            else if (token == "fen") {
+                m_Search.LoadPosition(Lookup::starting_pos);
+            } else if (token == "fen") {
                 std::string fen;
                 while (!istream.eof()) {
                     GetToken(istream, token);
                     fen += token;
                     fen += " ";
                 }
+                m_Search.LoadPosition(fen);
             }
         }
     }

@@ -136,11 +136,6 @@ namespace Lookup {
         }
     }
 
-
-
-    
-
-
     // 0: File, 1: Rank, 2: Diagonal, 3: AntiDiagonal
     static constexpr std::array<llu, 64 * 4> lines = {
         0x0101010101010101, 0x00000000000000ff, 0x8040201008040201, 0x0000000000000001,
@@ -299,6 +294,8 @@ namespace Lookup {
         0x0102040810204080, 0x0205081020408000, 0x040a112040800000, 0x0814224180000000,
         0x1028448201000000, 0x2050880402010000, 0x40a0100804020100, 0x8040201008040201
     };
+
+    static constexpr const char* starting_pos = { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" };
 
     static constexpr llu StartingPawnRank(const bool white) {
         return white ? lines[8 * 4 + 1] : lines[8 * 6 * 4 + 1];
@@ -2596,7 +2593,7 @@ namespace Lookup {
         0x7000000000000000, 0x6000000000000000, 0x4000000000000000, 000000000000000000
     };
 
-    static constexpr uint64 pawn_table[64] = {
+    static constexpr int pawn_table[64] = {
         0,   0,  0,  0,  0,  0,  0,  0,
         50, 50, 50, 50, 50, 50, 50, 50,
         10, 10, 20, 30, 30, 20, 10, 10,
@@ -2607,7 +2604,7 @@ namespace Lookup {
         0,   0,  0,  0,  0,  0,  0,  0,
     };
 
-    static constexpr uint64 knight_table[64] = {
+    static constexpr int knight_table[64] = {
         -50,-40,-30,-30,-30,-30,-40,-50,
         -40,-20,  0,  0,  0,  0,-20,-40,
         -30,  0, 10, 15, 15, 10,  0,-30,
@@ -2618,7 +2615,7 @@ namespace Lookup {
         -50,-40,-30,-30,-30,-30,-40,-50,
     };
 
-    static constexpr uint64 bishop_table[64] = {
+    static constexpr int bishop_table[64] = {
         -20,-10,-10,-10,-10,-10,-10,-20,
         -10,  0,  0,  0,  0,  0,  0,-10,
         -10,  0,  5, 10, 10,  5,  0,-10,
@@ -2629,7 +2626,7 @@ namespace Lookup {
         -20,-10,-10,-10,-10,-10,-10,-20
     };
 
-    static constexpr uint64 rook_table[64] = {
+    static constexpr int rook_table[64] = {
          0,  0,  0,  0,  0,  0,  0,  0,
          5, 10, 10, 10, 10, 10, 10,  5,
         -5,  0,  0,  0,  0,  0,  0, -5,
@@ -2640,7 +2637,7 @@ namespace Lookup {
          0,  0,  0,  5,  5,  0,  0,  0
     };
 
-    static constexpr uint64 queen_table[64] = {
+    static constexpr int queen_table[64] = {
         -20,-10,-10, -5, -5,-10,-10,-20,
         -10,  0,  0,  0,  0,  0,  0,-10,
         -10,  0,  5,  5,  5,  5,  0,-10,
@@ -2651,7 +2648,7 @@ namespace Lookup {
         -20,-10,-10, -5, -5,-10,-10,-20
     };
 
-    static constexpr uint64 king_table[64] = {
+    static constexpr int king_table[64] = {
         -30,-40,-40,-50,-50,-40,-40,-30,
         -30,-40,-40,-50,-50,-40,-40,-30,
         -30,-40,-40,-50,-50,-40,-40,-30,
@@ -2674,6 +2671,20 @@ namespace Lookup {
     }
 
     // Random constants used for zobrist hashing
+    /*
+        0-63: white pawn
+        64 - 63+64: black pawn
+        ...: white knight
+        ...
+        ... bishop
+        ... rook
+        ... queen
+        ... king
+        64*12: white active color
+        64*12+1: whitecastle
+
+
+    */
     static constexpr uint64 zobrist[781] = {
         0x1346dae1f2b2e7d8, 0x4ce15ee050a26deb, 0x8ee768c74613ecf2, 0x828fa53d48ebcc74,
         0x6e5d2ff014d569b6, 0x41b9aa988c239020, 0xc85c18062906fbf2, 0x9af0c0bf0652c713,

@@ -41,9 +41,6 @@
     <ClInclude Include="src\UCI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\MoveGen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Movelist.h">
       <Filter>Header Files</Filter>
     </ClInclude>
