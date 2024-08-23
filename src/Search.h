@@ -10,17 +10,17 @@ private:
 	int m_Maxdepth; // Maximum depth currently set
 	BoardInfo m_Info[64];
 	std::unique_ptr<Board> m_RootBoard;
-	uint64 m_RootHash;
+	uint64 m_Hash[64];
 public:
 
 	Search() 
-		: m_RootHash(0)
+        : m_Maxdepth(0)
 	{}
 
 	void LoadPosition(std::string fen) {
         m_Info[0] = FenInfo(fen);
 		m_RootBoard = std::make_unique<Board>(Board(fen));
-		m_RootHash = Zobrist_Hash(*m_RootBoard, m_Info[0]);
+        m_Hash[0] = Zobrist_Hash(*m_RootBoard, m_Info[0]);
 	}
 
 	int64 Evaluate(const Board& board) {
@@ -589,11 +589,12 @@ public:
         LPawns = LPawns & (~pinnedLPawns | movePinLPawns);
 
         for (; uint64 bit = PopBit(RPawns); RPawns > 0) { // Loop each bit
+            const MoveType capture = GetCaptureType(board, enemy, bit);
             if ((bit & Lookup::FirstRank(enemy)) > 0) { // If promote
-                result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_KNIGHT });
-                result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_BISHOP });
-                result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_ROOK });
-                result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_QUEEN });
+                result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_KNIGHT, capture });
+                result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_BISHOP, capture });
+                result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_ROOK, capture });
+                result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::P_QUEEN, capture });
             }
             else {
                 result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::PAWN });
@@ -601,14 +602,15 @@ public:
         }
 
         for (; uint64 bit = PopBit(LPawns); LPawns > 0) { // Loop each bit
+            const MoveType capture = GetCaptureType(board, enemy, bit);
             if ((bit & Lookup::FirstRank(enemy)) > 0) { // If promote
-                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_KNIGHT });
-                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_BISHOP });
-                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_ROOK });
-                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_QUEEN });
+                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_KNIGHT, capture });
+                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_BISHOP, capture });
+                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_ROOK, capture });
+                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::P_QUEEN, capture });
             }
             else {
-                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::PAWN });
+                result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::PAWN, capture });
             }
         }
 
@@ -622,7 +624,7 @@ public:
         REPawns = REPawns & (~pinnedREPawns | stillPinREPawns);
         if (REPawns > 0) {
             uint64 bit = PopBit(REPawns);
-            result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::EPASSANT });
+            result.push_back({ PawnAttackLeft(bit, enemy), bit, MoveType::EPASSANT, MoveType::PAWN }); // TODO: This could be obsolete as en passant can only capture pawns anyways
         }
 
         uint64 pinnedLEPawns = LEPawns & PawnAttackLeft(bishopPin, white);
@@ -630,7 +632,7 @@ public:
         LEPawns = LEPawns & (~pinnedLEPawns | stillPinLEPawns);
         if (LEPawns > 0) {
             uint64 bit = PopBit(LEPawns);
-            result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::EPASSANT });
+            result.push_back({ PawnAttackRight(bit, enemy), bit, MoveType::EPASSANT, MoveType::PAWN });
         }
 
 
@@ -643,7 +645,8 @@ public:
             int pos = PopPos(knights);
             uint64 moves = Lookup::knight_attacks[pos] & moveable;
             for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-                result.push_back({ 1ull << pos, bit, MoveType::KNIGHT });
+                const MoveType capture = GetCaptureType(board, enemy, bit);
+                result.push_back({ 1ull << pos, bit, MoveType::KNIGHT, capture });
             }
         }
 
@@ -658,7 +661,8 @@ public:
             int pos = PopPos(pinnedBishop);
             uint64 moves = board.BishopAttack(pos, board.m_Board) & moveable & bishopPin;
             for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-                result.push_back({ 1ull << pos, bit, MoveType::BISHOP });
+                const MoveType capture = GetCaptureType(board, enemy, bit);
+                result.push_back({ 1ull << pos, bit, MoveType::BISHOP, capture });
             }
         }
 
@@ -666,7 +670,8 @@ public:
             int pos = PopPos(notPinnedBishop);
             uint64 moves = board.BishopAttack(pos, board.m_Board) & moveable;
             for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-                result.push_back({ 1ull << pos, bit, MoveType::BISHOP });
+                const MoveType capture = GetCaptureType(board, enemy, bit);
+                result.push_back({ 1ull << pos, bit, MoveType::BISHOP, capture });
             }
         }
 
@@ -690,7 +695,8 @@ public:
             int pos = PopPos(pinnedRook);
             uint64 moves = board.RookAttack(pos, board.m_Board) & moveable & rookPin;
             for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-                result.push_back({ 1ull << pos, bit, MoveType::ROOK });
+                const MoveType capture = GetCaptureType(board, enemy, bit);
+                result.push_back({ 1ull << pos, bit, MoveType::ROOK, capture });
             }
         }
 
@@ -698,7 +704,8 @@ public:
             int pos = PopPos(notPinnedRook);
             uint64 moves = board.RookAttack(pos, board.m_Board) & moveable;
             for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-                result.push_back({ 1ull << pos, bit, MoveType::ROOK });
+                const MoveType capture = GetCaptureType(board, enemy, bit);
+                result.push_back({ 1ull << pos, bit, MoveType::ROOK, capture });
             }
         }
 
@@ -715,15 +722,18 @@ public:
             int pos = PopPos(pinnedStraightQueen);
             uint64 moves = board.RookAttack(pos, board.m_Board) & moveable & rookPin;
             for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-                result.push_back({ 1ull << pos, bit, MoveType::QUEEN });
+                const MoveType capture = GetCaptureType(board, enemy, bit);
+                result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
             }
         }
 
+        // TODO: Put this in bishop and rook loops instead perhaps
         while (pinnedDiagonalQueen > 0) {
             int pos = PopPos(pinnedDiagonalQueen);
             uint64 moves = board.BishopAttack(pos, board.m_Board) & moveable & bishopPin;
             for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-                result.push_back({ 1ull << pos, bit, MoveType::QUEEN });
+                const MoveType capture = GetCaptureType(board, enemy, bit);
+                result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
             }
         }
 
@@ -731,7 +741,8 @@ public:
             int pos = PopPos(notPinnedQueen);
             uint64 moves = board.QueenAttack(pos, board.m_Board) & moveable;
             for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-                result.push_back({ 1ull << pos, bit, MoveType::QUEEN });
+                const MoveType capture = GetCaptureType(board, enemy, bit);
+                result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
             }
         }
 
@@ -741,7 +752,8 @@ public:
         moves &= ~danger;
 
         for (; uint64 bit = PopBit(moves); moves > 0) { // Loop each bit
-            result.push_back({ 1ull << kingpos, bit, MoveType::KING });
+            const MoveType capture = GetCaptureType(board, enemy, bit);
+            result.push_back({ 1ull << kingpos, bit, MoveType::KING, capture });
         }
 
 
@@ -781,6 +793,26 @@ public:
         danger |= Lookup::king_attacks[GET_SQUARE(King(board, enemy))];
 
         return danger;
+    }
+
+    MoveType GetCaptureType(const Board& board, bool enemy, int bit) {
+        if (Pawn(board, enemy) & bit) {
+            return MoveType::PAWN;
+        } else if (Knight(board, enemy) & bit) {
+            return MoveType::KNIGHT;
+        }
+        else if (Bishop(board, enemy) & bit) {
+            return MoveType::BISHOP;
+        }
+        else if (Rook(board, enemy) & bit) {
+            return MoveType::ROOK;
+        }
+        else if (Queen(board, enemy) & bit) {
+            return MoveType::QUEEN;
+        }
+        else {
+            return MoveType::NONE;
+        }
     }
 
     Move GetMove(std::string str) {

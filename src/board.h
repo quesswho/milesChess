@@ -111,15 +111,21 @@ enum class MoveType {
 struct Move {
 
     Move()
-        : m_From(0), m_To(0), m_Type(MoveType::NONE)
+        : m_From(0), m_To(0), m_Type(MoveType::NONE), m_Capture(MoveType::NONE)
     {}
 
     Move(uint64 from, uint64 to, MoveType movetype)
-        : m_From(from), m_To(to), m_Type(movetype)
+        : m_From(from), m_To(to), m_Type(movetype), m_Capture(MoveType::NONE)
     {}
+
+    Move(uint64 from, uint64 to, MoveType movetype, MoveType capture)
+        : m_From(from), m_To(to), m_Type(movetype), m_Capture(capture)
+    {}
+
     uint64 m_From;
     uint64 m_To;
     MoveType m_Type;
+    MoveType m_Capture;
 
     inline std::string toString() const {
         std::string result = "";

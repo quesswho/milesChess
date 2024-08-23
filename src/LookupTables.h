@@ -2681,9 +2681,8 @@ namespace Lookup {
         ... queen
         ... king
         64*12: white active color
-        64*12+1: whitecastle
-
-
+        64*12+1- 64*12+4: castling
+        64*12+5-64*12+12: Enpassant file
     */
     static constexpr uint64 zobrist[781] = {
         0x1346dae1f2b2e7d8, 0x4ce15ee050a26deb, 0x8ee768c74613ecf2, 0x828fa53d48ebcc74,
