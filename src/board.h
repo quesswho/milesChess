@@ -329,7 +329,7 @@ static uint64 Zobrist_Hash(const Board& board, const BoardInfo& info) {
 
     // Knights
     while (wkn > 0) {
-        int pos = 63 - PopPos(wkn);
+        int pos = PopPos(wkn);
         result ^= Lookup::zobrist[pos + 64 * 2];
     }
 
@@ -340,7 +340,7 @@ static uint64 Zobrist_Hash(const Board& board, const BoardInfo& info) {
 
     // Bishops
     while (wb > 0) {
-        int pos = 63 - PopPos(wb);
+        int pos = PopPos(wb);
         result ^= Lookup::zobrist[pos + 64 * 4];
     }
 
@@ -351,7 +351,7 @@ static uint64 Zobrist_Hash(const Board& board, const BoardInfo& info) {
 
     // Rooks
     while (wr > 0) {
-        int pos = 63 - PopPos(wr);
+        int pos = PopPos(wr);
         result ^= Lookup::zobrist[pos + 64 * 6];
     }
 
@@ -361,7 +361,7 @@ static uint64 Zobrist_Hash(const Board& board, const BoardInfo& info) {
     }
 
     while (wq > 0) {
-        int pos = 63 - PopPos(wq);
+        int pos = PopPos(wq);
         result ^= Lookup::zobrist[pos + 64 * 8];
     }
 
@@ -371,7 +371,7 @@ static uint64 Zobrist_Hash(const Board& board, const BoardInfo& info) {
     }
 
     while (wk > 0) {
-        int pos = 63 - PopPos(wk);
+        int pos = PopPos(wk);
         result ^= Lookup::zobrist[pos + 64 * 10];
     }
 
