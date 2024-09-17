@@ -140,6 +140,15 @@ struct Move {
         int t = GET_SQUARE(m_To);
         result += 'h' - (t % 8);
         result += '1' + (t / 8);
+        if (m_Type == MoveType::P_BISHOP) {
+            result += 'b';
+        } else if (m_Type == MoveType::P_BISHOP) {
+            result += "kn";
+        } else if (m_Type == MoveType::P_ROOK) {
+            result += "r";
+        } else if (m_Type == MoveType::P_QUEEN) {
+            result += "q";
+        }
         return result;
     }
 };
