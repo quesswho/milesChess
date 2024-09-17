@@ -9,6 +9,7 @@
 
 
 #define GET_SQUARE(X) _tzcnt_u64(X)
+#define COUNT_BIT(X) _mm_popcnt_u64(X)
 
 struct BoardInfo {
     BoardInfo()
@@ -271,6 +272,11 @@ static std::string BoardtoFen(const Board& board, const BoardInfo& info) {
             FEN += "K";
             continue;
         }
+    }
+
+    if (skip > 0) {
+        FEN += (char)('0' + skip);
+        skip = 0;
     }
 
     if (info.m_WhiteMove) {
