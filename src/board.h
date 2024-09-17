@@ -103,8 +103,8 @@ static BoardInfo FenInfo(const std::string& FEN) {
     return info;
 }
 
-enum class MoveType {
-    NONE, PAWN, PAWN2, KNIGHT, BISHOP, ROOK, QUEEN, KING, EPASSANT,
+enum class MoveType { // Ordering is based on capture value
+    NONE, PAWN, PAWN2, EPASSANT, KNIGHT, BISHOP, ROOK, QUEEN, KING,
     KCASTLE, QCASTLE, P_KNIGHT, P_BISHOP, P_ROOK, P_QUEEN
 };
 
@@ -126,6 +126,10 @@ struct Move {
     uint64 m_To;
     MoveType m_Type;
     MoveType m_Capture;
+
+    bool operator==(const Move& other) const {
+        return m_From == other.m_From && m_To == other.m_To && m_Type == other.m_Type; // Capture should not be necessary
+    }
 
     inline std::string toString() const {
         std::string result = "";

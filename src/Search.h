@@ -1,8 +1,21 @@
 #pragma once
 
 #include "Movelist.h"
+#include <unordered_map>
+#include <algorithm>
 
 #define MAX_DEPTH 64 // Maximum depth that the engine will go
+
+// Transposition table entry
+struct TTEntry {
+    TTEntry(Move move, int depth, int64 eval)
+        : m_BestMove(move), m_Depth(depth), m_Evaluation(eval)
+    {}
+
+    Move m_BestMove;
+    int m_Depth;
+    int64 m_Evaluation;
+};
 
 class Search {
 private:
@@ -11,6 +24,7 @@ private:
 	BoardInfo m_Info[64];
 	std::unique_ptr<Board> m_RootBoard;
 	uint64 m_Hash[64];
+    std::unordered_map<uint64, TTEntry> m_TranspositionTable;
 public:
 
 	Search() 
@@ -21,83 +35,114 @@ public:
         m_Info[0] = FenInfo(fen);
 		m_RootBoard = std::make_unique<Board>(Board(fen));
         m_Hash[0] = Zobrist_Hash(*m_RootBoard, m_Info[0]);
+        m_TranspositionTable.clear();
 	}
 
 	int64 Evaluate(const Board& board) {
 
-		int64 centipawns = 0;
+		int64 middlegame = 0;
+        int64 endgame = 0;
 
 		uint64 wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
 			bp = board.m_BlackPawn, bkn = board.m_BlackKnight, bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
 
 		const uint64 pawnVal = 100, knightVal = 350, bishopVal = 350, rookVal = 525, queenVal = 1000, kingVal = 10000;
 
+        int64 phase = 4 + 4 + 8 + 8;
+
 		// Pawns
 		while (wp > 0) {
 			int pos = 63 - PopPos(wp);
-			centipawns += pawnVal + Lookup::pawn_table[pos];
+			middlegame += pawnVal + Lookup::pawn_table[pos];
+            endgame    += pawnVal + Lookup::eg_pawn_table[pos];
 		}
 
 		while (bp > 0) {
 			int pos = PopPos(bp);
-			centipawns -= pawnVal + Lookup::pawn_table[pos];
+			middlegame -= pawnVal + Lookup::pawn_table[pos];
+            endgame    -= pawnVal + Lookup::eg_pawn_table[pos];
 		}
 
 		// Knights
 		while (wkn > 0) {
 			int pos = 63 - PopPos(wkn);
-			centipawns += knightVal + Lookup::knight_table[pos];
+			middlegame += knightVal + Lookup::knight_table[pos];
+            endgame    += knightVal + Lookup::knight_table[pos];
+            phase -= 1;
 		}
 
 		while (bkn > 0) {
 			int pos = PopPos(bkn);
-			centipawns -= knightVal + Lookup::knight_table[pos];
+			middlegame -= knightVal + Lookup::knight_table[pos];
+            endgame    -= knightVal + Lookup::knight_table[pos];
+            phase -= 1;
 		}
 
 		// Bishops
 		while (wb > 0) {
 			int pos = 63 - PopPos(wb);
-			centipawns += bishopVal + Lookup::bishop_table[pos];
+			middlegame += bishopVal + Lookup::bishop_table[pos];
+            endgame    += bishopVal + Lookup::bishop_table[pos];
+            phase -= 1;
 		}
 
 		while (bb > 0) {
 			int pos = PopPos(bb);
-			centipawns -= bishopVal + Lookup::bishop_table[pos];
+			middlegame -= bishopVal + Lookup::bishop_table[pos];
+            endgame    -= bishopVal + Lookup::bishop_table[pos];
+            phase -= 1;
 		}
 
 		// Rooks
 		while (wr > 0) {
 			int pos = 63 - PopPos(wr);
-			centipawns += rookVal + Lookup::rook_table[pos];
+			middlegame += rookVal + Lookup::rook_table[pos];
+            endgame    += rookVal + Lookup::eg_rook_table[pos];
+            phase -= 2;
 		}
 
 		while (br > 0) {
 			int pos = PopPos(br);
-			centipawns -= rookVal + Lookup::rook_table[pos];
+			middlegame -= rookVal + Lookup::rook_table[pos];
+            endgame    -= rookVal + Lookup::eg_rook_table[pos];
+            phase -= 2;
 		}
 
+        // Queens
 		while (wq > 0) {
 			int pos = 63 - PopPos(wq);
-			centipawns += queenVal + Lookup::queen_table[pos];
+			middlegame += queenVal + Lookup::queen_table[pos];
+            endgame    += queenVal + Lookup::eg_queen_table[pos];
+            phase -= 4;
 		}
 
 		while (bq > 0) {
 			int pos = PopPos(bq);
-			centipawns -= queenVal + Lookup::queen_table[pos];;
+			middlegame -= queenVal + Lookup::queen_table[pos];
+            endgame    -= queenVal + Lookup::eg_queen_table[pos];
+            phase -= 4;
 		}
 
 		while (wk > 0) {
 			int pos = 63 - PopPos(wk);
-			centipawns += kingVal + Lookup::king_table[pos];
+			middlegame += kingVal + Lookup::king_table[pos];
+            endgame    += kingVal + Lookup::eg_king_table[pos];
 		}
 
 		while (bk > 0) {
 			int pos = PopPos(bk);
-			centipawns -= kingVal + Lookup::king_table[pos];;
+			middlegame -= kingVal + Lookup::king_table[pos];
+            endgame    -= kingVal + Lookup::eg_king_table[pos];
 		}
 
-		return centipawns;
+        phase = (phase * 256) / 16;
+		return (middlegame * (256-phase) + endgame * phase) / 256;
 	}
+
+    // Super simple move ordering
+    static bool Move_Order(const Move& a, const Move& b) {
+        return a.m_Capture > b.m_Capture;
+    }
 
 	uint64 Perft_r(const Board& board, int depth) {
         assert("Hash is not matched!", Zobrist_Hash(board, m_Info[depth]) != m_Hash[depth]);
@@ -124,56 +169,87 @@ public:
 		return result;
 	}
 
-	struct Line {
-		Line()
-			: count(0), moves()
-		{
-		}
-
-		int count; // Number of moves
-		Move moves[MAX_DEPTH];
-	};
-
 	int64 AlphaBeta_r(Board board, int64 alpha, int64 beta, int depth) {
 		int64 sgn = ((depth + m_Info[0].m_WhiteMove) & 0b1) ? 1 : -1;
 		if (depth == m_Maxdepth) {
+            int64 test = sgn * Evaluate(board);
 			return sgn * Evaluate(board);
 		}
-		const std::vector<Move> moves = GenerateMoves(board, depth);
-		if (moves.size() == 0) {
 
+		std::vector<Move> moves = GenerateMoves(board, depth);
+		if (moves.size() == 0) {
 			return -sgn * (10000 + depth); // Mate in 0 is 10000 centipawns worth
 		}
-		Line line;
+
 		int64 bestScore = -110000;
+
+        auto entryIt = m_TranspositionTable.find(m_Hash[depth]);
+        if (entryIt != m_TranspositionTable.end()) {
+            const Move hashMove = entryIt->second.m_BestMove;
+            std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
+                if (a == hashMove) {
+                    return true;
+                } else if (b == hashMove) {
+                    return false;
+                }
+                return Move_Order(a, b);
+            });
+        }
+        else {
+            std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
+                return Move_Order(a, b);
+            });
+        }
+
+        Move bestMove;
 		for (const Move& move : moves) {
 			int64 score = -AlphaBeta_r(MovePiece(board, move, depth + 1), -beta, -alpha, depth + 1);
 			if (score > bestScore) {
 				bestScore = score;
+                bestMove = move;
 				if (score > alpha) {
 					alpha = score;
 				}
 			}
 			if (score >= beta) { // Exit out early
-				return bestScore;
+				break;
 			}
 		}
+
+        auto r = m_TranspositionTable.insert(std::make_pair(m_Hash[depth], TTEntry(bestMove, depth, bestScore)));
+        //if (!r.second) {
+            
+        //}
 		return bestScore;
 	}
 
-	Move BestMove(int depth) {
-		m_Maxdepth = depth;
-		const std::vector<Move> moves = GenerateMoves(*m_RootBoard, 0);
-		if (moves.size() == 0) return Move(0, 0, MoveType::NONE);
-		Move best = moves[0];
-		int64 bestscore = -110000;
-		for (const Move& move : moves) {
-			int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), -110000, 110000, 1);
-			if (score > bestscore) {
-				bestscore = score;
-				best = move;
-			}
-		}
+    Move DepthFirst(int depth) {
+        m_Maxdepth = depth;
+        const std::vector<Move> moves = GenerateMoves(*m_RootBoard, 0);
+        if (moves.size() == 0) return Move(0, 0, MoveType::NONE);
+        Move best = moves[0];
+        int64 bestscore = -110000;
+        for (const Move& move : moves) {
+            int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), -110000, 110000, 1);
+            assert("Evaluation is unreasonably big\n", score >= 7205759403792);
+            if (score > bestscore) {
+                bestscore = score;
+                best = move;
+            }
+        }
+        return best;
+    }
+
+	Move BestMove(float elapse) {
+        int depth = 0;
+        // Start timer
+        Timer time;
+        time.Start();
+        Move best;
+        while (time.End() < elapse) {
+            best = DepthFirst(++depth);
+        }
+        printf("depth: %i, time: %.3f\n", depth, time.End());
 		return best;
 	}
 
