@@ -142,7 +142,7 @@ struct Move {
         result += '1' + (t / 8);
         if (m_Type == MoveType::P_BISHOP) {
             result += 'b';
-        } else if (m_Type == MoveType::P_BISHOP) {
+        } else if (m_Type == MoveType::P_KNIGHT) {
             result += "kn";
         } else if (m_Type == MoveType::P_ROOK) {
             result += "r";

@@ -20,6 +20,9 @@ int main() {
 	// Game against stockfish 16 with iterative deepening with 10s
 	// 1. Nf3 d5 2. e3 Nf6 3. Nc3 e6 4. Bb5+ c6 5. Be2 Bd6 6. O-O e5 7. d4 e4 8. Ne5 Nbd7 9. Nxd7 Bxd7 10. f3 Qe7 11. fxe4 dxe4 12. Qe1 h5 13. Qh4 Rh6 14. Bc4 g5 15. Qxg5 Bxh2+ 16. Kh1 Rg6 17. Qa5 Nd5 18. Nxd5 Qh4 19. Rxf7 Bf4+ 20. Kg1 Qh2+ 21. Kf1 Qxg2+ 22. Ke1 Bg3+ 23. Kd1 Bg4+ 24. Be2 Qxe2#
 
+	// Game against me & erik, we won
+	// 1. e4 e5 2. d3 Nf6 3. Nc3 Bb4 4. Ne2 d5 5. a3 Bxc3+ 6. Nxc3 dxe4 7. dxe4 Qxd1+ 8. Kxd1 O-O 9. h3 Rd8+ 10. Bd3 b6 11. g3 Ba6 12. f4 Bxd3 13. cxd3 Rxd3+ 14. Ke2 Rxg3 15. fxe5 Nfd7 16. Nd5 Na6 17. b4 c6 18. Ne7+ Kf8 19. Nxc6 Nc7 20. h4 Nb5 21. a4 Nc3+ 22. Ke1 Nxe4 23. Rf1 Rc8 24. e6 Ndf6 25. e7+ Ke8 26. b5 Rc3 27. Ba3 Rc7 28. Rd1 Re3#
+
 	//UCI uci;
 	//uci.Start();
 
@@ -30,13 +33,13 @@ int main() {
 
 	Search search;
 	search.LoadPosition(g_StartingFEN);
-	//search.LoadPosition("r3k3/pp1b1p2/2p3r1/Q2N3p/2BPp2q/4P3/PPP3Pb/R1B2R1K w q - 1 19");
-	//search.LoadPosition("r3k3/pp1b1p2/2p3r1/Q2N3p/2BPp2q/4P3/PPP3Pb/R1B2R1K w q - 1 19");
+	//search.LoadPosition("4qk2/7R/8/8/8/8/3R1K2/8 w - - 0 1");
+	//search.LoadPosition("rn1r2k1/p1p2ppp/bp3n2/4p3/4P3/P1NB2PP/1PP2P2/R1BK3R w - - 1 12");
 	//printf("%llu\n", search.Perft(6));
 
 
 	while (true) {
-		Move move = search.BestMove(10);
+		Move move = search.BestMove(1);
 		if (move.m_Type == MoveType::NONE) {
 			printf("You won!\n");
 			scanf("%s");

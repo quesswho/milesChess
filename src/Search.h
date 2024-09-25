@@ -216,32 +216,67 @@ public:
 	}
 
     int64 Quiesce(Board board, int64 alpha, int64 beta, int depth) {
-        int64 sgn = ((depth + m_Info[0].m_WhiteMove) & 0b1) ? 1 : -1;
-        int64 eval = sgn * Evaluate(board);
-        if (eval >= beta) {
-            return beta;
+        int64 sgn = m_Info[depth].m_WhiteMove ? 1 : -1;
+        int64 bestScore = sgn * Evaluate(board);
+        if (bestScore >= beta) {
+            return bestScore;
         }
-        if (alpha < eval) {
-            alpha = eval;
+        if (alpha < bestScore) {
+            alpha = bestScore;
         }
 
         std::vector<Move> moves = GenerateMoves(board, depth);
-        if (moves.size() == 0) {
-            int64 sgn = ((depth + m_Info[0].m_WhiteMove) & 0b1) ? 1 : -1;
-            return sgn * (10000 - depth); // Mate in 0 is 10000 centipawns worth
+
+        auto entryIt = m_TranspositionTable.find(m_Hash[depth]);
+        if (entryIt != m_TranspositionTable.end()) {
+            const Move hashMove = entryIt->second.m_BestMove;
+            std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
+                if (a == hashMove) {
+                    return true;
+                }
+                else if (b == hashMove) {
+                    return false;
+                }
+                return Move_Order(a, b);
+                });
         }
+        else {
+            std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
+                return Move_Order(a, b);
+                });
+        }
+
+        if (moves.size() == 0) {
+            int64 sgn = m_Info[depth].m_WhiteMove ? 1 : -1;
+            return -10000 + depth; // Mate in 0 is 10000 centipawns worth
+        }
+
+        Move bestMove = moves[0];
         for (const Move& move : moves) {
             if (move.m_Capture == MoveType::NONE) continue; // Only analyze capturing moves
+            //printf("%s\n", BoardtoFen(board, m_Info[depth]));
             int64 score = -Quiesce(MovePiece(board, move, depth + 1), -beta, -alpha, depth + 1);
-            if (score >= beta) {
-                return beta;
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = move;
+                if (score > alpha) {
+                    alpha = score;
+                }
             }
-            if (score > alpha) {
-                alpha = score;
+            if (alpha >= beta) {
+                break;
             }
         }
-        
-        return alpha;
+        if (entryIt != m_TranspositionTable.end()) {
+            // Currently doing always replace
+            // https://www.chessprogramming.org/Transposition_Table#Replacement_Strategies
+            entryIt->second = TTEntry(bestMove, depth, bestScore);
+        }
+        else {
+            m_TranspositionTable.insert(std::make_pair(m_Hash[depth], TTEntry(bestMove, depth, bestScore)));
+        }
+
+        return bestScore;
     }
 
 	int64 AlphaBeta_r(Board board, int64 alpha, int64 beta, int depth) {
@@ -249,10 +284,10 @@ public:
 			return Quiesce(board, alpha, beta, depth);
 		}
 
+		int64 sgn = m_Info[depth].m_WhiteMove ? 1 : -1;
 		std::vector<Move> moves = GenerateMoves(board, depth);
 		if (moves.size() == 0) {
-		    int64 sgn = ((depth + m_Info[0].m_WhiteMove) & 0b1) ? 1 : -1;
-			return sgn * (10000 - depth); // Mate in 0 is 10000 centipawns worth
+			return -10000 + depth; // Mate in 0 is 10000 centipawns worth
 		}
 
 		int64 bestScore = -110000;
@@ -275,7 +310,7 @@ public:
             });
         }
 
-        Move bestMove;
+        Move bestMove = moves[0];
 		for (const Move& move : moves) {
 			int64 score = -AlphaBeta_r(MovePiece(board, move, depth + 1), -beta, -alpha, depth + 1);
 			if (score > bestScore) {
@@ -285,12 +320,17 @@ public:
 					alpha = score;
 				}
 			}
-			if (score >= beta) { // Exit out early
+			if (alpha >= beta) { // Exit out early
 				break;
 			}
 		}
-
-        auto r = m_TranspositionTable.insert(std::make_pair(m_Hash[depth], TTEntry(bestMove, depth, bestScore)));
+        if (entryIt != m_TranspositionTable.end()) {
+            // Currently doing always replace
+            // https://www.chessprogramming.org/Transposition_Table#Replacement_Strategies
+            entryIt->second = TTEntry(bestMove, depth, bestScore);
+        } else {
+            m_TranspositionTable.insert(std::make_pair(m_Hash[depth], TTEntry(bestMove, depth, bestScore)));
+        }
         //if (!r.second) {
             
         //}
@@ -301,29 +341,11 @@ public:
         m_Maxdepth = 0;
         // Start timer
         std::vector<Move> moves = GenerateMoves(*m_RootBoard, 0);
+        if (moves.size() == 0) return Move(0, 0, MoveType::NONE);
 
         Timer time;
         time.Start();
-        Move best = moves[0];
-
-        auto entryIt = m_TranspositionTable.find(m_Hash[0]);
-        if (entryIt != m_TranspositionTable.end()) {
-            const Move hashMove = entryIt->second.m_BestMove;
-            std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
-                if (a == hashMove) {
-                    return true;
-                }
-                else if (b == hashMove) {
-                    return false;
-                }
-                return Move_Order(a, b);
-                });
-        }
-        else {
-            std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
-                return Move_Order(a, b);
-                });
-        }
+        Move bestMove = moves[0];
 
         int64 bestScore = -110000;
         int64 alpha = -110000;
@@ -331,23 +353,58 @@ public:
         while (time.End() < elapse) {
             bestScore = -110000;
             m_Maxdepth++;
-            if (moves.size() == 0) return Move(0, 0, MoveType::NONE);
             if (moves.size() == 1) break;
+            auto entryIt = m_TranspositionTable.find(m_Hash[0]);
+            if (entryIt != m_TranspositionTable.end()) {
+                std::sort(moves.begin(), moves.end(), [bestMove](const Move& a, const Move& b) {
+                    if (a == bestMove) {
+                        return true;
+                    }
+                    else if (b == bestMove) {
+                        return false;
+                    }
+                    return Move_Order(a, b);
+                    });
+            }
+            else {
+                std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
+                    return Move_Order(a, b);
+                    });
+            }
             for (const Move& move : moves) {
-                int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), alpha, beta, 1);
+                int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), -beta, -alpha, 1);
                 assert("Evaluation is unreasonably big\n", score >= 7205759403792);
                 if (score > bestScore) {
                     bestScore = score;
-                    best = move;
+                    bestMove = move;
                     if (score > alpha) {
                         alpha = score;
                     }
                 }
+                if (alpha >= beta) { // Exit out early
+                    break;
+                }
+                if (m_Maxdepth == 3) {
+                    printf("");
+                }
             }
-            
+            if (bestScore >= (10000 - 50)) { // if mate in 50 or less then exit out
+                printf("Mate in %lli\n", (10000 - bestScore + 1 + !m_Info[0].m_WhiteMove)/2);
+                break;
+            }
+            if (bestScore <= -(10000 - 50)) { // if mate in 50 or less then exit out
+                printf("Mate in %lli\n", (10000 - bestScore + 1 + !m_Info[0].m_WhiteMove)/2);
+                break;
+            }
+            if (entryIt != m_TranspositionTable.end()) {
+                entryIt->second = TTEntry(bestMove, 0, bestScore);
+            }
+            else {
+                m_TranspositionTable.insert(std::make_pair(m_Hash[0], TTEntry(bestMove, 0, bestScore)));
+            }
         }
-        printf("depth: %i, eval: %f, time: %.3f\n", m_Maxdepth, bestScore/100.0f, time.End());
-		return best;
+        printf("depth: %i, eval: %f, time: %.3f\n", m_Maxdepth, (m_Info[0].m_WhiteMove ? 1 : -1) * bestScore/100.0f, time.End());
+		return bestMove;
 	}
 
 	Board MovePiece(const Board& board, const Move& move, int depth) {
@@ -372,6 +429,8 @@ public:
         if (m_Info[depth - 1].m_EnPassant) {
             m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(m_Info[depth - 1].m_EnPassant) % 8)];
         }
+
+        if(move.m_Capture != MoveType::NONE) m_Info[depth].m_HalfMoves = 0;
 
 		if (white) {
             switch (move.m_Capture) {
@@ -404,10 +463,12 @@ public:
 			switch (move.m_Type) {
 			case MoveType::PAWN:
                 m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[tpos] ^ Lookup::zobrist[fpos];
+                m_Info[depth].m_HalfMoves = 0;
 				return Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::PAWN2:
                 m_Info[depth].m_EnPassant = move.m_To >> 8;
                 m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[tpos] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 12 + 5 + (tpos % 8)];
+                m_Info[depth].m_HalfMoves = 0;
 				return Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::KNIGHT:
                 m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 2 + tpos] ^ Lookup::zobrist[64 * 2 + fpos];
@@ -516,10 +577,12 @@ public:
 			switch (move.m_Type) {
 			case MoveType::PAWN:
                 m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 + tpos] ^ Lookup::zobrist[64 + fpos];
+                m_Info[depth].m_HalfMoves = 0;
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp ^ swp, bkn, bb, br, bq, bk);
 			case MoveType::PAWN2:
                 m_Info[depth].m_EnPassant = move.m_To << 8;
                 m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 + tpos] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[64 * 12 + 5 + (tpos % 8)];
+                m_Info[depth].m_HalfMoves = 0;
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp ^ swp, bkn, bb, br, bq, bk);
 			case MoveType::KNIGHT:
                 m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 3 + tpos] ^ Lookup::zobrist[64 * 3 + fpos];
@@ -611,16 +674,19 @@ public:
         if (!white) m_Info[0].m_FullMoves++;
         m_Info[0].m_EnPassant = 0;
         m_Info[0].m_WhiteMove = !white;
+        if(move.m_Capture != MoveType::NONE) m_Info[0].m_HalfMoves = 0;
 
         if (white) {
             assert("Cant move to same color piece", move.m_To & m_White);
             switch (move.m_Type) {
             case MoveType::PAWN:
                 m_RootBoard = std::make_unique<Board>(Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk));
+                m_Info[0].m_HalfMoves = 0;
                 break;
             case MoveType::PAWN2:
                 m_Info[0].m_EnPassant = move.m_To >> 8;
                 m_RootBoard = std::make_unique<Board>(Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk));
+                m_Info[0].m_HalfMoves = 0;
                 break;
             case MoveType::KNIGHT:
                 m_RootBoard = std::make_unique<Board>(Board(wp, wkn ^ swp, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk));
@@ -680,10 +746,12 @@ public:
             switch (move.m_Type) {
             case MoveType::PAWN:
                 m_RootBoard = std::make_unique<Board>(Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp ^ swp, bkn, bb, br, bq, bk));
+                m_Info[0].m_HalfMoves = 0;
                 break;
             case MoveType::PAWN2:
                 m_Info[0].m_EnPassant = move.m_To << 8;
                 m_RootBoard = std::make_unique<Board>(Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp ^ swp, bkn, bb, br, bq, bk));
+                m_Info[0].m_HalfMoves = 0;
                 break;
             case MoveType::KNIGHT:
                 m_RootBoard = std::make_unique<Board>(Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn ^ swp, bb, br, bq, bk));
@@ -1148,7 +1216,7 @@ public:
                 type = MoveType::P_ROOK;
                 break;
             case 'q':
-                type = MoveType::P_ROOK;
+                type = MoveType::P_QUEEN;
                 break;
             }
         }
