@@ -28,18 +28,18 @@ int main() {
 
 	//Lookup::PrintWhitePassedPawnTable();
 	//Lookup::PrintBlackPassedPawnTable();
-
+	Lookup::PrintKingSafety(false);
 	char str[1000];
 
 	Search search;
 	search.LoadPosition(g_StartingFEN);
-	//search.LoadPosition("4qk2/7R/8/8/8/8/3R1K2/8 w - - 0 1");
-	//search.LoadPosition("rn1r2k1/p1p2ppp/bp3n2/4p3/4P3/P1NB2PP/1PP2P2/R1BK3R w - - 1 12");
+	//search.LoadPosition("rn1qkb1r/pppb2pp/5n2/3p4/4pP2/4P1PP/PPP5/RNBQKBNR w KQkq - 15 8");
+	//search.LoadPosition("r3k3/pp1b1p2/2p3r1/Q2N3p/2BPp2q/4P3/PPP3Pb/R1B2R1K w q - 1 19");
 	//printf("%llu\n", search.Perft(6));
 
 
 	while (true) {
-		Move move = search.BestMove(1);
+		Move move = search.BestMove(5);
 		if (move.m_Type == MoveType::NONE) {
 			printf("You won!\n");
 			scanf("%s");

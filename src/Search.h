@@ -46,7 +46,7 @@ public:
 		uint64 wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
 			bp = board.m_BlackPawn, bkn = board.m_BlackKnight, bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
 
-		const uint64 pawnVal = 100, knightVal = 350, bishopVal = 350, rookVal = 525, queenVal = 1000, kingVal = 10000;
+		const int64 pawnVal = 100, knightVal = 350, bishopVal = 350, rookVal = 525, queenVal = 1000, kingVal = 10000;
 
         int64 phase = 4 + 4 + 8 + 8;
 
@@ -82,7 +82,7 @@ public:
 			int pos = 63 - rpos;
 			middlegame += knightVal + Lookup::knight_table[pos];
             endgame    += knightVal + Lookup::knight_table[pos];
-            if (uint64 temp = Lookup::king_attacks[blackking] & Lookup::knight_attacks[rpos]) {
+            if (uint64 temp = Lookup::b_king_safety[blackking] & Lookup::knight_attacks[rpos]) {
                 whiteAttack += 2 * COUNT_BIT(temp);
             }
             phase -= 1;
@@ -92,7 +92,7 @@ public:
 			int pos = PopPos(bkn);
 			middlegame -= knightVal + Lookup::knight_table[pos];
             endgame    -= knightVal + Lookup::knight_table[pos];
-            if (uint64 temp = Lookup::king_attacks[whiteking] & Lookup::knight_attacks[pos]) {
+            if (uint64 temp = Lookup::w_king_safety[whiteking] & Lookup::knight_attacks[pos]) {
                 blackAttack += 2 * COUNT_BIT(temp);
             }
             phase -= 1;
@@ -105,7 +105,7 @@ public:
 			middlegame += bishopVal + Lookup::bishop_table[pos];
             endgame    += bishopVal + Lookup::bishop_table[pos];
             uint64 bish_atk = board.BishopAttack(rpos, board.m_Board);
-            if (uint64 temp = Lookup::king_attacks[blackking] & bish_atk) {
+            if (uint64 temp = Lookup::b_king_safety[blackking] & bish_atk) {
                 whiteAttack += 2 * COUNT_BIT(temp);
             }
             phase -= 1;
@@ -116,7 +116,7 @@ public:
 			middlegame -= bishopVal + Lookup::bishop_table[pos];
             endgame    -= bishopVal + Lookup::bishop_table[pos];
             uint64 bish_atk = board.BishopAttack(pos, board.m_Board);
-            if (uint64 temp = Lookup::king_attacks[whiteking] & bish_atk) {
+            if (uint64 temp = Lookup::w_king_safety[whiteking] & bish_atk) {
                 blackAttack += 2 * COUNT_BIT(temp);
             }
             phase -= 1;
@@ -129,7 +129,7 @@ public:
 			middlegame += rookVal + Lookup::rook_table[pos];
             endgame    += rookVal + Lookup::eg_rook_table[pos];
             uint64 rook_atk = board.RookAttack(rpos, board.m_Board);
-            if (uint64 temp = Lookup::king_attacks[blackking] & rook_atk) {
+            if (uint64 temp = Lookup::b_king_safety[blackking] & rook_atk) {
                 whiteAttack += 3 * COUNT_BIT(temp);
             }
             phase -= 2;
@@ -140,7 +140,7 @@ public:
 			middlegame -= rookVal + Lookup::rook_table[pos];
             endgame    -= rookVal + Lookup::eg_rook_table[pos];
             uint64 rook_atk = board.RookAttack(pos, board.m_Board);
-            if (uint64 temp = Lookup::king_attacks[whiteking] & rook_atk) {
+            if (uint64 temp = Lookup::w_king_safety[whiteking] & rook_atk) {
                 blackAttack += 3 * COUNT_BIT(temp);
             }
             phase -= 2;
@@ -153,7 +153,7 @@ public:
 			middlegame += queenVal + Lookup::queen_table[pos];
             endgame    += queenVal + Lookup::eg_queen_table[pos];
             uint64 queen_atk = board.QueenAttack(rpos, board.m_Board);
-            if (uint64 temp = Lookup::king_attacks[blackking] & queen_atk) {
+            if (uint64 temp = Lookup::b_king_safety[blackking] & queen_atk) {
                 whiteAttack += 5 * COUNT_BIT(temp);
             }
             phase -= 4;
@@ -247,7 +247,6 @@ public:
         }
 
         if (moves.size() == 0) {
-            int64 sgn = m_Info[depth].m_WhiteMove ? 1 : -1;
             return -10000 + depth; // Mate in 0 is 10000 centipawns worth
         }
 
@@ -373,7 +372,7 @@ public:
             }
             for (const Move& move : moves) {
                 int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), -beta, -alpha, 1);
-                assert("Evaluation is unreasonably big\n", score >= 7205759403792);
+                assert("Evaluation is unreasonably big\n", score >= 72057594);
                 if (score > bestScore) {
                     bestScore = score;
                     bestMove = move;
@@ -664,6 +663,7 @@ public:
 	}
 
     void MoveRootPiece(const Move& move) {
+        m_TranspositionTable.clear();
         const uint64 re = ~move.m_To;
         const uint64 swp = move.m_From | move.m_To;
         const bool white = m_Info[0].m_WhiteMove;
