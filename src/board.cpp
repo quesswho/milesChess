@@ -10,19 +10,17 @@ Board::Board(const std::string& FEN)
 {}
 
 uint64 Board::RookAttack(int pos, uint64 occ) const {
-    uint64 boardpos = 1ull << pos;
-    return (Slide(boardpos, Lookup::linesEx[4 * pos], occ) | Slide(boardpos, Lookup::linesEx[4 * pos + 1], occ));
+    Lookup::BlackMagic m = Lookup::r_magics[pos];
+    return m.attacks[((occ | m.mask) * m.hash) >> (64 - 12)];
 }
 
 uint64 Board::BishopAttack(int pos, uint64 occ) const {
-    uint64 boardpos = 1ull << pos;
-    return (Slide(boardpos, Lookup::linesEx[4 * pos + 2], occ) | Slide(boardpos, Lookup::linesEx[4 * pos + 3], occ));
+    Lookup::BlackMagic m = Lookup::b_magics[pos];
+    return m.attacks[((occ | m.mask) * m.hash) >> (64 - 9)];
 }
 
 uint64 Board::QueenAttack(int pos, uint64 occ) const {
-    uint64 boardpos = 1ull << pos;
-    return (Slide(boardpos, Lookup::linesEx[4 * pos], occ) | Slide(boardpos, Lookup::linesEx[4 * pos + 1], occ)
-        | Slide(boardpos, Lookup::linesEx[4 * pos + 2], occ) | Slide(boardpos, Lookup::linesEx[4 * pos + 3], occ));
+    return RookAttack(pos, occ) | BishopAttack(pos, occ);
 }
 
 uint64_t Board::RookXray(int pos, uint64_t occ) const {

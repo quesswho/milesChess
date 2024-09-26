@@ -37,7 +37,7 @@ int main() {
 		time.Start();
 		//search->m_MaxTime = 20000;
 		//search->UCIMove_async();
-		search->Perft(5); // 109487502
+		search->Perft(5); // 109487502, 23MN/s
 		printf("%.3fs\n", time.End());
 		
 		//while (true) {

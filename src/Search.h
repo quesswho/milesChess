@@ -1102,7 +1102,7 @@ public:
             result.push_back({ King(board, white), CQ, MoveType::QCASTLE });
         }
 
-        uint64 pinnedRook = rookPin & rooks;
+        uint64 pinnedRook = rookPin & (rooks);
         uint64 notPinnedRook = rooks ^ pinnedRook;
 
         while (pinnedRook > 0) {
