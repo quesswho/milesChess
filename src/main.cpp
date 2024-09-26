@@ -28,15 +28,21 @@ int main() {
 		uci.Start();
 	} else {
 		char str[1000];
-		Search search;
+		Search* search = new Search();
 		//search.LoadPosition(g_StartingFEN);
-		search.LoadPosition("r1b2rk1/pp3pp1/2n4p/8/2P1Q3/2qB1N2/P1P2PPP/R3K2R w KQ - 1 16");
+		search->LoadPosition("2r3k1/5pp1/pb2q2p/5N2/Q4PP1/5K2/P1PBr2P/3R4 w - - 9 33");
 		//search.LoadPosition("r3k3/pp1b1p2/2p3r1/Q2N3p/2BPp2q/4P3/PPP3Pb/R1B2R1K w q - 1 19");
 		//printf("%llu\n", search.Perft(6));
+		Timer time;
+		time.Start();
+		//search->m_MaxTime = 20000;
+		//search->UCIMove_async();
+		search->Perft(5); // 109487502
+		printf("%.3fs\n", time.End());
 		
-
-		while (true) {
-			Move move = search.BestMove(2);
+		//while (true) {
+			
+			/*Move move = search.BestMove(2);
 			if (move.m_Type == MoveType::NONE) {
 				printf("You won!\n");
 				scanf("%s");
@@ -50,6 +56,8 @@ int main() {
 
 			move = search.GetMove(str);
 			search.MoveRootPiece(move);
-		}
+		}*/
+		scanf("%s", &str);
+		delete search;
 	}
 }

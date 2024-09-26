@@ -1,43 +1,41 @@
 #pragma once
 
-#include "Movelist.h"
+#include "Transposition.h"
+
 #include <unordered_map>
 #include <algorithm>
 #include <vector>
 #include <thread>
+#include <cmath>
 
 #define MAX_DEPTH 64 // Maximum depth that the engine will go
+#define MATE_SCORE 32767
 
-// Transposition table entry
-struct TTEntry {
-    TTEntry(Move move, int depth, int64 eval)
-        : m_BestMove(move), m_Depth(depth), m_Evaluation(eval)
-    {}
-
-    Move m_BestMove;
-    int m_Depth;
-    int64 m_Evaluation;
-};
 
 class Search {
 public:
 	BoardInfo m_Info[64];
 	std::unique_ptr<Board> m_RootBoard;
+    int64 m_MaxTime;
 private:
 	uint64 m_Hash[64];
     std::vector<std::unique_ptr<std::thread>> m_Threads;
     bool m_Running;
     Timer m_Timer;
-    int64 m_MaxTime;
 	int m_Maxdepth; // Maximum depth currently set
-    std::unordered_map<uint64, TTEntry> m_TranspositionTable;
     uint64 m_NodeCnt;
+    TranspositionTable* m_Table;
 public:
 
 	Search() 
         : m_Maxdepth(0), m_Running(false), m_MaxTime(999999999999999), m_NodeCnt(0)
 	{
+        m_Table = new TranspositionTable(1024 * 1024 * 1024);
         LoadPosition(Lookup::starting_pos);
+    }
+
+    ~Search() {
+        delete m_Table;
     }
 
     void Stop() {
@@ -54,7 +52,7 @@ public:
         m_Info[0] = FenInfo(fen);
 		m_RootBoard = std::make_unique<Board>(Board(fen));
         m_Hash[0] = Zobrist_Hash(*m_RootBoard, m_Info[0]);
-        m_TranspositionTable.clear();
+        m_Table->Clear();
 	}
 
 	int64 Evaluate(const Board& board) {
@@ -216,7 +214,7 @@ public:
         return score_a > score_b;
     }
 
-	uint64 Perft_r(Board board, int depth) {
+	uint64 Perft_r(const Board& board, int depth) {
         if (!m_Running) return 0;
         assert("Hash is not matched!", Zobrist_Hash(board, m_Info[depth]) != m_Hash[depth]);
 		const std::vector<Move> moves = GenerateMoves(board, depth);
@@ -244,7 +242,7 @@ public:
 		return result;
 	}
 
-    int64 Quiesce(Board board, int64 alpha, int64 beta, int depth) {
+    int64 Quiesce(const Board& board, int64 alpha, int64 beta, int depth) {
         m_NodeCnt++;
         int64 sgn = m_Info[depth].m_WhiteMove ? 1 : -1;
         int64 bestScore = sgn * Evaluate(board);
@@ -263,9 +261,9 @@ public:
             return -10000 + depth; // Mate in 0 is 10000 centipawns worth
         }
 
-        auto entryIt = m_TranspositionTable.find(m_Hash[depth]);
-        if (entryIt != m_TranspositionTable.end()) {
-            const Move hashMove = entryIt->second.m_BestMove;
+        TTEntry* entry = m_Table->Get(m_Hash[depth]);
+        if (entry != nullptr) {
+            const Move hashMove = entry->m_BestMove;
             std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
                 if (a == hashMove) {
                     return true;
@@ -279,10 +277,10 @@ public:
         else {
             std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
                 return Move_Order(a, b);
-                });
+            });
         }
 
-        Move bestMove = moves[0];
+        Move bestMove;
         for (const Move& move : moves) {
             if (move.m_Capture == MoveType::NONE) continue; // Only analyze capturing moves
             int64 score = -Quiesce(MovePiece(board, move, depth + 1), -beta, -alpha, depth + 1);
@@ -297,19 +295,14 @@ public:
                 break;
             }
         }
-        if (entryIt != m_TranspositionTable.end()) {
-            // Currently doing always replace
-            // https://www.chessprogramming.org/Transposition_Table#Replacement_Strategies
-            entryIt->second = TTEntry(bestMove, depth, bestScore);
-        }
-        else {
-            m_TranspositionTable.insert(std::make_pair(m_Hash[depth], TTEntry(bestMove, depth, bestScore)));
+        if (bestMove.m_Type != MoveType::NONE) {
+            m_Table->Enter(m_Hash[depth], TTEntry(m_Hash[depth], bestMove, bestScore, depth, m_Info[depth].m_FullMoves));
         }
 
         return bestScore;
     }
 
-	int64 AlphaBeta_r(Board board, int64 alpha, int64 beta, int depth) {
+	int64 AlphaBeta_r(const Board& board, int64 alpha, int64 beta, int depth) {
         m_NodeCnt++;
         if (!m_Running || m_Timer.EndMs() >= m_MaxTime) return 0;
 		if (depth == m_Maxdepth) {
@@ -327,17 +320,18 @@ public:
 
 		int64 bestScore = -110000;
 
-        auto entryIt = m_TranspositionTable.find(m_Hash[depth]);
-        if (entryIt != m_TranspositionTable.end()) {
-            const Move hashMove = entryIt->second.m_BestMove;
+        TTEntry* entry = m_Table->Get(m_Hash[depth]);
+        if (entry != nullptr) {
+            const Move hashMove = entry->m_BestMove;
             std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
                 if (a == hashMove) {
                     return true;
-                } else if (b == hashMove) {
+                }
+                else if (b == hashMove) {
                     return false;
                 }
                 return Move_Order(a, b);
-            });
+                });
         }
         else {
             std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
@@ -359,15 +353,24 @@ public:
 				break;
 			}
 		}
-        if (entryIt != m_TranspositionTable.end()) {
-            // Currently doing always replace
-            // https://www.chessprogramming.org/Transposition_Table#Replacement_Strategies
-            entryIt->second = TTEntry(bestMove, depth, bestScore);
-        } else {
-            m_TranspositionTable.insert(std::make_pair(m_Hash[depth], TTEntry(bestMove, depth, bestScore)));
-        }
+        m_Table->Enter(m_Hash[depth], TTEntry(m_Hash[depth], bestMove, bestScore, depth, m_Info[depth].m_FullMoves));
+
 		return bestScore;
 	}
+
+    // Calculate time to allocate for a move
+    void MoveTimed(int64 wtime, int64 btime, int64 winc, int64 binc) {
+        int64 timediff = llabs(wtime - btime);
+
+        int64 timeleft = m_Info[0].m_WhiteMove ? wtime : btime;
+        int64 timeic = m_Info[0].m_WhiteMove ? winc : binc;
+        int64 target = timeleft / 40 + timeic;
+        float x = (m_Info[0].m_FullMoves - 20.0f)/30.0f; 
+        float factor = exp(-x*x);   // Bell curve
+        printf("info movetime %lli\n", (int64)(target * factor));
+        UCIMove(target * factor);
+    }
+
     void UCIMove(int64 time) {
         m_MaxTime = time;
         if (m_MaxTime == -1) {
@@ -395,25 +398,26 @@ public:
             int64 beta = 110000;
             m_Maxdepth++;
             if (moves.size() == 1) break;
-            auto entryIt = m_TranspositionTable.find(m_Hash[0]);
-            if (entryIt != m_TranspositionTable.end()) {
-                std::sort(moves.begin(), moves.end(), [bestMove](const Move& a, const Move& b) {
-                    if (a == bestMove) {
+
+            TTEntry* entry = m_Table->Get(m_Hash[0]);
+            if (entry != nullptr) {
+                const Move hashMove = entry->m_BestMove;
+                std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
+                    if (a == hashMove) {
                         return true;
                     }
-                    else if (b == bestMove) {
+                    else if (b == hashMove) {
                         return false;
                     }
                     return Move_Order(a, b);
                 });
-                alpha = entryIt->second.m_Evaluation - 100;
-                beta = entryIt->second.m_Evaluation + 100;
             }
             else {
                 std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
                     return Move_Order(a, b);
-                    });
+                });
             }
+
             for (const Move& move : moves) {
                 int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), -beta, -alpha, 1);
                 assert("Evaluation is unreasonably big\n", score >= 72057594);
@@ -431,80 +435,13 @@ public:
             if (!m_Running || m_Timer.EndMs() >= m_MaxTime) break;
             sync_printf("info pv %s depth %i score cp %lli time %lli nodes %llu tps %llu\n", bestMove.toString().c_str(), m_Maxdepth, (m_Info[0].m_WhiteMove ? 1 : -1) * bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
             finalMove = bestMove;
-            if (entryIt != m_TranspositionTable.end()) {
-                entryIt->second = TTEntry(bestMove, 0, bestScore);
-            }
-            else {
-                m_TranspositionTable.insert(std::make_pair(m_Hash[0], TTEntry(bestMove, 0, bestScore)));
-            }
+
+            m_Table->Enter(m_Hash[0], TTEntry(m_Hash[0], bestMove, bestScore, 0, m_Info[0].m_FullMoves));
+
+            if (m_Timer.EndMs() * 2 >= m_MaxTime) break; // We won't have enough time to calculate more depth anyway
         }
         sync_printf("bestmove %s\n", finalMove.toString().c_str());
     }
-
-	Move BestMove(float elapse) {
-        m_Running = true;
-        m_Maxdepth = 0;
-        m_NodeCnt = 1;
-        // Start timer
-        std::vector<Move> moves = GenerateMoves(*m_RootBoard, 0);
-        if (moves.size() == 0) return Move(0, 0, MoveType::NONE);
-
-        Timer time;
-        time.Start();
-        Move bestMove = moves[0];
-
-        int64 bestScore = -110000;
-        while (time.End() < elapse) {
-            bestScore = -110000;
-            int64 alpha = -110000;
-            int64 beta = 110000;
-            m_Maxdepth++;
-            
-            if (moves.size() == 1) break;
-            auto entryIt = m_TranspositionTable.find(m_Hash[0]);
-            if (entryIt != m_TranspositionTable.end()) {
-                std::sort(moves.begin(), moves.end(), [bestMove](const Move& a, const Move& b) {
-                    if (a == bestMove) {
-                        return true;
-                    }
-                    else if (b == bestMove) {
-                        return false;
-                    }
-                    return Move_Order(a, b);
-                });
-                alpha = entryIt->second.m_Evaluation - 100;
-                beta = entryIt->second.m_Evaluation + 100;
-            }
-            else {
-                std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
-                    return Move_Order(a, b);
-                    });
-            }
-            for (const Move& move : moves) {
-                int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), -beta, -alpha, 1);
-                assert("Evaluation is unreasonably big\n", score >= 72057594);
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMove = move;
-                    if (score > alpha) {
-                        alpha = score;
-                    }
-                }
-                if (alpha >= beta) { // Exit out early
-                    break;
-                }
-            }
-            if (entryIt != m_TranspositionTable.end()) {
-                entryIt->second = TTEntry(bestMove, 0, bestScore);
-            }
-            else {
-                m_TranspositionTable.insert(std::make_pair(m_Hash[0], TTEntry(bestMove, 0, bestScore)));
-            }
-        }
-        sync_printf("depth: %i, eval: %f, time: %.3f, %fMN/s \n", m_Maxdepth, (m_Info[0].m_WhiteMove ? 1 : -1) * bestScore/100.0f, time.End(), m_NodeCnt / time.End()/1000000.0f);
-        m_Running = false;
-		return bestMove;
-	}
 
 	Board MovePiece(const Board& board, const Move& move, int depth) {
 		const uint64 re = ~move.m_To;
@@ -763,7 +700,7 @@ public:
 	}
 
     void MoveRootPiece(const Move& move) {
-        m_TranspositionTable.clear();
+        m_Table->Clear();
         const uint64 re = ~move.m_To;
         const uint64 swp = move.m_From | move.m_To;
         const bool white = m_Info[0].m_WhiteMove;
@@ -1342,13 +1279,11 @@ public:
             }
             else if (King(*m_RootBoard, white) & from) {
                 uint64 danger = Danger(white, *m_RootBoard);
-                if (CastleKing(danger, m_RootBoard->m_Board, Rook(*m_RootBoard, white), white) && !(Lookup::king_attacks[posTo] & from)) {
+                if (((from & 0b1000) && (to & 0b10)) || ((from & (0b1000ull << 56)) && (to & (0b10ull << 56)))) {
                     type = MoveType::KCASTLE;
-                }
-                else if (CastleQueen(danger, m_RootBoard->m_Board, Rook(*m_RootBoard, white), white) && !(Lookup::king_attacks[posTo] & from)) {
+                } else if (((from & 0b1000) && (to & 0b100000)) || ((from & (0b1000ull << 56)) && (to & (0b100000ull << 56)))) {
                     type = MoveType::QCASTLE;
-                }
-                else {
+                } else {
                     type = MoveType::KING;
                 }
             }
