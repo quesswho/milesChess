@@ -3,6 +3,8 @@
 #include "Movelist.h"
 #include <unordered_map>
 #include <algorithm>
+#include <vector>
+#include <thread>
 
 #define MAX_DEPTH 64 // Maximum depth that the engine will go
 
@@ -18,18 +20,35 @@ struct TTEntry {
 };
 
 class Search {
-private:
-
-	int m_Maxdepth; // Maximum depth currently set
+public:
 	BoardInfo m_Info[64];
 	std::unique_ptr<Board> m_RootBoard;
+private:
 	uint64 m_Hash[64];
+    std::vector<std::unique_ptr<std::thread>> m_Threads;
+    bool m_Running;
+    Timer m_Timer;
+    int64 m_MaxTime;
+	int m_Maxdepth; // Maximum depth currently set
     std::unordered_map<uint64, TTEntry> m_TranspositionTable;
+    uint64 m_NodeCnt;
 public:
 
 	Search() 
-        : m_Maxdepth(0)
-	{}
+        : m_Maxdepth(0), m_Running(false), m_MaxTime(999999999999999), m_NodeCnt(0)
+	{
+        LoadPosition(Lookup::starting_pos);
+    }
+
+    void Stop() {
+        m_Running = false;
+        for (std::unique_ptr<std::thread>& t : m_Threads) {
+            if (t->joinable()) {
+                t->join();
+            }
+        }
+        m_Threads.clear();
+    }
 
 	void LoadPosition(std::string fen) {
         m_Info[0] = FenInfo(fen);
@@ -185,12 +204,20 @@ public:
 		return (middlegame * (256-phase) + endgame * phase) / 256;
 	}
 
-    // Super simple move ordering
+
+
+    // Simple Most Valuable Victim - Least Valuable Aggressor sorting function
     static bool Move_Order(const Move& a, const Move& b) {
-        return a.m_Capture > b.m_Capture;
+        int64 score_a = 0;
+        int64 score_b = 0;
+        if ((int)a.m_Capture) score_a += 9 + Lookup::pieceValue[(int)a.m_Capture] - Lookup::pieceValue[(int)a.m_Type];
+        if ((int)b.m_Capture) score_b += 9 + Lookup::pieceValue[(int)b.m_Capture] - Lookup::pieceValue[(int)b.m_Type];
+
+        return score_a > score_b;
     }
 
-	uint64 Perft_r(const Board& board, int depth) {
+	uint64 Perft_r(Board board, int depth) {
+        if (!m_Running) return 0;
         assert("Hash is not matched!", Zobrist_Hash(board, m_Info[depth]) != m_Hash[depth]);
 		const std::vector<Move> moves = GenerateMoves(board, depth);
 		if (depth == m_Maxdepth-1) return moves.size();
@@ -199,23 +226,26 @@ public:
 			int64 count = Perft_r(MovePiece(board, move, depth + 1), depth + 1);
 			result += count;
 			if (depth == 0) {
-				printf("%s: %llu: %s\n", move.toString().c_str(), count, BoardtoFen(MovePiece(board, move, depth + 1), m_Info[depth+1]).c_str());
+                if(m_Running) sync_printf("%s: %llu: %s\n", move.toString().c_str(), count, BoardtoFen(MovePiece(board, move, depth + 1), m_Info[depth+1]).c_str());
 			}
 		}
 		return result;
 	}
 
 	uint64 Perft(int maxdepth) {
+        m_Running = true;
         m_Maxdepth = maxdepth;
 		Timer time;
 		time.Start();
-		uint64 result = Perft_r(*m_RootBoard, 0);
+        uint64 result = Perft_r(*m_RootBoard, 0);
 		float t = time.End();
-		printf("%.3fMNodes/s\n", (result / 1000000.0f) / t);
+        if(m_Running) sync_printf("%llu\n%.3fMNodes/s\n", result, (result / 1000000.0f) / t);
+        m_Running = false;
 		return result;
 	}
 
     int64 Quiesce(Board board, int64 alpha, int64 beta, int depth) {
+        m_NodeCnt++;
         int64 sgn = m_Info[depth].m_WhiteMove ? 1 : -1;
         int64 bestScore = sgn * Evaluate(board);
         if (bestScore >= beta) {
@@ -226,6 +256,12 @@ public:
         }
 
         std::vector<Move> moves = GenerateMoves(board, depth);
+        if (moves.size() == 0) {
+            uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[depth].m_EnPassant;
+            Check(m_Info[depth].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
+            if (active == 0xFFFFFFFFFFFFFFFFull) return 0; // Draw
+            return -10000 + depth; // Mate in 0 is 10000 centipawns worth
+        }
 
         auto entryIt = m_TranspositionTable.find(m_Hash[depth]);
         if (entryIt != m_TranspositionTable.end()) {
@@ -246,14 +282,9 @@ public:
                 });
         }
 
-        if (moves.size() == 0) {
-            return -10000 + depth; // Mate in 0 is 10000 centipawns worth
-        }
-
         Move bestMove = moves[0];
         for (const Move& move : moves) {
             if (move.m_Capture == MoveType::NONE) continue; // Only analyze capturing moves
-            //printf("%s\n", BoardtoFen(board, m_Info[depth]));
             int64 score = -Quiesce(MovePiece(board, move, depth + 1), -beta, -alpha, depth + 1);
             if (score > bestScore) {
                 bestScore = score;
@@ -279,6 +310,8 @@ public:
     }
 
 	int64 AlphaBeta_r(Board board, int64 alpha, int64 beta, int depth) {
+        m_NodeCnt++;
+        if (!m_Running || m_Timer.EndMs() >= m_MaxTime) return 0;
 		if (depth == m_Maxdepth) {
 			return Quiesce(board, alpha, beta, depth);
 		}
@@ -286,6 +319,9 @@ public:
 		int64 sgn = m_Info[depth].m_WhiteMove ? 1 : -1;
 		std::vector<Move> moves = GenerateMoves(board, depth);
 		if (moves.size() == 0) {
+            uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[depth].m_EnPassant;
+            Check(m_Info[depth].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
+            if (active == 0xFFFFFFFFFFFFFFFFull) return 0; // Draw
 			return -10000 + depth; // Mate in 0 is 10000 centipawns worth
 		}
 
@@ -330,27 +366,33 @@ public:
         } else {
             m_TranspositionTable.insert(std::make_pair(m_Hash[depth], TTEntry(bestMove, depth, bestScore)));
         }
-        //if (!r.second) {
-            
-        //}
 		return bestScore;
 	}
-
-	Move BestMove(float elapse) {
+    void UCIMove(int64 time) {
+        m_MaxTime = time;
+        if (m_MaxTime == -1) {
+            m_MaxTime = 999999999999999;
+        }
+        m_Threads.push_back(std::make_unique<std::thread>(&Search::UCIMove_async, &*this));
+    }
+    void UCIMove_async() {
+        m_Running = true;
         m_Maxdepth = 0;
-        // Start timer
+
+        m_NodeCnt = 1;
         std::vector<Move> moves = GenerateMoves(*m_RootBoard, 0);
-        if (moves.size() == 0) return Move(0, 0, MoveType::NONE);
+        if (moves.size() == 0) return;
 
-        Timer time;
-        time.Start();
+        
+        // Start timer
+        m_Timer.Start();
         Move bestMove = moves[0];
-
+        Move finalMove = bestMove;
         int64 bestScore = -110000;
-        int64 alpha = -110000;
-        int64 beta = 110000;
-        while (time.End() < elapse) {
+        while (m_Running && m_Timer.EndMs() < m_MaxTime) {
             bestScore = -110000;
+            int64 alpha = -110000;
+            int64 beta = 110000;
             m_Maxdepth++;
             if (moves.size() == 1) break;
             auto entryIt = m_TranspositionTable.find(m_Hash[0]);
@@ -363,7 +405,9 @@ public:
                         return false;
                     }
                     return Move_Order(a, b);
-                    });
+                });
+                alpha = entryIt->second.m_Evaluation - 100;
+                beta = entryIt->second.m_Evaluation + 100;
             }
             else {
                 std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
@@ -383,17 +427,72 @@ public:
                 if (alpha >= beta) { // Exit out early
                     break;
                 }
-                if (m_Maxdepth == 3) {
-                    printf("");
+            }
+            if (!m_Running || m_Timer.EndMs() >= m_MaxTime) break;
+            sync_printf("info pv %s depth %i score cp %lli time %lli nodes %llu tps %llu\n", bestMove.toString().c_str(), m_Maxdepth, (m_Info[0].m_WhiteMove ? 1 : -1) * bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
+            finalMove = bestMove;
+            if (entryIt != m_TranspositionTable.end()) {
+                entryIt->second = TTEntry(bestMove, 0, bestScore);
+            }
+            else {
+                m_TranspositionTable.insert(std::make_pair(m_Hash[0], TTEntry(bestMove, 0, bestScore)));
+            }
+        }
+        sync_printf("bestmove %s\n", finalMove.toString().c_str());
+    }
+
+	Move BestMove(float elapse) {
+        m_Running = true;
+        m_Maxdepth = 0;
+        m_NodeCnt = 1;
+        // Start timer
+        std::vector<Move> moves = GenerateMoves(*m_RootBoard, 0);
+        if (moves.size() == 0) return Move(0, 0, MoveType::NONE);
+
+        Timer time;
+        time.Start();
+        Move bestMove = moves[0];
+
+        int64 bestScore = -110000;
+        while (time.End() < elapse) {
+            bestScore = -110000;
+            int64 alpha = -110000;
+            int64 beta = 110000;
+            m_Maxdepth++;
+            
+            if (moves.size() == 1) break;
+            auto entryIt = m_TranspositionTable.find(m_Hash[0]);
+            if (entryIt != m_TranspositionTable.end()) {
+                std::sort(moves.begin(), moves.end(), [bestMove](const Move& a, const Move& b) {
+                    if (a == bestMove) {
+                        return true;
+                    }
+                    else if (b == bestMove) {
+                        return false;
+                    }
+                    return Move_Order(a, b);
+                });
+                alpha = entryIt->second.m_Evaluation - 100;
+                beta = entryIt->second.m_Evaluation + 100;
+            }
+            else {
+                std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
+                    return Move_Order(a, b);
+                    });
+            }
+            for (const Move& move : moves) {
+                int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), -beta, -alpha, 1);
+                assert("Evaluation is unreasonably big\n", score >= 72057594);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = move;
+                    if (score > alpha) {
+                        alpha = score;
+                    }
                 }
-            }
-            if (bestScore >= (10000 - 50)) { // if mate in 50 or less then exit out
-                printf("Mate in %lli\n", (10000 - bestScore + 1 + !m_Info[0].m_WhiteMove)/2);
-                break;
-            }
-            if (bestScore <= -(10000 - 50)) { // if mate in 50 or less then exit out
-                printf("Mate in %lli\n", (10000 - bestScore + 1 + !m_Info[0].m_WhiteMove)/2);
-                break;
+                if (alpha >= beta) { // Exit out early
+                    break;
+                }
             }
             if (entryIt != m_TranspositionTable.end()) {
                 entryIt->second = TTEntry(bestMove, 0, bestScore);
@@ -402,7 +501,8 @@ public:
                 m_TranspositionTable.insert(std::make_pair(m_Hash[0], TTEntry(bestMove, 0, bestScore)));
             }
         }
-        printf("depth: %i, eval: %f, time: %.3f\n", m_Maxdepth, (m_Info[0].m_WhiteMove ? 1 : -1) * bestScore/100.0f, time.End());
+        sync_printf("depth: %i, eval: %f, time: %.3f, %fMN/s \n", m_Maxdepth, (m_Info[0].m_WhiteMove ? 1 : -1) * bestScore/100.0f, time.End(), m_NodeCnt / time.End()/1000000.0f);
+        m_Running = false;
 		return bestMove;
 	}
 
@@ -445,7 +545,7 @@ public:
             case MoveType::BISHOP:
                 m_Hash[depth] ^= Lookup::zobrist[64 * 5 + tpos];
                 break;
-            case MoveType::ROOK: // TODO: Check if we should remove castle rights for black here (Could be cause of perft fail)
+            case MoveType::ROOK:
                 m_Hash[depth] ^= Lookup::zobrist[64 * 7 + tpos];
                 break;
             case MoveType::QUEEN:
@@ -806,6 +906,7 @@ public:
                 break;
             }
         }
+        m_Hash[0] = Zobrist_Hash(*m_RootBoard, m_Info[0]);
     }
 
    uint64 Check(bool white, const Board& board, uint64& danger, uint64& active, uint64& rookPin, uint64& bishopPin, uint64& enPassant) const {
@@ -952,11 +1053,6 @@ public:
         for (; const uint64 bit = PopBit(F2Pawns); F2Pawns > 0) { // Loop each bit
             result.push_back({ Pawn2Forward(bit, enemy), bit, MoveType::PAWN2 });
         }
-
-        //PrintMap(pawns);
-        //printf("\n");
-        // PrintMap(nonRookPawns);
-         //printf("\n");
 
         const uint64 nonRookPawns = pawns & ~rookPin;
         uint64 RPawns = PawnAttackRight(nonRookPawns, white) & Enemy(board, white) & active;
@@ -1246,10 +1342,10 @@ public:
             }
             else if (King(*m_RootBoard, white) & from) {
                 uint64 danger = Danger(white, *m_RootBoard);
-                if (CastleKing(danger, m_RootBoard->m_Board, Pawn(*m_RootBoard, white), white) && !(Lookup::king_attacks[posTo] & from)) {
+                if (CastleKing(danger, m_RootBoard->m_Board, Rook(*m_RootBoard, white), white) && !(Lookup::king_attacks[posTo] & from)) {
                     type = MoveType::KCASTLE;
                 }
-                else if (CastleQueen(danger, m_RootBoard->m_Board, Pawn(*m_RootBoard, white), white) && !(Lookup::king_attacks[posTo] & from)) {
+                else if (CastleQueen(danger, m_RootBoard->m_Board, Rook(*m_RootBoard, white), white) && !(Lookup::king_attacks[posTo] & from)) {
                     type = MoveType::QCASTLE;
                 }
                 else {

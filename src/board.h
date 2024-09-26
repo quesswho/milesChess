@@ -109,6 +109,8 @@ enum class MoveType { // Ordering is based on capture value
     KCASTLE, QCASTLE, P_KNIGHT, P_BISHOP, P_ROOK, P_QUEEN
 };
 
+
+
 struct Move {
 
     Move()

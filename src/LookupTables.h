@@ -2853,6 +2853,15 @@ namespace Lookup {
         0x0038383838383838, 0x0070707070707070, 0x00e0e0e0e0e0e0e0, 0x00c0c0c0c0c0c0c0,
     };
 
+    /*
+        NONE, PAWN, PAWN2, EPASSANT, KNIGHT, BISHOP, ROOK, QUEEN, KING,
+        KCASTLE, QCASTLE, P_KNIGHT, P_BISHOP, P_ROOK, P_QUEEN
+    */
+    static constexpr int pieceValue[15] = {
+        0,1,1,2,3,3,4,5,6,
+        6,6,8,7,7,9
+    };
+
     static void PrintZobristConstants() {
         uint64 seed = 9966442212445; // just random number
 

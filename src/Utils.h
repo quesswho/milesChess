@@ -2,6 +2,7 @@
 #include <bit>
 #include <cassert>
 #include <chrono>
+#include <stdarg.h>
 
 using uint64 = unsigned long long;
 using int64 = long long;
@@ -56,6 +57,26 @@ static void PrintMap(uint64 map) {
     }
 }
 
+static int sync_printf(const char* format, ...) {
+    static std::mutex lock;
+    std::lock_guard guard{ lock };
+    va_list args;
+    va_start(args, format);
+    setbuf(stdout, NULL);
+    return vprintf(format, args);
+}
+
+// Remove double whitespaces and \t characters from command
+static std::string trim_str(std::string str) {
+    for (int i = 0; i < str.length() - 1; i++) {
+        if ((str.at(i) == ' ' && str.at(i + 1) == ' ') || str.at(i) == '\t') {
+            str.erase(str.begin() + i);
+            i--;
+        }
+    }
+    return str;
+}
+
 class Timer {
 private:
     std::chrono::time_point<std::chrono::high_resolution_clock> m_Start;
@@ -68,6 +89,7 @@ public:
 
     void Start() { m_Start = std::chrono::high_resolution_clock::now(); }
     float End() { return std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - m_Start).count(); } // Returns x seconds after Start() was called
+    float EndMs() { return std::chrono::duration_cast<std::chrono::milliseconds > (std::chrono::high_resolution_clock::now() - m_Start).count(); }
 };
 
 #define GetLower(S) ((1ull << S) - 1)

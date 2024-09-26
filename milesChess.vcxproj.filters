@@ -44,5 +44,8 @@
     <ClInclude Include="src\Movelist.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Thread.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -23,35 +23,33 @@ int main() {
 	// Game against me & erik, we won
 	// 1. e4 e5 2. d3 Nf6 3. Nc3 Bb4 4. Ne2 d5 5. a3 Bxc3+ 6. Nxc3 dxe4 7. dxe4 Qxd1+ 8. Kxd1 O-O 9. h3 Rd8+ 10. Bd3 b6 11. g3 Ba6 12. f4 Bxd3 13. cxd3 Rxd3+ 14. Ke2 Rxg3 15. fxe5 Nfd7 16. Nd5 Na6 17. b4 c6 18. Ne7+ Kf8 19. Nxc6 Nc7 20. h4 Nb5 21. a4 Nc3+ 22. Ke1 Nxe4 23. Rf1 Rc8 24. e6 Ndf6 25. e7+ Ke8 26. b5 Rc3 27. Ba3 Rc7 28. Rd1 Re3#
 
-	//UCI uci;
-	//uci.Start();
+	if (true) {
+		UCI uci;
+		uci.Start();
+	} else {
+		char str[1000];
+		Search search;
+		//search.LoadPosition(g_StartingFEN);
+		search.LoadPosition("r1b2rk1/pp3pp1/2n4p/8/2P1Q3/2qB1N2/P1P2PPP/R3K2R w KQ - 1 16");
+		//search.LoadPosition("r3k3/pp1b1p2/2p3r1/Q2N3p/2BPp2q/4P3/PPP3Pb/R1B2R1K w q - 1 19");
+		//printf("%llu\n", search.Perft(6));
+		
 
-	//Lookup::PrintWhitePassedPawnTable();
-	//Lookup::PrintBlackPassedPawnTable();
-	Lookup::PrintKingSafety(false);
-	char str[1000];
+		while (true) {
+			Move move = search.BestMove(2);
+			if (move.m_Type == MoveType::NONE) {
+				printf("You won!\n");
+				scanf("%s");
+				break;
+			}
 
-	Search search;
-	search.LoadPosition(g_StartingFEN);
-	//search.LoadPosition("rn1qkb1r/pppb2pp/5n2/3p4/4pP2/4P1PP/PPP5/RNBQKBNR w KQkq - 15 8");
-	//search.LoadPosition("r3k3/pp1b1p2/2p3r1/Q2N3p/2BPp2q/4P3/PPP3Pb/R1B2R1K w q - 1 19");
-	//printf("%llu\n", search.Perft(6));
+			search.MoveRootPiece(move);
+			printf("%s, %s\n", move.toString().c_str(), search.GetFen().c_str());
+			scanf("%s", &str);
+			if (str[0] == 'q') break;
 
-
-	while (true) {
-		Move move = search.BestMove(5);
-		if (move.m_Type == MoveType::NONE) {
-			printf("You won!\n");
-			scanf("%s");
-			break;
+			move = search.GetMove(str);
+			search.MoveRootPiece(move);
 		}
-
-		search.MoveRootPiece(move);
-		printf("%s, %s\n", move.toString().c_str(), search.GetFen().c_str());
-		scanf("%s", &str);
-		if (str[0] == 'q') break;
-
-		move = search.GetMove(str);
-		search.MoveRootPiece(move);
 	}
 }

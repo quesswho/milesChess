@@ -121,6 +121,7 @@
     <ClInclude Include="src\LookupTables.h" />
     <ClInclude Include="src\Movelist.h" />
     <ClInclude Include="src\Search.h" />
+    <ClInclude Include="src\Thread.h" />
     <ClInclude Include="src\UCI.h" />
     <ClInclude Include="src\Utils.h" />
   </ItemGroup>
