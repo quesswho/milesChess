@@ -56,7 +56,12 @@ public:
         m_Table->Clear();
 	}
 
-	int64 Evaluate(const Board& board) {
+	int64 Evaluate(const Board& board, int depth) {
+
+        /*TTEntry* entry = m_Table->Probe(m_Hash[depth]);
+        if (entry != nullptr) {
+            return entry->m_Evaluation;
+        }*/
 
 		int64 middlegame = 0;
         int64 endgame = 0;
@@ -247,8 +252,8 @@ public:
     int64 Quiesce(const Board& board, int64 alpha, int64 beta, int depth) {
         m_NodeCnt++;
         int64 sgn = m_Info[depth].m_WhiteMove ? 1 : -1;
-        int64 bestScore = sgn * Evaluate(board);
-        if (bestScore >= beta) {
+        int64 bestScore = sgn * Evaluate(board, depth);
+        if (bestScore >= beta) { // fail soft
             return bestScore;
         }
         if (alpha < bestScore) {
@@ -263,7 +268,7 @@ public:
             return -10000 + depth; // Mate in 0 is 10000 centipawns worth
         }
 
-        TTEntry* entry = m_Table->Get(m_Hash[depth]);
+        TTEntry* entry = m_Table->Probe(m_Hash[depth]);
         if (entry != nullptr) {
             const Move hashMove = entry->m_BestMove;
             std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
@@ -321,7 +326,7 @@ public:
 
 		int64 bestScore = -110000;
 
-        TTEntry* entry = m_Table->Get(m_Hash[depth]);
+        TTEntry* entry = m_Table->Probe(m_Hash[depth]);
         if (entry != nullptr) {
             const Move hashMove = entry->m_BestMove;
             std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
@@ -365,9 +370,10 @@ public:
     void MoveTimed(int64 wtime, int64 btime, int64 winc, int64 binc) {
         int64 timediff = llabs(wtime - btime);
 
+        bool moreTime = m_Info[0].m_WhiteMove ? wtime > btime : wtime < btime;
         int64 timeleft = m_Info[0].m_WhiteMove ? wtime : btime;
         int64 timeic = m_Info[0].m_WhiteMove ? winc : binc;
-        int64 target = timeleft / 40;
+        int64 target = (timeleft+ (moreTime ? timediff : 0)) / 40 + 200;
         float x = (m_Info[0].m_FullMoves - 20.0f)/30.0f; 
         float factor = exp(-x*x);   // Bell curve
         sync_printf("info movetime %lli\n", (int64)(target * factor));
@@ -411,7 +417,7 @@ public:
             m_Maxdepth++;
             if (moves.size() == 1) break;
 
-            TTEntry* entry = m_Table->Get(m_Hash[0]);
+            TTEntry* entry = m_Table->Probe(m_Hash[0]);
             if (entry != nullptr) {
                 rootAlpha = entry->m_Evaluation - delta;
                 rootBeta = entry->m_Evaluation + delta;

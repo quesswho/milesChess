@@ -56,7 +56,7 @@ struct TranspositionTable {
         }
     }
 
-    TTEntry* Get(uint64 hash) {
+    TTEntry* Probe(uint64 hash) {
         uint64 index = hash & m_Indexer;
         if (m_Table[index].m_Hash == hash) {
             return &m_Table[index];
