@@ -30,14 +30,14 @@ int main() {
 		char str[1000];
 		Search* search = new Search();
 		//search.LoadPosition(g_StartingFEN);
-		search->LoadPosition("2r3k1/5pp1/pb2q2p/5N2/Q4PP1/5K2/P1PBr2P/3R4 w - - 9 33");
+		search->LoadPosition("r4rk1/pp2nppp/1np5/4Qp2/2PB1P1q/1P2PB2/P5PP/R4RK1 b - - 1 21");
 		//search.LoadPosition("r3k3/pp1b1p2/2p3r1/Q2N3p/2BPp2q/4P3/PPP3Pb/R1B2R1K w q - 1 19");
 		//printf("%llu\n", search.Perft(6));
 		Timer time;
 		time.Start();
-		//search->m_MaxTime = 20000;
-		//search->UCIMove_async();
-		search->Perft(5); // 109487502, 23MN/s
+		search->m_MaxTime = 20000;
+		search->UCIMove_async();
+		//search->Perft(5); // 109487502, 23MN/s
 		printf("%.3fs\n", time.End());
 		
 		//while (true) {

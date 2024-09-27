@@ -10,7 +10,8 @@
 
 #define MAX_DEPTH 64 // Maximum depth that the engine will go
 #define MATE_SCORE 32767
-
+#define MIN_ALPHA -110000ll
+#define MAX_BETA 110000ll
 
 class Search {
 public:
@@ -78,8 +79,8 @@ public:
 			middlegame += pawnVal + Lookup::pawn_table[pos];
             endgame    += pawnVal + Lookup::eg_pawn_table[pos];
             if ((Lookup::white_passed[rpos] & board.m_BlackPawn) == 0) { // pawn is passed
-                endgame += 100;
-                middlegame += 40;
+                endgame += 80;
+                middlegame += 20;
             }
 		}
 
@@ -88,8 +89,8 @@ public:
 			middlegame -= pawnVal + Lookup::pawn_table[pos];
             endgame    -= pawnVal + Lookup::eg_pawn_table[pos];
             if ((Lookup::black_passed[pos] & board.m_WhitePawn) == 0) { // pawn is passed
-                endgame -= 100;
-                middlegame -= 40;
+                endgame -= 80;
+                middlegame -= 20;
             }
 		}
 
@@ -187,6 +188,7 @@ public:
             }
 		}
 
+        // Kings
 		if (wk > 0) {
 			int pos = 63 - whiteking;
 			middlegame += kingVal + Lookup::king_table[pos] + Lookup::king_safetyindex[whiteAttack];
@@ -302,10 +304,10 @@ public:
         return bestScore;
     }
 
-	int64 AlphaBeta_r(const Board& board, int64 alpha, int64 beta, int depth) {
+	int64 AlphaBeta_r(const Board& board, int64 alpha, int64 beta, int depth, int maxdepth) {
         m_NodeCnt++;
         if (!m_Running || m_Timer.EndMs() >= m_MaxTime) return 0;
-		if (depth == m_Maxdepth) {
+		if (depth == maxdepth) {
 			return Quiesce(board, alpha, beta, depth);
 		}
 
@@ -340,7 +342,7 @@ public:
 
         Move bestMove = moves[0];
 		for (const Move& move : moves) {
-			int64 score = -AlphaBeta_r(MovePiece(board, move, depth + 1), -beta, -alpha, depth + 1);
+			int64 score = -AlphaBeta_r(MovePiece(board, move, depth + 1), -beta, -alpha, depth + 1, m_Maxdepth);
 			if (score > bestScore) {
 				bestScore = score;
                 bestMove = move;
@@ -357,16 +359,18 @@ public:
 		return bestScore;
 	}
 
+    
+
     // Calculate time to allocate for a move
     void MoveTimed(int64 wtime, int64 btime, int64 winc, int64 binc) {
         int64 timediff = llabs(wtime - btime);
 
         int64 timeleft = m_Info[0].m_WhiteMove ? wtime : btime;
         int64 timeic = m_Info[0].m_WhiteMove ? winc : binc;
-        int64 target = timeleft / 40 + timeic;
+        int64 target = timeleft / 40;
         float x = (m_Info[0].m_FullMoves - 20.0f)/30.0f; 
         float factor = exp(-x*x);   // Bell curve
-        printf("info movetime %lli\n", (int64)(target * factor));
+        sync_printf("info movetime %lli\n", (int64)(target * factor));
         UCIMove(target * factor);
     }
 
@@ -377,6 +381,7 @@ public:
         }
         m_Threads.push_back(std::make_unique<std::thread>(&Search::UCIMove_async, &*this));
     }
+
     void UCIMove_async() {
         m_Running = true;
         m_Maxdepth = 0;
@@ -391,15 +396,25 @@ public:
         Move bestMove = moves[0];
         Move finalMove = bestMove;
         int64 bestScore = -110000;
+        int64 rootAlpha = MIN_ALPHA;
+        int64 rootBeta = MAX_BETA;
+        int64 delta = 10;
         while (m_Running && m_Timer.EndMs() < m_MaxTime) {
             bestScore = -110000;
-            int64 alpha = -110000;
-            int64 beta = 110000;
+
+            delta = 10;
+            rootAlpha = MIN_ALPHA;
+            rootBeta = MAX_BETA;
+
+            int64 alpha, beta;
+
             m_Maxdepth++;
             if (moves.size() == 1) break;
 
             TTEntry* entry = m_Table->Get(m_Hash[0]);
             if (entry != nullptr) {
+                rootAlpha = entry->m_Evaluation - delta;
+                rootBeta = entry->m_Evaluation + delta;
                 const Move hashMove = entry->m_BestMove;
                 std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
                     if (a == hashMove) {
@@ -410,26 +425,54 @@ public:
                     }
                     return Move_Order(a, b);
                 });
-            }
-            else {
-                std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
+            } else {
+                std::sort(moves.begin(), moves.end(), [bestMove](const Move& a, const Move& b) {
                     return Move_Order(a, b);
                 });
             }
-
-            for (const Move& move : moves) {
-                int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), -beta, -alpha, 1);
-                assert("Evaluation is unreasonably big\n", score >= 72057594);
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMove = move;
-                    if (score > alpha) {
-                        alpha = score;
+            int failHigh = 0;
+            while (true) {
+                alpha = rootAlpha;
+                beta = rootBeta;
+                bestScore = -110000;
+                for (const Move& move : moves) {
+                    int64 score = -AlphaBeta_r(MovePiece(*m_RootBoard, move, 1), -beta, -alpha, 1, std::max(1, m_Maxdepth - failHigh));
+                    assert("Evaluation is unreasonably big\n", score >= 72057594);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = move;
+                        if (score > alpha) {
+                            alpha = score;
+                        }
+                    }
+                    if (alpha >= beta) { // Exit out early
+                        break;
                     }
                 }
-                if (alpha >= beta) { // Exit out early
-                    break;
+
+                if (bestScore <= rootAlpha) { // Failed low
+                    rootBeta = (rootAlpha + rootBeta) / 2;
+                    rootAlpha = std::max(bestScore - delta, MIN_ALPHA);
+                    failHigh = 0;
                 }
+                else if (bestScore >= rootBeta) { // Failed high
+                    rootBeta = std::min(bestScore + delta, MAX_BETA);
+                    failHigh++;
+                }
+                else
+                    break;
+
+                std::sort(moves.begin(), moves.end(), [bestMove](const Move& a, const Move& b) {
+                    if (a == bestMove) {
+                        return true;
+                    }
+                    else if (b == bestMove) {
+                        return false;
+                    }
+                    return Move_Order(a, b);
+                });
+
+                delta *= 1.5;
             }
             if (!m_Running || m_Timer.EndMs() >= m_MaxTime) break;
             sync_printf("info pv %s depth %i score cp %lli time %lli nodes %llu tps %llu\n", bestMove.toString().c_str(), m_Maxdepth, (m_Info[0].m_WhiteMove ? 1 : -1) * bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
@@ -699,7 +742,6 @@ public:
 	}
 
     void MoveRootPiece(const Move& move) {
-        m_Table->Clear();
         const uint64 re = ~move.m_To;
         const uint64 swp = move.m_From | move.m_To;
         const bool white = m_Info[0].m_WhiteMove;

@@ -7,6 +7,8 @@
 using uint64 = unsigned long long;
 using int64 = long long;
 
+#define _COMPILETIME static inline constexpr
+
 static inline uint64 PopBit(uint64& val) {
     uint64 result = (val & -val);
     val &= (val - 1);
