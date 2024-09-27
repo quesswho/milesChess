@@ -45,8 +45,8 @@ void UCI::Start() {
                         GetToken(istream, token);
                         Move move = m_Search.GetMove(token);
                         m_Search.MoveRootPiece(move);
-                        //printf("info %s, %s\n", move.toString().c_str(), BoardtoFen(*m_Search.m_RootBoard, m_Search.m_Info[0]).c_str());
                     }
+                    printf("info %s\n", BoardtoFen(*m_Search.m_RootBoard, m_Search.m_Info[0]).c_str());
                 }
             } else if (token == "fen") {
                 std::string fen;
