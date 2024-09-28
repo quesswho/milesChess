@@ -23,14 +23,14 @@ int main() {
 	// Game against me & erik, we won
 	// 1. e4 e5 2. d3 Nf6 3. Nc3 Bb4 4. Ne2 d5 5. a3 Bxc3+ 6. Nxc3 dxe4 7. dxe4 Qxd1+ 8. Kxd1 O-O 9. h3 Rd8+ 10. Bd3 b6 11. g3 Ba6 12. f4 Bxd3 13. cxd3 Rxd3+ 14. Ke2 Rxg3 15. fxe5 Nfd7 16. Nd5 Na6 17. b4 c6 18. Ne7+ Kf8 19. Nxc6 Nc7 20. h4 Nb5 21. a4 Nc3+ 22. Ke1 Nxe4 23. Rf1 Rc8 24. e6 Ndf6 25. e7+ Ke8 26. b5 Rc3 27. Ba3 Rc7 28. Rd1 Re3#
 
-	if (false) {
+	if (true) {
 		UCI uci;
 		uci.Start();
 	} else {
 		char str[1000];
 		Search* search = new Search();
 		//search.LoadPosition(g_StartingFEN);
-		//search->LoadPosition("r4rk1/pp2nppp/1np5/4Qp2/2PB1P1q/1P2PB2/P5PP/R4RK1 b - - 1 21");
+		search->LoadPosition("r4rk1/pp2nppp/1np5/4Qp2/2PB1P1q/1P2PB2/P5PP/R4RK1 b - - 1 21");
 		//search.LoadPosition("r3k3/pp1b1p2/2p3r1/Q2N3p/2BPp2q/4P3/PPP3Pb/R1B2R1K w q - 1 19");
 		//printf("%llu\n", search.Perft(6));
 		Timer time;

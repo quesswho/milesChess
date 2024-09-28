@@ -9,10 +9,16 @@
 #include <thread>
 #include <cmath>
 
-#define MAX_DEPTH 64 // Maximum depth that the engine will go
-#define MATE_SCORE 32767
+#define MAX_DEPTH 256 // Maximum depth that the engine will go
+#define MATE_SCORE 32767/2
 #define MIN_ALPHA -110000ll
 #define MAX_BETA 110000ll
+
+// Quadratic https://www.chessprogramming.org/Triangular_PV-Table
+struct MoveStack {
+    Move m_PV[MAX_DEPTH];
+    int ply;
+};
 
 struct RootMove {
     int score;
@@ -165,7 +171,7 @@ public:
         return bestScore;
     }
 
-	int64 AlphaBeta(const Board& board, int64 alpha, int64 beta, int depth, int depthleft) {
+	int64 AlphaBeta(const Board& board, MoveStack* stack, int64 alpha, int64 beta, int depth, int depthleft) {
         m_NodeCnt++;
         if (!m_Running || m_Timer.EndMs() >= m_MaxTime) return 0;
 
@@ -205,7 +211,7 @@ public:
 
         Move bestMove = moves[0];
 		for (const Move& move : moves) {
-			int64 score = -AlphaBeta(MovePiece(board, move, depth + 1), -beta, -alpha, depth + 1, depthleft-1);
+			int64 score = -AlphaBeta(MovePiece(board, move, depth + 1), stack, -beta, -alpha, depth + 1, depthleft-1);
 			if (score > bestScore) {
 				bestScore = score;
                 bestMove = move;
@@ -252,6 +258,8 @@ public:
 
         m_NodeCnt = 1;
 
+        MoveStack movestack;
+        MoveStack* stack = &movestack;
 
         // Move the moves into rootmoves
         std::vector<Move> generatedMoves = GenerateMoves(*m_RootBoard, 0);
@@ -299,7 +307,7 @@ public:
                 bestScore = -110000;
                 std::stable_sort(m_RootMoves.begin(), m_RootMoves.end());
                 for (RootMove& move : m_RootMoves) {
-                    int64 score = -AlphaBeta(MovePiece(*m_RootBoard, move.move, 1), -beta, -alpha, 1, std::max(1, m_Maxdepth - failHigh));
+                    int64 score = -AlphaBeta(MovePiece(*m_RootBoard, move.move, 1), stack, -beta, -alpha, 1, std::max(1, m_Maxdepth - failHigh));
                     assert("Evaluation is unreasonably big\n", score >= 72057594);
                     if (score > bestScore) {
                         bestScore = score;
