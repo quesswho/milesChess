@@ -16,8 +16,8 @@
 
 // Quadratic https://www.chessprogramming.org/Triangular_PV-Table
 struct MoveStack {
-    Move m_PV[MAX_DEPTH];
-    int ply;
+    Move m_PV[MAX_DEPTH] = {};
+    int m_Ply;
 };
 
 struct RootMove {
@@ -42,6 +42,7 @@ private:
     uint64 m_NodeCnt;
     TranspositionTable* m_Table;
     std::vector<RootMove> m_RootMoves;
+    int m_RootDelta;
 public:
 
 	Search() 
@@ -113,9 +114,15 @@ public:
 		return result;
 	}
 
-    int64 Quiesce(const Board& board, int64 alpha, int64 beta, int depth) {
+    static void Update_PV(Move* pv, Move move, Move* target) {
+        for (*pv++ = move; target && *target != Move();)
+            *pv++ = *target++;
+        *pv = Move();
+    }
+
+    int64 Quiesce(const Board& board, int64 alpha, int64 beta, int ply) {
         m_NodeCnt++;
-        int64 bestScore = Evaluate(board, m_Info[depth].m_WhiteMove);
+        int64 bestScore = Evaluate(board, m_Info[ply].m_WhiteMove);
         if (bestScore >= beta) { // fail soft
             return bestScore;
         }
@@ -123,15 +130,15 @@ public:
             alpha = bestScore;
         }
 
-        std::vector<Move> moves = GenerateCaptureMoves(board, depth);
+        std::vector<Move> moves = GenerateCaptureMoves(board, ply);
         if (moves.size() == 0) {
-            uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[depth].m_EnPassant;
-            Check(m_Info[depth].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
+            uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[ply].m_EnPassant;
+            Check(m_Info[ply].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
             if (active == 0xFFFFFFFFFFFFFFFFull) return 0; // Draw
-            return -10000 + depth; // Mate in 0 is 10000 centipawns worth
+            return -10000 + ply; // Mate in 0 is 10000 centipawns worth
         }
 
-        TTEntry* entry = m_Table->Probe(m_Hash[depth]);
+        TTEntry* entry = m_Table->Probe(m_Hash[ply]);
         if (entry != nullptr) {
             const Move hashMove = entry->m_BestMove;
             std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
@@ -152,7 +159,7 @@ public:
         Move bestMove;
         for (const Move& move : moves) {
             if (move.m_Capture == MoveType::NONE) continue; // Only analyze capturing moves
-            int64 score = -Quiesce(MovePiece(board, move, depth + 1), -beta, -alpha, depth + 1);
+            int64 score = -Quiesce(MovePiece(board, move, ply + 1), -beta, -alpha, ply + 1);
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = move;
@@ -165,57 +172,81 @@ public:
             }
         }
         if (bestMove.m_Type != MoveType::NONE) {
-            m_Table->Enter(m_Hash[depth], TTEntry(m_Hash[depth], bestMove, bestScore, depth, m_Info[depth].m_FullMoves));
+            m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, ply, m_Info[ply].m_FullMoves));
         }
 
         return bestScore;
     }
 
-	int64 AlphaBeta(const Board& board, MoveStack* stack, int64 alpha, int64 beta, int depth, int depthleft) {
+	int64 AlphaBeta(const Board& board, MoveStack* stack, int64 alpha, int64 beta, int ply, int depth) {
         m_NodeCnt++;
         if (!m_Running || m_Timer.EndMs() >= m_MaxTime) return 0;
 
+        // Prevent explosions
+        assert("Ply is more than MAX_DEPTH!\n", ply >= MAX_DEPTH);
+        depth = std::min(depth, MAX_DEPTH - 1);
+
         // Quiesce search if we reached the bottom
-        if (depthleft <= 1) {
-			return Quiesce(board, alpha, beta, depth);
+        if (depth <= 1) {
+			return Quiesce(board, alpha, beta, ply);
 		}
 
-		std::vector<Move> moves = GenerateMoves(board, depth);
+		std::vector<Move> moves = GenerateMoves(board, ply);
 		if (moves.size() == 0) {
-            uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[depth].m_EnPassant;
-            Check(m_Info[depth].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
+            uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[ply].m_EnPassant;
+            Check(m_Info[ply].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
             if (active == 0xFFFFFFFFFFFFFFFFull) return 0; // Draw
-			return -10000 + depth; // Mate in 0 is 10000 centipawns worth
+			return -10000 + ply; // Mate in 0 is 10000 centipawns worth
 		}
-
+        
 		int64 bestScore = -110000;
-
-        TTEntry* entry = m_Table->Probe(m_Hash[depth]);
-        if (entry != nullptr) {
-            const Move hashMove = entry->m_BestMove;
-            std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
-                if (a == hashMove) {
+        if (*stack->m_PV != Move()) {
+            const Move pvMove = *stack->m_PV;
+            std::sort(moves.begin(), moves.end(), [pvMove](const Move& a, const Move& b) {
+                if (a == pvMove) {
                     return true;
-                }
-                else if (b == hashMove) {
+                } else if (b == pvMove) {
                     return false;
                 }
                 return Move_Order(a, b);
-                });
-        }
-        else {
+            });
+        } else {
             std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
                 return Move_Order(a, b);
             });
         }
+        
+        Move hashMove = Move();
+        TTEntry* entry = m_Table->Probe(m_Hash[ply]);
+        if (entry != nullptr) {
+            hashMove = entry->m_BestMove;
+        }
 
         Move bestMove = moves[0];
 		for (const Move& move : moves) {
-			int64 score = -AlphaBeta(MovePiece(board, move, depth + 1), stack, -beta, -alpha, depth + 1, depthleft-1);
+            int newdepth = depth - 1;
+            int extension = 0;
+            int delta = beta - alpha;
+            if (ply >= 4) {
+                int reduction = (1500 - delta * 800 / m_RootDelta) / 1024 * std::log(ply);
+                // If we are on pv node then decrease reduction
+                if (*stack->m_PV != Move()) reduction -= 1;
+
+                // If hash move is not found then increase reduction
+                if (hashMove == Move() && depth <= ply * 2) reduction += 1;
+
+                reduction = std::max(0, reduction);
+                newdepth = std::max(1, newdepth - reduction);
+            }
+
+            newdepth += extension;
+            
+			int64 score = -AlphaBeta(MovePiece(board, move, ply + 1), stack+1, -beta, -alpha, ply + 1, newdepth);
 			if (score > bestScore) {
 				bestScore = score;
                 bestMove = move;
 				if (score > alpha) {
+                    Update_PV(stack->m_PV, bestMove, (stack + 1)->m_PV);
 					alpha = score;
 				}
 			}
@@ -223,7 +254,7 @@ public:
 				break;
 			}
 		}
-        m_Table->Enter(m_Hash[depth], TTEntry(m_Hash[depth], bestMove, bestScore, depth, m_Info[depth].m_FullMoves));
+        m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, ply, m_Info[ply].m_FullMoves));
 
 		return bestScore;
 	}
@@ -258,8 +289,12 @@ public:
 
         m_NodeCnt = 1;
 
-        MoveStack movestack;
-        MoveStack* stack = &movestack;
+        //MoveStack movestack[64] = {};
+        MoveStack* stack = new MoveStack[MAX_DEPTH];
+
+        for (int i = 0; i < MAX_DEPTH; i++) {
+            (stack + i)->m_Ply = i;
+        }
 
         // Move the moves into rootmoves
         std::vector<Move> generatedMoves = GenerateMoves(*m_RootBoard, 0);
@@ -282,11 +317,11 @@ public:
         int64 bestScore = -110000;
         int64 rootAlpha = MIN_ALPHA;
         int64 rootBeta = MAX_BETA;
-        int64 delta = 10;
+        m_RootDelta = 10;
         while (m_Running && m_Timer.EndMs() < m_MaxTime) {
             bestScore = -110000;
 
-            delta = 10;
+            m_RootDelta = 10;
             rootAlpha = MIN_ALPHA;
             rootBeta = MAX_BETA;
 
@@ -297,8 +332,8 @@ public:
 
             TTEntry* entry = m_Table->Probe(m_Hash[0]);
             if (entry != nullptr) {
-                rootAlpha = entry->m_Evaluation - delta;
-                rootBeta = entry->m_Evaluation + delta;
+                rootAlpha = entry->m_Evaluation - m_RootDelta;
+                rootBeta = entry->m_Evaluation + m_RootDelta;
             }
             int failHigh = 0;
             while (true) {
@@ -307,13 +342,14 @@ public:
                 bestScore = -110000;
                 std::stable_sort(m_RootMoves.begin(), m_RootMoves.end());
                 for (RootMove& move : m_RootMoves) {
-                    int64 score = -AlphaBeta(MovePiece(*m_RootBoard, move.move, 1), stack, -beta, -alpha, 1, std::max(1, m_Maxdepth - failHigh));
+                    int64 score = -AlphaBeta(MovePiece(*m_RootBoard, move.move, 1), stack+1, -beta, -alpha, 1, std::max(1, m_Maxdepth - failHigh));
                     assert("Evaluation is unreasonably big\n", score >= 72057594);
                     if (score > bestScore) {
                         bestScore = score;
                         bestMove = move.move;
                         move.score = score;
                         if (score > alpha) {
+                            Update_PV(stack->m_PV, bestMove, (stack + 1)->m_PV);
                             alpha = score;
                         }
                     }
@@ -324,27 +360,37 @@ public:
 
                 if (bestScore <= rootAlpha) { // Failed low
                     rootBeta = (rootAlpha + rootBeta) / 2;
-                    rootAlpha = std::max(bestScore - delta, MIN_ALPHA);
+                    rootAlpha = std::max(bestScore - m_RootDelta, MIN_ALPHA);
                     failHigh = 0;
                 }
                 else if (bestScore >= rootBeta) { // Failed high
-                    rootBeta = std::min(bestScore + delta, MAX_BETA);
+                    rootBeta = std::min(bestScore + m_RootDelta, MAX_BETA);
                     failHigh++;
-                }
-                else
+                } else {
                     break;
+                }
 
-                delta *= 1.5;
+                m_RootDelta *= 1.5;
             }
             if (!m_Running || m_Timer.EndMs() >= m_MaxTime) break;
-            sync_printf("info pv %s depth %i score cp %lli time %lli nodes %llu tps %llu\n", bestMove.toString().c_str(), m_Maxdepth, (m_Info[0].m_WhiteMove ? 1 : -1) * bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
+
+            // Print pv and search info
+            sync_printf("info depth %i score cp %lli time %lli nodes %llu tps %llu\n", m_Maxdepth, (m_Info[0].m_WhiteMove ? 1 : -1) * bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
+            sync_printf("info pv");
+            for (int i = 0; i < MAX_DEPTH && stack->m_PV[i] != Move(); i++) {
+                sync_printf(" %s", stack->m_PV[i].toString().c_str());
+            }
+            sync_printf("\n");
+
             finalMove = bestMove;
+
 
             m_Table->Enter(m_Hash[0], TTEntry(m_Hash[0], bestMove, bestScore, 0, m_Info[0].m_FullMoves));
 
             if (m_Timer.EndMs() * 2 >= m_MaxTime) break; // We won't have enough time to calculate more depth anyway
         }
         sync_printf("bestmove %s\n", finalMove.toString().c_str());
+        delete[] stack;
     }
 
 	Board MovePiece(const Board& board, const Move& move, int depth) {
