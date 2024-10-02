@@ -240,7 +240,7 @@ public:
             int delta = beta - alpha;
             if (inCheck && ply < MAX_DEPTH) extension++;
 
-            if (ply >= 4 && move.m_Capture == MoveType::NONE) {
+            if (ply >= 4 && move.m_Capture == MoveType::NONE && !inCheck) {
                 int reduction = (1500 - delta * 800 / m_RootDelta) / 1024 * std::log(ply);
                 // If we are on pv node then decrease reduction
                 if (*stack->m_PV != Move()) reduction -= 1;
