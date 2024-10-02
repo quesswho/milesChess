@@ -30,7 +30,7 @@ int main() {
 		char str[1000];
 		Search* search = new Search();
 		//search.LoadPosition(g_StartingFEN);
-		search->LoadPosition("r1bqk2r/2p1b1pp/p1n2n2/1p1p1P2/8/1B2QN2/PPP2PPP/RNB1K2R w KQkq - 0 10");
+		search->LoadPosition("4k2r/5p2/p3p2p/4P1p1/1Q6/5KBP/5PP1/5q2 b k - 0 36");
 		//search.LoadPosition("r3k3/pp1b1p2/2p3r1/Q2N3p/2BPp2q/4P3/PPP3Pb/R1B2R1K w q - 1 19");
 		//printf("%llu\n", search.Perft(6));
 		Timer time;

@@ -182,10 +182,10 @@ static int64 Evaluate(const Board& board, bool white) {
         }
         // Don't develop queen on starting pos too early
         if (rpos == 4) {
-            if (board.m_WhiteKnight & 0b10ull) middlegame += 2;
-            if (board.m_WhiteKnight & 0b1000000ull) middlegame += 2;
-            if (board.m_WhiteBishop & 0b100ull) middlegame += 2;
-            if (board.m_WhiteBishop & 0b100000ull) middlegame += 2;
+            if (board.m_WhiteKnight & 0b10ull) middlegame += 4;
+            if (board.m_WhiteKnight & 0b1000000ull) middlegame += 4;
+            if (board.m_WhiteBishop & 0b100ull) middlegame += 4;
+            if (board.m_WhiteBishop & 0b100000ull) middlegame += 4;
         }
         phase -= 4;
     }

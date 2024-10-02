@@ -191,13 +191,24 @@ public:
 			return Quiesce(board, alpha, beta, ply);
 		}
 
+        uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[ply].m_EnPassant;
+        Check(m_Info[ply].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
+        bool inCheck = false;
+        if (active != 0xFFFFFFFFFFFFFFFFull) inCheck = true;
+
 		std::vector<Move> moves = GenerateMoves(board, ply);
 		if (moves.size() == 0) {
-            uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[ply].m_EnPassant;
-            Check(m_Info[ply].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
-            if (active == 0xFFFFFFFFFFFFFFFFull) return 0; // Draw
+            if (!inCheck) return 0; // Draw
 			return -10000 + ply; // Mate in 0 is 10000 centipawns worth
 		}
+
+        // We count any repition as draw
+        for (int i = 4; ply >= i; i += 2) {
+            if (m_Hash[ply - i] == m_Hash[ply]) {
+                return 0;
+            }
+
+        }
         
 		int64 bestScore = -110000;
         if (*stack->m_PV != Move()) {
@@ -227,7 +238,9 @@ public:
             int newdepth = depth - 1;
             int extension = 0;
             int delta = beta - alpha;
-            if (ply >= 4) {
+            if (inCheck && ply < MAX_DEPTH) extension++;
+
+            if (ply >= 4 && move.m_Capture == MoveType::NONE) {
                 int reduction = (1500 - delta * 800 / m_RootDelta) / 1024 * std::log(ply);
                 // If we are on pv node then decrease reduction
                 if (*stack->m_PV != Move()) reduction -= 1;
