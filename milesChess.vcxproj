@@ -114,6 +114,7 @@
   <ItemGroup>
     <ClCompile Include="src\board.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\TableBase.cpp" />
     <ClCompile Include="src\UCI.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -122,6 +123,7 @@
     <ClInclude Include="src\LookupTables.h" />
     <ClInclude Include="src\Movelist.h" />
     <ClInclude Include="src\Search.h" />
+    <ClInclude Include="src\TableBase.h" />
     <ClInclude Include="src\Thread.h" />
     <ClInclude Include="src\Transposition.h" />
     <ClInclude Include="src\UCI.h" />

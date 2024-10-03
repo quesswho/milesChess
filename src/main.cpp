@@ -1,13 +1,14 @@
 #include<stdio.h>
 #include "UCI.h"
-//#include "Search.h"
+#include "TableBase.h" 
+
 
 const char* g_StartingFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 
 
 int main() {
-
+	TableBase::Init("tb/");
 	// First game 2024-08-17 (Lost against me)
 	// 1. h3 d5 2. g3 e5 3. e3 e4 4. c3 Nf6 5. f3 Nc6 6. d3 Bd6 7. f4 O - O 8. b3 a5 9. a3 Ne7 10. h4 Ng4 11. d4(11. dxe4 dxe4 12. c4 Bc5 13. Qe2 h5 14. Nh3 Nf5 15. Qg2 Re8 16. b4 axb4 17. axb4 Rxa1 18. Qb2 Rxb1 19. Qxb1 Bxe3 20. Bxe3 Ngxe3 21. Rg1 Nxf1 22. Rxf1 Nxg3 23. Rg1 Bxh3 24. Qc2 Qxh4 25. f5 Bg4 26. c5 Ne2 + 27. Rg3 Qxg3 + 28. Kf1 Qg1#
 

@@ -11,7 +11,7 @@ _COMPILETIME uint64 FirstRank() {
     }
 }
 
-_COMPILETIME llu FirstRank(const bool white) {
+_COMPILETIME uint64 FirstRank(const bool white) {
     return white ? Lookup::lines[1] : Lookup::lines[4 * 56 + 1];
 }
 

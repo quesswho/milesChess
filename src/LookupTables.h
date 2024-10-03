@@ -3,24 +3,22 @@
 #include <random>
 #include "Utils.h"
 
-using llu = unsigned long long;
-
 namespace Lookup {
 
-    constexpr llu InitFile(int p) {
+    constexpr uint64 InitFile(int p) {
         return (0x0101010101010101ull << (p % 8));
     }
 
-    constexpr llu InitRank(int p) {
+    constexpr uint64 InitRank(int p) {
         return (0xFFull << ((p >> 3) << 3)); // Truncate the first 3 bits
     }
 
-    constexpr llu InitDiagonal(int p) {
+    constexpr uint64 InitDiagonal(int p) {
         int s = 8 * (p % 8) - ((p >> 3) << 3);
         return s > 0 ? 0x8040201008040201 >> (s) : 0x8040201008040201 << (-s);
     }
 
-    constexpr llu InitAntiDiagonal(int p) {
+    constexpr uint64 InitAntiDiagonal(int p) {
         int s = 56 - 8 * (p % 8) - ((p >> 3) << 3);
         return s > 0 ? 0x0102040810204080 >> (s) : 0x0102040810204080 << (-s);
     }
@@ -30,14 +28,14 @@ namespace Lookup {
 
     }
 
-    constexpr llu AddToMap(llu map, int x, int y) {
+    constexpr uint64 AddToMap(uint64 map, int x, int y) {
         int pos = CoordToPos(x,y);
         return (pos == -1) ? map : map | (1ull << pos);
     }
 
     // Table generator for lines;
-    static std::array<llu, 64 * 4> InitSlider() {
-        std::array<llu, 64 * 4> result{};
+    static std::array<uint64, 64 * 4> InitSlider() {
+        std::array<uint64, 64 * 4> result{};
         for (int i = 0; i < 64; i++) {
             result[i * 4] = InitFile(i);
             result[i * 4 + 1] = InitRank(i);
@@ -48,8 +46,8 @@ namespace Lookup {
     }
 
     // Table generator for knight_attacks
-    static std::array<llu, 64> InitKnight() {
-        std::array<llu, 64> result{};
+    static std::array<uint64, 64> InitKnight() {
+        std::array<uint64, 64> result{};
         for (int i = 0; i < 64; i++) {
             int x = i % 8 + 1;
             int y = i / 8 + 1;
@@ -65,8 +63,8 @@ namespace Lookup {
         return result;
     }
 
-    static std::array<llu, 64> InitKing() {
-        std::array<llu, 64> result{};
+    static std::array<uint64, 64> InitKing() {
+        std::array<uint64, 64> result{};
         for (int i = 0; i < 64; i++) {
             int x = i % 8 + 1;
             int y = i / 8 + 1;
@@ -83,7 +81,7 @@ namespace Lookup {
     }
 
     static void PrintKingSafety(bool white) {
-        std::array<llu, 64> result{};
+        std::array<uint64, 64> result{};
         for (int i = 0; i < 64; i++) {
             int x = i % 8 + 1;
             int y = i / 8 + 1;
@@ -104,23 +102,23 @@ namespace Lookup {
         }
 
         int i = 0;
-        for (llu e : result) {
+        for (uint64 e : result) {
             printf("%#018llx, ", e);
             i++;
             if (i % 4 == 0) printf("\n");
         }
     }
 
-    static std::array<llu, 64> InitRook() {
-        std::array<llu, 64> result{};
+    static std::array<uint64, 64> InitRook() {
+        std::array<uint64, 64> result{};
         for (int i = 0; i < 64; i++) {
             result[i] = InitFile(i) | InitRank(i);
         }
         return result;
     }
 
-    static std::array<llu, 64> InitBishop() {
-        std::array<llu, 64> result{};
+    static std::array<uint64, 64> InitBishop() {
+        std::array<uint64, 64> result{};
         for (int i = 0; i < 64; i++) {
             result[i] = InitDiagonal(i) | InitAntiDiagonal(i);
         }
@@ -129,7 +127,7 @@ namespace Lookup {
 
     static void PrintLineTable() {
         int i = 0;
-        for (llu e : Lookup::InitSlider()) {
+        for (uint64 e : Lookup::InitSlider()) {
             printf("%#018llx, ", e);
             i++;
             if (i % 4 == 0) printf("\n");
@@ -140,7 +138,7 @@ namespace Lookup {
 
     static void PrintKnightTable() {
         int i = 0;
-        for (llu e : Lookup::InitKnight()) {
+        for (uint64 e : Lookup::InitKnight()) {
             printf("%#018llx, ", e);
             i++;
             if (i % 4 == 0) printf("\n");
@@ -149,16 +147,16 @@ namespace Lookup {
 
     static void PrintKingTable() {
         int i = 0;
-        for (llu e : Lookup::InitKing()) {
+        for (uint64 e : Lookup::InitKing()) {
             printf("%#018llx, ", e);
             i++;
             if (i % 4 == 0) printf("\n");
         }
     }
 
-    static void PrintTable(std::array<llu, 64> table) {
+    static void PrintTable(std::array<uint64, 64> table) {
         int i = 0;
-        for (llu e : table) {
+        for (uint64 e : table) {
             printf("%#018llx, ", e);
             i++;
             if (i % 4 == 0) printf("\n");
@@ -166,7 +164,7 @@ namespace Lookup {
     }
 
     // 0: File, 1: Rank, 2: Diagonal, 3: AntiDiagonal
-    static constexpr std::array<llu, 64 * 4> lines = {
+    static constexpr std::array<uint64, 64 * 4> lines = {
         0x0101010101010101, 0x00000000000000ff, 0x8040201008040201, 0x0000000000000001,
         0x0202020202020202, 0x00000000000000ff, 0x0080402010080402, 0x0000000000000102,
         0x0404040404040404, 0x00000000000000ff, 0x0000804020100804, 0x0000000000010204,
@@ -243,7 +241,7 @@ namespace Lookup {
 
     static constexpr std::array<lineEx, 256> linesEx = Init();
 
-    static constexpr std::array<llu, 64> knight_attacks = {
+    static constexpr std::array<uint64, 64> knight_attacks = {
         0x0000000000020400, 0x0000000000050800, 0x00000000000a1100, 0x0000000000142200,
         0x0000000000284400, 0x0000000000508800, 0x0000000000a01000, 0x0000000000402000,
         0x0000000002040004, 0x0000000005080008, 0x000000000a110011, 0x0000000014220022,
@@ -262,7 +260,7 @@ namespace Lookup {
         0x0044280000000000, 0x0088500000000000, 0x0010a00000000000, 0x0020400000000000
     };
 
-    static constexpr std::array<llu, 64> king_attacks = {
+    static constexpr std::array<uint64, 64> king_attacks = {
         0x0000000000000302, 0x0000000000000705, 0x0000000000000e0a, 0x0000000000001c14,
         0x0000000000003828, 0x0000000000007050, 0x000000000000e0a0, 0x000000000000c040,
         0x0000000000030203, 0x0000000000070507, 0x00000000000e0a0e, 0x00000000001c141c,
@@ -281,7 +279,7 @@ namespace Lookup {
         0x2838000000000000, 0x5070000000000000, 0xa0e0000000000000, 0x40c0000000000000
     };
 
-    static constexpr std::array<llu, 64> w_king_safety = {
+    static constexpr std::array<uint64, 64> w_king_safety = {
         0x0000000000030302, 0x0000000000070705, 0x00000000000e0e0a, 0x00000000001c1c14,
         0x0000000000383828, 0x0000000000707050, 0x0000000000e0e0a0, 0x0000000000c0c040,
         0x0000000003030303, 0x0000000007070707, 0x000000000e0e0e0e, 0x000000001c1c1c1c,
@@ -300,7 +298,7 @@ namespace Lookup {
         0x3838000000000000, 0x7070000000000000, 0xe0e0000000000000, 0xc0c0000000000000,
     };
 
-    static constexpr std::array<llu, 64> b_king_safety = {
+    static constexpr std::array<uint64, 64> b_king_safety = {
         0x0000000000000303, 0x0000000000000707, 0x0000000000000e0e, 0x0000000000001c1c,
         0x0000000000003838, 0x0000000000007070, 0x000000000000e0e0, 0x000000000000c0c0,
         0x0000000000030303, 0x0000000000070707, 0x00000000000e0e0e, 0x00000000001c1c1c,
@@ -319,7 +317,7 @@ namespace Lookup {
         0x2838380000000000, 0x5070700000000000, 0xa0e0e00000000000, 0x40c0c00000000000
     };
 
-    static constexpr std::array<llu, 64> rook_mask = {
+    static constexpr std::array<uint64, 64> rook_mask = {
         0x01010101010101ff, 0x02020202020202ff, 0x04040404040404ff, 0x08080808080808ff,
         0x10101010101010ff, 0x20202020202020ff, 0x40404040404040ff, 0x80808080808080ff,
         0x010101010101ff01, 0x020202020202ff02, 0x040404040404ff04, 0x080808080808ff08,
@@ -338,7 +336,7 @@ namespace Lookup {
         0xff10101010101010, 0xff20202020202020, 0xff40404040404040, 0xff80808080808080
     };
 
-    static constexpr std::array<llu, 64> bishop_mask = {
+    static constexpr std::array<uint64, 64> bishop_mask = {
         0x8040201008040201, 0x0080402010080502, 0x0000804020110a04, 0x0000008041221408,
         0x0000000182442810, 0x0000010204885020, 0x000102040810a040, 0x0102040810204080,
         0x4020100804020102, 0x8040201008050205, 0x00804020110a040a, 0x0000804122140814,
@@ -359,16 +357,16 @@ namespace Lookup {
 
     static constexpr const char* starting_pos = { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" };
 
-    static constexpr llu StartingPawnRank(const bool white) {
+    static constexpr uint64 StartingPawnRank(const bool white) {
         return white ? lines[8 * 4 + 1] : lines[8 * 6 * 4 + 1];
     }
 
-    static constexpr llu EnPassantRank(const bool white) {
+    static constexpr uint64 EnPassantRank(const bool white) {
         return white ? lines[8 * 4 * 4 + 1] : lines[8 * 3 * 4 + 1];
     }
 
-    static std::array<llu, 64 * 64> InitActiveMoves() {
-        std::array<llu, 64 * 64> result;
+    static std::array<uint64, 64 * 64> InitActiveMoves() {
+        std::array<uint64, 64 * 64> result;
         for (int ksq = 0; ksq < 64; ksq++) {
             for (int enemysq = 0; enemysq < 64; enemysq++) {
                 if (ksq == enemysq) {
@@ -457,8 +455,8 @@ namespace Lookup {
         return result;
     }
 
-    static std::array<llu, 64 * 64> InitCheckMoves() {
-        std::array<llu, 64 * 64> result;
+    static std::array<uint64, 64 * 64> InitCheckMoves() {
+        std::array<uint64, 64 * 64> result;
         for (int ksq = 0; ksq < 64; ksq++) {
             for (int enemysq = 0; enemysq < 64; enemysq++) {
                 if (ksq == enemysq) {
@@ -584,7 +582,7 @@ namespace Lookup {
 
     static void PrintActiveMoves() {
         int i = 0;
-        for (llu e : InitActiveMoves()) {
+        for (uint64 e : InitActiveMoves()) {
             printf("%#018llx, ", e);
             i++;
             if (i % 4 == 0) printf("\n");
@@ -593,7 +591,7 @@ namespace Lookup {
 
     static void PrintCheckMoves() {
         int i = 0;
-        for (llu e : InitCheckMoves()) {
+        for (uint64 e : InitCheckMoves()) {
             printf("%#018llx, ", e);
             i++;
             if (i % 4 == 0) printf("\n");
