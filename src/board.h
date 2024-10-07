@@ -104,6 +104,10 @@ static BoardInfo FenInfo(const std::string& FEN) {
     return info;
 }
 
+enum class PieceType {
+    NONE = 0, PAWN = 1, KNIGHT = 2, BISHOP = 3, ROOK = 4, QUEEN = 5, KING = 6
+};
+
 enum class MoveType { // Ordering is based on capture value
     NONE, PAWN, PAWN2, EPASSANT, KNIGHT, BISHOP, ROOK, QUEEN, KING,
     KCASTLE, QCASTLE, P_KNIGHT, P_BISHOP, P_ROOK, P_QUEEN
