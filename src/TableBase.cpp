@@ -4,13 +4,14 @@
 */
 
 #include "TableBase.h"
+
+#include <windows.h>
+
 namespace TableBase {
 
     static std::string s_Path;
 
     static char pchr[] = { 'K', 'Q', 'R', 'B', 'N', 'P' };
-
-    
 
     static int TBnum_piece, TBnum_pawn;
     static TBEntry_piece TB_piece[TBMAX_PIECE];
@@ -18,6 +19,520 @@ namespace TableBase {
 
     static TBHashEntry TB_hash[1 << TBHASHBITS][HSHMAX];
 
+    static int binomial[5][64];
+    static int pawnidx[5][24];
+    static int pfactor[5][4];
+
+    // Given a position return the table base string such as KQPvKRP
+
+    static void TB_Str(const Board& board, char* str, int mirror) {
+        int color = mirror ? 8 : 0;
+        int pt;
+        int i;
+        uint64 key = 0;
+
+        uint8_t wp = COUNT_BIT(board.m_WhitePawn), wkn = COUNT_BIT(board.m_WhiteKnight), wb = COUNT_BIT(board.m_WhiteBishop), wr = COUNT_BIT(board.m_WhiteRook), wq = COUNT_BIT(board.m_WhiteQueen), wk = COUNT_BIT(board.m_WhiteKing),
+            bp = COUNT_BIT(board.m_BlackPawn), bkn = COUNT_BIT(board.m_BlackKnight), bb = COUNT_BIT(board.m_BlackBishop), br = COUNT_BIT(board.m_BlackRook), bq = COUNT_BIT(board.m_BlackQueen), bk = COUNT_BIT(board.m_BlackKing);
+
+
+        while(wk-- > 0) {
+            *str++ = pchr[0];
+        }
+        while(wq-- > 0) {
+            *str++ = pchr[1];
+        }
+        while(wr-- > 0) {
+            *str++ = pchr[2];
+        }
+        while(wb-- > 0) {
+            *str++ = pchr[3];
+        }
+        while(wkn-- > 0) {
+            *str++ = pchr[4];
+        }
+        while(wp-- > 0) {
+            *str++ = pchr[5];
+        }
+        *str++ = 'v';
+
+        while (bk-- > 0) {
+            *str++ = pchr[0];
+        }
+        while (bq-- > 0) {
+            *str++ = pchr[1];
+        }
+        while (br-- > 0) {
+            *str++ = pchr[2];
+        }
+        while (bb-- > 0) {
+            *str++ = pchr[3];
+        }
+        while (bkn-- > 0) {
+            *str++ = pchr[4];
+        }
+        while (bp-- > 0) {
+            *str++ = pchr[5];
+        }
+        *str++ = 0;
+    }
+
+    static uint64 Material_Key(const Board& board) {
+        const uint8_t wp = COUNT_BIT(board.m_WhitePawn), wkn = COUNT_BIT(board.m_WhiteKnight), wb = COUNT_BIT(board.m_WhiteBishop), wr = COUNT_BIT(board.m_WhiteRook), wq = COUNT_BIT(board.m_WhiteQueen), wk = COUNT_BIT(board.m_WhiteKing),
+            bp = COUNT_BIT(board.m_BlackPawn), bkn = COUNT_BIT(board.m_BlackKnight), bb = COUNT_BIT(board.m_BlackBishop), br = COUNT_BIT(board.m_BlackRook), bq = COUNT_BIT(board.m_BlackQueen), bk = COUNT_BIT(board.m_BlackKing);
+        
+        uint64 key = 0;
+        if (wp) {
+            key ^= Lookup::zobrist[wp-1];
+        }
+        if (bp) {
+            key ^= Lookup::zobrist[64+bp-1];
+        }
+        if (wkn) {
+            key ^= Lookup::zobrist[128 + wkn - 1];
+        }
+        if (bkn) {
+            key ^= Lookup::zobrist[64+128 + wkn - 1];
+        }
+        if (wb) {
+            key ^= Lookup::zobrist[128*2 + wb - 1];
+        }
+        if (bb) {
+            key ^= Lookup::zobrist[64+128 * 2 + bb - 1];
+        }
+        if (wr) {
+            key ^= Lookup::zobrist[128 * 3 + wr - 1];
+        }
+        if (br) {
+            key ^= Lookup::zobrist[64 + 128 * 3 + br - 1];
+        }
+        if (wq) {
+            key ^= Lookup::zobrist[128 * 4 + wq - 1];
+        }
+        if (bq) {
+            key ^= Lookup::zobrist[64 + 128 * 4 + bq - 1];
+        }
+
+        // White and black king are always present
+        key ^= Lookup::zobrist[128 * 5];
+        key ^= Lookup::zobrist[128 * 5 + 64];
+
+        return key;
+    }
+
+    static void set_norm_piece(TBEntry_piece* ptr, ubyte* norm, ubyte* pieces) {
+        int i, j;
+
+        for (i = 0; i < ptr->num; i++)
+            norm[i] = 0;
+
+        switch (ptr->enc_type) {
+        case 0:
+            norm[0] = 3;
+            break;
+        default:
+            norm[0] = 2;
+            break;
+        }
+
+        for (i = norm[0]; i < ptr->num; i += norm[i])
+            for (j = i; j < ptr->num && pieces[j] == pieces[i]; j++)
+                norm[i]++;
+    }
+
+    // place k like pieces on n squares
+    static int subfactor(int k, int n) {
+        int i, f, l;
+
+        f = n;
+        l = 1;
+        for (i = 1; i < k; i++) {
+            f *= n - i;
+            l *= i + 1;
+        }
+
+        return f / l;
+    }
+
+    static uint64 calc_factors_piece(int* factor, int num, int order, ubyte* norm, ubyte enc_type) {
+        int i, k, n;
+        uint64 f;
+        static int pivfac[] = { 31332, 28056, 462 };
+
+        n = 64 - norm[0];
+
+        f = 1;
+        for (i = norm[0], k = 0; i < num || k == order; k++) {
+            if (k == order) {
+                factor[0] = f;
+                f *= pivfac[enc_type];
+            } else {
+                factor[i] = f;
+                f *= subfactor(norm[i], n);
+                n -= norm[i];
+                i += norm[i];
+            }
+        }
+
+        return f;
+    }
+
+    static void setup_pieces_piece(struct TBEntry_piece* ptr, unsigned char* data, uint64* tb_size) {
+        int i;
+        int order;
+
+        for (i = 0; i < ptr->num; i++)
+            ptr->pieces[0][i] = data[i + 1] & 0x0f;
+        order = data[0] & 0x0f;
+        set_norm_piece(ptr, ptr->norm[0], ptr->pieces[0]);
+        tb_size[0] = calc_factors_piece(ptr->factor[0], ptr->num, order, ptr->norm[0], ptr->enc_type);
+
+        for (i = 0; i < ptr->num; i++)
+            ptr->pieces[1][i] = data[i + 1] >> 4;
+        order = data[0] >> 4;
+        set_norm_piece(ptr, ptr->norm[1], ptr->pieces[1]);
+        tb_size[1] = calc_factors_piece(ptr->factor[1], ptr->num, order, ptr->norm[1], ptr->enc_type);
+    }
+
+    static uint64 calc_factors_pawn(int* factor, int num, int order, int order2, ubyte* norm, int file) {
+        int i, k, n;
+        uint64 f;
+
+        i = norm[0];
+        if (order2 < 0x0f) i += norm[i];
+        n = 64 - i;
+
+        f = 1;
+        for (k = 0; i < num || k == order || k == order2; k++) {
+            if (k == order) {
+                factor[0] = f;
+                f *= pfactor[norm[0] - 1][file];
+            } else if (k == order2) {
+                factor[norm[0]] = f;
+                f *= subfactor(norm[norm[0]], 48 - norm[0]);
+            } else {
+                factor[i] = f;
+                f *= subfactor(norm[i], n);
+                n -= norm[i];
+                i += norm[i];
+            }
+        }
+
+        return f;
+    }
+
+    static void set_norm_pawn(struct TBEntry_pawn* ptr, ubyte* norm, ubyte* pieces) {
+        int i, j;
+
+        for (i = 0; i < ptr->num; i++)
+            norm[i] = 0;
+
+        norm[0] = ptr->pawns[0];
+        if (ptr->pawns[1]) norm[ptr->pawns[0]] = ptr->pawns[1];
+
+        for (i = ptr->pawns[0] + ptr->pawns[1]; i < ptr->num; i += norm[i])
+            for (j = i; j < ptr->num && pieces[j] == pieces[i]; j++)
+                norm[i]++;
+    }
+
+    static void setup_pieces_pawn(struct TBEntry_pawn* ptr, unsigned char* data, uint64* tb_size, int f) {
+        int i, j;
+        int order, order2;
+
+        j = 1 + (ptr->pawns[1] > 0);
+        order = data[0] & 0x0f;
+        order2 = ptr->pawns[1] ? (data[1] & 0x0f) : 0x0f;
+        for (i = 0; i < ptr->num; i++)
+            ptr->file[f].pieces[0][i] = data[i + j] & 0x0f;
+        set_norm_pawn(ptr, ptr->file[f].norm[0], ptr->file[f].pieces[0]);
+        tb_size[0] = calc_factors_pawn(ptr->file[f].factor[0], ptr->num, order, order2, ptr->file[f].norm[0], f);
+
+        order = data[0] >> 4;
+        order2 = ptr->pawns[1] ? (data[1] >> 4) : 0x0f;
+        for (i = 0; i < ptr->num; i++)
+            ptr->file[f].pieces[1][i] = data[i + j] >> 4;
+        set_norm_pawn(ptr, ptr->file[f].norm[1], ptr->file[f].pieces[1]);
+        tb_size[1] = calc_factors_pawn(ptr->file[f].factor[1], ptr->num, order, order2, ptr->file[f].norm[1], f);
+    }
+
+    static void calc_symlen(struct PairsData* d, int s, char* tmp) {
+        int s1, s2;
+
+        int w = *(int*)(d->sympat + 3 * s);
+        s2 = (w >> 12) & 0x0fff;
+        if (s2 == 0x0fff)
+            d->symlen[s] = 0;
+        else {
+            s1 = w & 0x0fff;
+            if (!tmp[s1]) calc_symlen(d, s1, tmp);
+            if (!tmp[s2]) calc_symlen(d, s2, tmp);
+            d->symlen[s] = d->symlen[s1] + d->symlen[s2] + 1;
+        }
+        tmp[s] = 1;
+    }
+
+    static PairsData* setup_pairs(unsigned char* data, uint64 tb_size, uint64* size, unsigned char** next, ubyte* flags, int wdl) {
+        PairsData* d;
+        int i;
+
+        *flags = data[0];
+        if (data[0] & 0x80) {
+            d = (PairsData*)malloc(sizeof(PairsData));
+            d->idxbits = 0;
+            if (wdl)
+                d->min_len = data[1];
+            else
+                d->min_len = 0;
+            *next = data + 2;
+            size[0] = size[1] = size[2] = 0;
+            return d;
+        }
+
+        int blocksize = data[1];
+        int idxbits = data[2];
+        int real_num_blocks = *(uint*)(&data[4]);
+        int num_blocks = real_num_blocks + *(ubyte*)(&data[3]);
+        int max_len = data[8];
+        int min_len = data[9];
+        int h = max_len - min_len + 1;
+        int num_syms = *(ushort*)(&data[10 + 2 * h]);
+        d = (struct PairsData*)malloc(sizeof(struct PairsData) + (h - 1) * sizeof(uint) + num_syms);
+        d->blocksize = blocksize;
+        d->idxbits = idxbits;
+        d->offset = (ushort*)(&data[10]);
+        d->symlen = ((ubyte*)d) + sizeof(struct PairsData) + (h - 1) * sizeof(uint);
+        d->sympat = &data[12 + 2 * h];
+        d->min_len = min_len;
+        *next = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
+
+        int num_indices = (tb_size + (1ULL << idxbits) - 1) >> idxbits;
+        size[0] = 6ULL * num_indices;
+        size[1] = 2ULL * num_blocks;
+        size[2] = (1ULL << blocksize) * real_num_blocks;
+
+        // char tmp[num_syms];
+        char tmp[4096];
+        for (i = 0; i < num_syms; i++)
+            tmp[i] = 0;
+        for (i = 0; i < num_syms; i++)
+            if (!tmp[i])
+                calc_symlen(d, i, tmp);
+
+        d->base[h - 1] = 0;
+        for (i = h - 2; i >= 0; i--)
+            d->base[i] = (d->base[i + 1] + d->offset[i] - d->offset[i + 1]) / 2;
+
+        for (i = 0; i < h; i++)
+            d->base[i] <<= 32 - (min_len + i);
+
+        d->offset -= d->min_len;
+
+        return d;
+    }
+
+    static FD Open_TB(const char* str, const char* suffix) {
+
+        char file[256];
+        strcpy(file, s_Path.c_str());
+        strcat(file, "/");
+        strcat(file, str);
+        strcat(file, suffix);
+        HANDLE fd = CreateFile(file, GENERIC_READ, FILE_SHARE_READ, NULL,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (fd != FD_ERR) return fd;
+
+        return FD_ERR;
+    }
+
+    static void Close_TB(FD fd) {
+        CloseHandle(fd);
+    }
+
+    static char* Map_TB(const char* name, const char* suffix, uint64* mapping) {
+        FD fd = Open_TB(name, suffix);
+        if (fd == FD_ERR)
+            return NULL;
+        DWORD size_low, size_high;
+        size_low = GetFileSize(fd, &size_high);
+        HANDLE map = CreateFileMapping(fd, NULL, PAGE_READONLY, size_high, size_low,
+            NULL);
+        if (map == NULL) {
+            printf("CreateFileMapping() failed.\n");
+            exit(1);
+        }
+        *mapping = (uint64)map;
+        char* data = (char*)MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
+        if (data == NULL) {
+            printf("MapViewOfFile() failed, name = %s%s, error = %lu.\n", name, suffix, GetLastError());
+            exit(1);
+        }
+
+        Close_TB(fd);
+        return data;
+    }
+
+    static void Unmap_TB(char* data, uint64 mapping) {
+        if (!data) return;
+        UnmapViewOfFile(data);
+        CloseHandle((HANDLE)mapping);
+    }
+
+    static int Load_Wdl(TBEntry* entry, char* str) {
+        ubyte* next;
+        int f, s;
+        uint64 tb_size[8];
+        uint64 size[8 * 3];
+        ubyte flags;
+
+        entry->data = Map_TB(str, WDLSUFFIX, &entry->mapping);
+        if (!entry->data) {
+            printf("Could not find %s" WDLSUFFIX "\n", str);
+            return 0;
+        }
+
+        ubyte* data = (ubyte*)entry->data;
+        if (((uint*)data)[0] != WDL_MAGIC) {
+            printf("Corrupted table.\n");
+            Unmap_TB(entry->data, entry->mapping);
+            entry->data = 0;
+            return 0;
+        }
+
+        int split = data[4] & 0x01;
+        int files = data[4] & 0x02 ? 4 : 1;
+
+        data += 5;
+
+        if (!entry->has_pawns) {
+            TBEntry_piece* ptr = (TBEntry_piece*)entry;
+            setup_pieces_piece(ptr, data, &tb_size[0]);
+            data += ptr->num + 1;
+            data += ((uintptr_t)data) & 0x01;
+
+            ptr->precomp[0] = setup_pairs(data, tb_size[0], &size[0], &next, &flags, 1);
+            data = next;
+            if (split) {
+                ptr->precomp[1] = setup_pairs(data, tb_size[1], &size[3], &next, &flags, 1);
+                data = next;
+            } else
+                ptr->precomp[1] = NULL;
+
+            ptr->precomp[0]->indextable = (char*)data;
+            data += size[0];
+            if (split) {
+                ptr->precomp[1]->indextable = (char*)data;
+                data += size[3];
+            }
+
+            ptr->precomp[0]->sizetable = (ushort*)data;
+            data += size[1];
+            if (split) {
+                ptr->precomp[1]->sizetable = (ushort*)data;
+                data += size[4];
+            }
+
+            data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+            ptr->precomp[0]->data = data;
+            data += size[2];
+            if (split) {
+                data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+                ptr->precomp[1]->data = data;
+            }
+        } else {
+            struct TBEntry_pawn* ptr = (struct TBEntry_pawn*)entry;
+            s = 1 + (ptr->pawns[1] > 0);
+            for (f = 0; f < 4; f++) {
+                setup_pieces_pawn((struct TBEntry_pawn*)ptr, data, &tb_size[2 * f], f);
+                data += ptr->num + s;
+            }
+            data += ((uintptr_t)data) & 0x01;
+
+            for (f = 0; f < files; f++) {
+                ptr->file[f].precomp[0] = setup_pairs(data, tb_size[2 * f], &size[6 * f], &next, &flags, 1);
+                data = next;
+                if (split) {
+                    ptr->file[f].precomp[1] = setup_pairs(data, tb_size[2 * f + 1], &size[6 * f + 3], &next, &flags, 1);
+                    data = next;
+                } else
+                    ptr->file[f].precomp[1] = NULL;
+            }
+
+            for (f = 0; f < files; f++) {
+                ptr->file[f].precomp[0]->indextable = (char*)data;
+                data += size[6 * f];
+                if (split) {
+                    ptr->file[f].precomp[1]->indextable = (char*)data;
+                    data += size[6 * f + 3];
+                }
+            }
+
+            for (f = 0; f < files; f++) {
+                ptr->file[f].precomp[0]->sizetable = (ushort*)data;
+                data += size[6 * f + 1];
+                if (split) {
+                    ptr->file[f].precomp[1]->sizetable = (ushort*)data;
+                    data += size[6 * f + 4];
+                }
+            }
+
+            for (f = 0; f < files; f++) {
+                data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+                ptr->file[f].precomp[0]->data = data;
+                data += size[6 * f + 2];
+                if (split) {
+                    data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+                    ptr->file[f].precomp[1]->data = data;
+                    data += size[6 * f + 5];
+                }
+            }
+        }
+
+        return 1;
+    }
+
+    int TableBase::Probe_WDL(const Board& board, int* success) {
+        *success = 1;
+
+        TBEntry* ptr;
+        TBHashEntry* ptr2;
+        int i;
+
+        int man = COUNT_BIT(board.m_Board);
+        if (man > TBPIECES) {
+            *success = 0;
+            return 0;
+        }
+
+        if (man == 2) { // Two kings is automatic draw
+            return 0;
+        }
+
+        uint64 key = Material_Key(board);
+
+        // Check if we have this particular tablebase
+        ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
+        for (i = 0; i < HSHMAX; i++)
+            if (ptr2[i].key == key) break;
+        if (i == HSHMAX) {
+            *success = 0;
+            return 0;
+        }
+
+        // Load the tablebase if we haven't already
+        ptr = ptr2[i].ptr;
+        if (!ptr->ready) {
+            char str[16];
+            TB_Str(board, str, ptr->key != key);
+            if (!Load_Wdl(ptr, str)) {
+                ptr2[i].key = 0ULL;
+                *success = 0;
+                return 0;
+            }
+            ptr->ready = 1;
+        }
+
+
+        return 0;
+    }
 
     static uint64 PCSHashKey(int* pcs, bool mirror) {
         int color = mirror ? 8 : 0;
@@ -58,7 +573,10 @@ namespace TableBase {
         int pcs[16];
         int i,j;
 
-        // TODO: Check if file exists
+        // Check if file exists
+        FD fd = Open_TB(tablebase.c_str(), WDLSUFFIX);
+        if (fd == FD_ERR) return;
+        Close_TB(fd);
 
         for (i = 0; i < 16; i++) {
             pcs[i] = 0;
@@ -136,6 +654,10 @@ namespace TableBase {
         if (key2 != key) InsertTB(entry, key2);
 
     }
+
+    
+
+    
 
     static const signed char offdiag[] = {
       0,-1,-1,-1,-1,-1,-1,-1,
@@ -323,10 +845,6 @@ namespace TableBase {
         -1, -1, -1, -1, -1, -1,460,440,
         -1, -1, -1, -1, -1, -1, -1,461 }
     };
-
-    static int binomial[5][64];
-    static int pawnidx[5][24];
-    static int pfactor[5][4];
 
     void TableBase::Init(std::string path) {
         s_Path = path;

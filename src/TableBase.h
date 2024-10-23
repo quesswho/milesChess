@@ -14,6 +14,28 @@ namespace TableBase {
 #define TBMAX_PAWN 256
 #define HSHMAX 5
 
+#define WDL_MAGIC 0x5d23e871
+#define DTZ_MAGIC 0xa50c66d7
+
+#define WDLSUFFIX ".rtbw"
+#define DTZSUFFIX ".rtbz"
+
+#define FD HANDLE
+#define FD_ERR INVALID_HANDLE_VALUE
+
+    struct PairsData {
+        char* indextable;
+        ushort* sizetable;
+        ubyte* data;
+        ushort* offset;
+        ubyte* symlen;
+        ubyte* sympat;
+        int blocksize;
+        int idxbits;
+        int min_len;
+        uint base[1];
+    };
+
     struct TBEntry {
         char* data;
         uint64 key;
@@ -62,4 +84,6 @@ namespace TableBase {
     };
 
 	void Init(std::string path);
+
+    int Probe_WDL(const Board& board, int* success);
 }

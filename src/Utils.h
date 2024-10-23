@@ -6,9 +6,9 @@
 
 using uint64 = unsigned long long;
 using int64 = long long;
-
-typedef unsigned char ubyte;
-typedef unsigned short ushort;
+using uint = unsigned int;
+using ushort = unsigned short;
+using ubyte = unsigned char;
 
 #define _COMPILETIME static inline constexpr
 

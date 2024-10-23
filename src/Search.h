@@ -2,6 +2,7 @@
 
 #include "Transposition.h"
 #include "Evaluate.h"
+#include "TableBase.h"
 
 #include <unordered_map>
 #include <algorithm>
@@ -185,6 +186,15 @@ public:
         // Prevent explosions
         assert("Ply is more than MAX_DEPTH!\n", ply >= MAX_DEPTH);
         depth = std::min(depth, MAX_DEPTH - 1);
+
+
+        // Probe the tablebase
+        int success;
+        int v = TableBase::Probe_WDL(board, &success);
+        if (success) {
+            printf("Tablebase found: %d\n", &v);
+        }
+
 
         // Quiesce search if we reached the bottom
         if (depth <= 1) {
