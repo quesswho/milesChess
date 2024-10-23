@@ -18,10 +18,21 @@ static inline uint64 PopBit(uint64& val) {
     return result;
 }
 
+static inline int LSB(uint64& val) {
+    unsigned long r;
+    _BitScanForward64(&r, val);
+    return r;
+}
+
 static inline int PopPos(uint64& val) {
-    int index = int(_tzcnt_u64(val));
+    int index = int(LSB(val)); // 0 returns 0
+    //int index = int(_tzcnt_u64(val));
     val &= val - 1;
     return index;
+}
+
+static inline int Signum(int val) {
+    return (0 < val) - (val < 0);
 }
 
 static uint64 FenToMap(const std::string& FEN, char p) {

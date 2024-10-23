@@ -172,23 +172,34 @@ struct Move {
 
 class Board {
 public:
-    const uint64 m_WhitePawn;
-    const uint64 m_WhiteKnight;
-    const uint64 m_WhiteBishop;
-    const uint64 m_WhiteRook;
-    const uint64 m_WhiteQueen;
-    const uint64 m_WhiteKing;
+    
+    union {
+        struct {
+            uint64 m_White;
+            uint64 m_Black;
 
-    const uint64 m_BlackPawn;
-    const uint64 m_BlackKnight;
-    const uint64 m_BlackBishop;
-    const uint64 m_BlackRook;
-    const uint64 m_BlackQueen;
-    const uint64 m_BlackKing;
+            const uint64 m_WhitePawn;
+            const uint64 m_BlackPawn;
 
-    const uint64 m_White;
-    const uint64 m_Black;
-    const uint64 m_Board;
+            const uint64 m_WhiteKnight;
+            const uint64 m_BlackKnight;
+
+            const uint64 m_WhiteBishop;
+            const uint64 m_BlackBishop;
+
+            const uint64 m_WhiteRook;
+            const uint64 m_BlackRook;
+
+            const uint64 m_WhiteQueen;
+            const uint64 m_BlackQueen;
+
+            const uint64 m_WhiteKing;
+            const uint64 m_BlackKing;
+        };
+        const uint64 m_Pieces[7][2]; // 6 pieces for each color: 0 for white and 1 for black
+        
+    };
+    uint64 m_Board;
 
     Board(const std::string& FEN);
 

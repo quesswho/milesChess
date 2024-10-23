@@ -10,10 +10,10 @@
 #include <thread>
 #include <cmath>
 
-#define MAX_DEPTH 256 // Maximum depth that the engine will go
+#define MAX_DEPTH 64 // Maximum depth that the engine will go
 #define MATE_SCORE 32767/2
-#define MIN_ALPHA -110000ll
-#define MAX_BETA 110000ll
+#define MIN_ALPHA -32767ll
+#define MAX_BETA 32767ll
 
 // Quadratic https://www.chessprogramming.org/Triangular_PV-Table
 struct MoveStack {
@@ -31,11 +31,12 @@ struct RootMove {
 
 class Search {
 public:
-	BoardInfo m_Info[64];
+	BoardInfo m_Info[MAX_DEPTH];
 	std::unique_ptr<Board> m_RootBoard;
     int64 m_MaxTime;
 private:
-	uint64 m_Hash[64];
+	uint64 m_Hash[MAX_DEPTH];
+    uint64 m_History[256];
     std::vector<std::unique_ptr<std::thread>> m_Threads;
     bool m_Running;
     Timer m_Timer;
@@ -72,6 +73,7 @@ public:
 		m_RootBoard = std::make_unique<Board>(Board(fen));
         m_Hash[0] = Zobrist_Hash(*m_RootBoard, m_Info[0]);
         m_Table->Clear();
+        m_History[0] = m_Hash[0];
 	}
 
 
@@ -136,7 +138,7 @@ public:
             uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[ply].m_EnPassant;
             Check(m_Info[ply].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
             if (active == 0xFFFFFFFFFFFFFFFFull) return 0; // Draw
-            return -10000 + ply; // Mate in 0 is 10000 centipawns worth
+            return -MATE_SCORE + ply; // Mate in 0 is 10000 centipawns worth
         }
 
         TTEntry* entry = m_Table->Probe(m_Hash[ply]);
@@ -190,9 +192,9 @@ public:
 
         // Probe the tablebase
         int success;
-        int v = TableBase::Probe_WDL(board, &success);
+        int v = TableBase::Probe_DTZ(board, m_Info[ply], &success);
         if (success) {
-            printf("Tablebase found: %d\n", &v);
+            return Signum(v) * (MATE_SCORE-v);
         }
 
 
@@ -209,18 +211,19 @@ public:
 		std::vector<Move> moves = GenerateMoves(board, ply);
 		if (moves.size() == 0) {
             if (!inCheck) return 0; // Draw
-			return -10000 + ply; // Mate in 0 is 10000 centipawns worth
+			return -MATE_SCORE + ply; // Mate in 0 is 10000 centipawns worth
 		}
 
-        // We count any repition as draw
-        for (int i = 4; ply >= i; i += 2) {
-            if (m_Hash[ply - i] == m_Hash[ply]) {
+        // We count any repetion as draw
+        // TODO: Maybe employ hashing to make this O(1) instead of O(n)
+        for (int i = 0; i < m_Info[ply].m_HalfMoves; i++) {
+            if (m_History[i] == m_Hash[ply]) {
                 return 0;
             }
 
         }
         
-		int64 bestScore = -110000;
+		int64 bestScore = -MATE_SCORE;
         if (*stack->m_PV != Move()) {
             const Move pvMove = *stack->m_PV;
             std::sort(moves.begin(), moves.end(), [pvMove](const Move& a, const Move& b) {
@@ -337,12 +340,12 @@ public:
         m_Timer.Start();
         Move bestMove = m_RootMoves[0].move;
         Move finalMove = bestMove;
-        int64 bestScore = -110000;
+        int64 bestScore = -MATE_SCORE;
         int64 rootAlpha = MIN_ALPHA;
         int64 rootBeta = MAX_BETA;
         m_RootDelta = 10;
-        while (m_Running && m_Timer.EndMs() < m_MaxTime) {
-            bestScore = -110000;
+        while (m_Running && m_Timer.EndMs() < m_MaxTime && MAX_DEPTH > m_Maxdepth) {
+            bestScore = -MATE_SCORE;
 
             m_RootDelta = 10;
             rootAlpha = MIN_ALPHA;
@@ -362,7 +365,7 @@ public:
             while (true) {
                 alpha = rootAlpha;
                 beta = rootBeta;
-                bestScore = -110000;
+                bestScore = -MATE_SCORE;
                 std::stable_sort(m_RootMoves.begin(), m_RootMoves.end());
                 for (RootMove& move : m_RootMoves) {
                     int64 score = -AlphaBeta(MovePiece(*m_RootBoard, move.move, 1), stack+1, -beta, -alpha, 1, std::max(1, m_Maxdepth - failHigh));
@@ -406,60 +409,61 @@ public:
             sync_printf("\n");
 
             finalMove = bestMove;
-
+            
 
             m_Table->Enter(m_Hash[0], TTEntry(m_Hash[0], bestMove, bestScore, 0, m_Info[0].m_FullMoves));
 
             if (m_Timer.EndMs() * 2 >= m_MaxTime) break; // We won't have enough time to calculate more depth anyway
+            if (bestScore >= MATE_SCORE - MAX_DEPTH || bestScore <= -MATE_SCORE + MAX_DEPTH) break; // Position is solved so exit out
         }
         sync_printf("bestmove %s\n", finalMove.toString().c_str());
         delete[] stack;
     }
 
-	Board MovePiece(const Board& board, const Move& move, int depth) {
+	Board MovePiece(const Board& board, const Move& move, int ply) {
 		const uint64 re = ~move.m_To;
 		const uint64 swp = move.m_From | move.m_To;
-		const bool white = m_Info[depth-1].m_WhiteMove;
+		const bool white = m_Info[ply-1].m_WhiteMove;
 		const uint64 wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
 			bp = board.m_BlackPawn, bkn = board.m_BlackKnight, bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
 
-        m_Info[depth] = m_Info[depth - 1]; // Maybe expensive copy, consider making an unmoving function
-        m_Info[depth].m_HalfMoves = m_Info[depth-1].m_HalfMoves+1;
-        if (!white) m_Info[depth].m_FullMoves = m_Info[depth - 1].m_FullMoves + 1;
-        m_Info[depth].m_EnPassant = 0;
-        m_Info[depth].m_WhiteMove = !white;
+        m_Info[ply] = m_Info[ply - 1]; // Maybe expensive copy, consider making an unmoving function
+        m_Info[ply].m_HalfMoves = m_Info[ply-1].m_HalfMoves+1;
+        if (!white) m_Info[ply].m_FullMoves = m_Info[ply - 1].m_FullMoves + 1;
+        m_Info[ply].m_EnPassant = 0;
+        m_Info[ply].m_WhiteMove = !white;
 
 
         int fpos = GET_SQUARE(move.m_From);
         int tpos = GET_SQUARE(move.m_To);
 
-        m_Hash[depth] = m_Hash[depth - 1] ^ Lookup::zobrist[64 * 12];
+        m_Hash[ply] = m_Hash[ply - 1] ^ Lookup::zobrist[64 * 12];
 
-        if (m_Info[depth - 1].m_EnPassant) {
-            m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(m_Info[depth - 1].m_EnPassant) % 8)];
+        if (m_Info[ply - 1].m_EnPassant) {
+            m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(m_Info[ply - 1].m_EnPassant) % 8)];
         }
 
-        if(move.m_Capture != MoveType::NONE) m_Info[depth].m_HalfMoves = 0;
+        if(move.m_Capture != MoveType::NONE) m_Info[ply].m_HalfMoves = 0;
 
 		if (white) {
             switch (move.m_Capture) {
             case MoveType::PAWN:
-                m_Hash[depth] ^= Lookup::zobrist[64 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[64 + tpos];
                 break;
             case MoveType::EPASSANT:
-                m_Hash[depth] ^= Lookup::zobrist[56 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[56 + tpos];
                 break;
             case MoveType::KNIGHT:
-                m_Hash[depth] ^= Lookup::zobrist[64 * 3 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[64 * 3 + tpos];
                 break;
             case MoveType::BISHOP:
-                m_Hash[depth] ^= Lookup::zobrist[64 * 5 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[64 * 5 + tpos];
                 break;
             case MoveType::ROOK:
-                m_Hash[depth] ^= Lookup::zobrist[64 * 7 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[64 * 7 + tpos];
                 break;
             case MoveType::QUEEN:
-                m_Hash[depth] ^= Lookup::zobrist[64 * 9 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[64 * 9 + tpos];
                 break;
             case MoveType::PAWN2: // Should never happen
                 assert("Pawn can not take when moving forward twice!");
@@ -471,85 +475,85 @@ public:
 			assert("Cant move to same color piece", move.m_To & m_White);
 			switch (move.m_Type) {
 			case MoveType::PAWN:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[tpos] ^ Lookup::zobrist[fpos];
-                m_Info[depth].m_HalfMoves = 0;
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[tpos] ^ Lookup::zobrist[fpos];
+                m_Info[ply].m_HalfMoves = 0;
 				return Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::PAWN2:
-                m_Info[depth].m_EnPassant = move.m_To >> 8;
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[tpos] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 12 + 5 + (tpos % 8)];
-                m_Info[depth].m_HalfMoves = 0;
+                m_Info[ply].m_EnPassant = move.m_To >> 8;
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[tpos] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 12 + 5 + (tpos % 8)];
+                m_Info[ply].m_HalfMoves = 0;
 				return Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::KNIGHT:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 2 + tpos] ^ Lookup::zobrist[64 * 2 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 2 + tpos] ^ Lookup::zobrist[64 * 2 + fpos];
 				return Board(wp, wkn ^ swp, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::BISHOP:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 4 + tpos] ^ Lookup::zobrist[64 * 4 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 4 + tpos] ^ Lookup::zobrist[64 * 4 + fpos];
 				return Board(wp, wkn, wb ^ swp, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::ROOK:
                 if (move.m_From == 0b1ull) {
-                    m_Info[depth].m_WhiteCastleKing = false;
-                    if (m_Info[depth - 1].m_WhiteCastleKing) {
-                        m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 1];
+                    m_Info[ply].m_WhiteCastleKing = false;
+                    if (m_Info[ply - 1].m_WhiteCastleKing) {
+                        m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 1];
                     }
                 }
                 else if (move.m_From == 0b10000000ull) {
-                    m_Info[depth].m_WhiteCastleQueen = false;
-                    if (m_Info[depth - 1].m_WhiteCastleQueen) {
-                        m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 2];
+                    m_Info[ply].m_WhiteCastleQueen = false;
+                    if (m_Info[ply - 1].m_WhiteCastleQueen) {
+                        m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 2];
                     }
                 }
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 6 + tpos] ^ Lookup::zobrist[64 * 6 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 6 + tpos] ^ Lookup::zobrist[64 * 6 + fpos];
 				return Board(wp, wkn, wb, wr ^ swp, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::QUEEN:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 8 + tpos] ^ Lookup::zobrist[64 * 8 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 8 + tpos] ^ Lookup::zobrist[64 * 8 + fpos];
 				return Board(wp, wkn, wb, wr, wq ^ swp, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::KING:
-                m_Info[depth].m_WhiteCastleQueen = false;
-                m_Info[depth].m_WhiteCastleKing = false;
-                if (m_Info[depth - 1].m_WhiteCastleQueen) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 2];
+                m_Info[ply].m_WhiteCastleQueen = false;
+                m_Info[ply].m_WhiteCastleKing = false;
+                if (m_Info[ply - 1].m_WhiteCastleQueen) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 2];
                 }
-                if (m_Info[depth - 1].m_WhiteCastleKing) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 1];
+                if (m_Info[ply - 1].m_WhiteCastleKing) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 1];
                 }
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 10 + tpos] ^ Lookup::zobrist[64 * 10 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 10 + tpos] ^ Lookup::zobrist[64 * 10 + fpos];
 				return Board(wp, wkn, wb, wr, wq, wk ^ swp, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::EPASSANT:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[tpos] ^ Lookup::zobrist[fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[tpos] ^ Lookup::zobrist[fpos];
 				return Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & ~(move.m_To >> 8), bkn, bb, br, bq, bk);
 			case MoveType::KCASTLE:
-                m_Info[depth].m_WhiteCastleQueen = false;
-                m_Info[depth].m_WhiteCastleKing = false;
-                if (m_Info[depth - 1].m_WhiteCastleQueen) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 2];
+                m_Info[ply].m_WhiteCastleQueen = false;
+                m_Info[ply].m_WhiteCastleKing = false;
+                if (m_Info[ply - 1].m_WhiteCastleQueen) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 2];
                 }
-                if (m_Info[depth - 1].m_WhiteCastleKing) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 1];
+                if (m_Info[ply - 1].m_WhiteCastleKing) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 1];
                 }
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 10 + 1] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6] ^ Lookup::zobrist[64 * 6 + 2];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 10 + 1] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6] ^ Lookup::zobrist[64 * 6 + 2];
 				return Board(wp, wkn, wb, wr ^ 0b101ull, wq, wk ^ swp, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::QCASTLE:
-                m_Info[depth].m_WhiteCastleQueen = false;
-                m_Info[depth].m_WhiteCastleKing = false;
-                if (m_Info[depth - 1].m_WhiteCastleQueen) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 2];
+                m_Info[ply].m_WhiteCastleQueen = false;
+                m_Info[ply].m_WhiteCastleKing = false;
+                if (m_Info[ply - 1].m_WhiteCastleQueen) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 2];
                 }
-                if (m_Info[depth - 1].m_WhiteCastleKing) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 1];
+                if (m_Info[ply - 1].m_WhiteCastleKing) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 1];
                 }
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 10 + 5] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6 + 7] ^ Lookup::zobrist[64 * 6 + 4];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 10 + 5] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6 + 7] ^ Lookup::zobrist[64 * 6 + 4];
 				return Board(wp, wkn, wb, wr ^ 0b10010000ull, wq, wk ^ swp, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::P_KNIGHT:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 2 + tpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 2 + tpos];
 				return Board(wp & (~move.m_From), wkn | move.m_To, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::P_BISHOP:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 4 + tpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 4 + tpos];
 				return Board(wp & (~move.m_From), wkn, wb | move.m_To, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::P_ROOK:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 6 + tpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 6 + tpos];
 				return Board(wp & (~move.m_From), wkn, wb, wr | move.m_To, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::P_QUEEN:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 8 + tpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[fpos] ^ Lookup::zobrist[64 * 8 + tpos];
 				return Board(wp & (~move.m_From), wkn, wb, wr, wq | move.m_To, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
 			case MoveType::NONE:
 				assert("Invalid move!");
@@ -560,22 +564,22 @@ public:
             switch (move.m_Capture) {
             case MoveType::PAWN:
             case MoveType::PAWN2:
-                m_Hash[depth] ^= Lookup::zobrist[tpos];
+                m_Hash[ply] ^= Lookup::zobrist[tpos];
                 break;
             case MoveType::EPASSANT:
-                m_Hash[depth] ^= Lookup::zobrist[8 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[8 + tpos];
                 break;
             case MoveType::KNIGHT:
-                m_Hash[depth] ^= Lookup::zobrist[64 * 2 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[64 * 2 + tpos];
                 break;
             case MoveType::BISHOP:
-                m_Hash[depth] ^= Lookup::zobrist[64 * 4 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[64 * 4 + tpos];
                 break;
             case MoveType::ROOK:
-                m_Hash[depth] ^= Lookup::zobrist[64 * 6 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[64 * 6 + tpos];
                 break;
             case MoveType::QUEEN:
-                m_Hash[depth] ^= Lookup::zobrist[64 * 8 + tpos];
+                m_Hash[ply] ^= Lookup::zobrist[64 * 8 + tpos];
                 break;
             case MoveType::NONE:
                 // No capture
@@ -585,91 +589,92 @@ public:
 			assert("Cant move to same color piece", move.m_To & m_Black);
 			switch (move.m_Type) {
 			case MoveType::PAWN:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 + tpos] ^ Lookup::zobrist[64 + fpos];
-                m_Info[depth].m_HalfMoves = 0;
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 + tpos] ^ Lookup::zobrist[64 + fpos];
+                m_Info[ply].m_HalfMoves = 0;
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp ^ swp, bkn, bb, br, bq, bk);
 			case MoveType::PAWN2:
-                m_Info[depth].m_EnPassant = move.m_To << 8;
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 + tpos] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[64 * 12 + 5 + (tpos % 8)];
-                m_Info[depth].m_HalfMoves = 0;
+                m_Info[ply].m_EnPassant = move.m_To << 8;
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 + tpos] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[64 * 12 + 5 + (tpos % 8)];
+                m_Info[ply].m_HalfMoves = 0;
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp ^ swp, bkn, bb, br, bq, bk);
 			case MoveType::KNIGHT:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 3 + tpos] ^ Lookup::zobrist[64 * 3 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 3 + tpos] ^ Lookup::zobrist[64 * 3 + fpos];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn ^ swp, bb, br, bq, bk);
 			case MoveType::BISHOP:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 5 + tpos] ^ Lookup::zobrist[64 * 5 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 5 + tpos] ^ Lookup::zobrist[64 * 5 + fpos];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb ^ swp, br, bq, bk);
 			case MoveType::ROOK:
                 if (move.m_From == (1ull << 56)) {
-                    m_Info[depth].m_BlackCastleKing = false;
-                    if (m_Info[depth - 1].m_BlackCastleKing) {
-                        m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 3];
+                    m_Info[ply].m_BlackCastleKing = false;
+                    if (m_Info[ply - 1].m_BlackCastleKing) {
+                        m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 3];
                     }
                 }
                 else if (move.m_From == (0b10000000ull << 56)) {
-                    m_Info[depth].m_BlackCastleQueen = false;
-                    if (m_Info[depth - 1].m_BlackCastleQueen) {
-                        m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 4];
+                    m_Info[ply].m_BlackCastleQueen = false;
+                    if (m_Info[ply - 1].m_BlackCastleQueen) {
+                        m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 4];
                     }
                 }
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 7 + tpos] ^ Lookup::zobrist[64 * 7 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 7 + tpos] ^ Lookup::zobrist[64 * 7 + fpos];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb, br ^ swp, bq, bk);
 			case MoveType::QUEEN:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 9 + tpos] ^ Lookup::zobrist[64 * 9 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 9 + tpos] ^ Lookup::zobrist[64 * 9 + fpos];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb, br, bq ^ swp, bk);
 			case MoveType::KING:
-                m_Info[depth].m_BlackCastleKing = false;
-                m_Info[depth].m_BlackCastleQueen = false;
-                if (m_Info[depth - 1].m_BlackCastleKing) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 3];
+                m_Info[ply].m_BlackCastleKing = false;
+                m_Info[ply].m_BlackCastleQueen = false;
+                if (m_Info[ply - 1].m_BlackCastleKing) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 3];
                 }
-                if (m_Info[depth - 1].m_BlackCastleQueen) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 4];
+                if (m_Info[ply - 1].m_BlackCastleQueen) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 4];
                 }
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 11 + tpos] ^ Lookup::zobrist[64 * 11 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 11 + tpos] ^ Lookup::zobrist[64 * 11 + fpos];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb, br, bq, bk ^ swp);
 			case MoveType::EPASSANT:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 + tpos] ^ Lookup::zobrist[64 + fpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 + tpos] ^ Lookup::zobrist[64 + fpos];
 				return Board(wp & ~(move.m_To << 8), wkn, wb, wr, wq, wk, bp ^ swp, bkn, bb, br, bq, bk);
 			case MoveType::KCASTLE:
-                m_Info[depth].m_BlackCastleKing = false;
-                m_Info[depth].m_BlackCastleQueen = false;
-                if (m_Info[depth - 1].m_BlackCastleKing) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 3];
+                m_Info[ply].m_BlackCastleKing = false;
+                m_Info[ply].m_BlackCastleQueen = false;
+                if (m_Info[ply - 1].m_BlackCastleKing) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 3];
                 }
-                if (m_Info[depth - 1].m_BlackCastleQueen) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 4];
+                if (m_Info[ply - 1].m_BlackCastleQueen) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 4];
                 }
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 11 + 57] ^ Lookup::zobrist[64 * 11 + 59] ^ Lookup::zobrist[64 * 7 + 56] ^ Lookup::zobrist[64 * 7 + 58];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 11 + 57] ^ Lookup::zobrist[64 * 11 + 59] ^ Lookup::zobrist[64 * 7 + 56] ^ Lookup::zobrist[64 * 7 + 58];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb, br ^ (0b101ull << 56), bq, bk ^ swp);
 			case MoveType::QCASTLE:
-                m_Info[depth].m_BlackCastleKing = false;
-                m_Info[depth].m_BlackCastleQueen = false;
-                if (m_Info[depth - 1].m_BlackCastleKing) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 3];
+                m_Info[ply].m_BlackCastleKing = false;
+                m_Info[ply].m_BlackCastleQueen = false;
+                if (m_Info[ply - 1].m_BlackCastleKing) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 3];
                 }
-                if (m_Info[depth - 1].m_BlackCastleQueen) {
-                    m_Hash[depth] ^= Lookup::zobrist[64 * 12 + 4];
+                if (m_Info[ply - 1].m_BlackCastleQueen) {
+                    m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 4];
                 }
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 * 11 + 61] ^ Lookup::zobrist[64 * 11 + 59] ^ Lookup::zobrist[64 * 7 + 60] ^ Lookup::zobrist[64 * 7 + 63];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 11 + 61] ^ Lookup::zobrist[64 * 11 + 59] ^ Lookup::zobrist[64 * 7 + 60] ^ Lookup::zobrist[64 * 7 + 63];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp, bkn, bb, br ^ (0b10010000ull << 56), bq, bk ^ swp);
 			case MoveType::P_KNIGHT:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[3 * 64 + tpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[3 * 64 + tpos];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp & (~move.m_From), bkn | move.m_To, bb, br, bq, bk);
 			case MoveType::P_BISHOP:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[5 * 64 + tpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[5 * 64 + tpos];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp & (~move.m_From), bkn, bb | move.m_To, br, bq, bk);
 			case MoveType::P_ROOK:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[7 * 64 + tpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[7 * 64 + tpos];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp & (~move.m_From), bkn, bb, br | move.m_To, bq, bk);
 			case MoveType::P_QUEEN:
-                m_Hash[depth] = m_Hash[depth] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[9 * 64 + tpos];
+                m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 + fpos] ^ Lookup::zobrist[9 * 64 + tpos];
 				return Board(wp & re, wkn & re, wb & re, wr & re, wq & re, wk, bp & (~move.m_From), bkn, bb, br, bq | move.m_To, bk);
 			case MoveType::NONE:
 				assert("Invalid move!");
 				break;
 			}
 		}
+        m_History[m_Info[ply].m_HalfMoves] = m_Hash[ply];
 	}
 
     void MoveRootPiece(const Move& move) {
@@ -816,6 +821,7 @@ public:
             }
         }
         m_Hash[0] = Zobrist_Hash(*m_RootBoard, m_Info[0]);
+        m_History[m_Info[0].m_HalfMoves] = m_Hash[0];
     }
 
     uint64 Check(bool white, const Board& board, uint64& danger, uint64& active, uint64& rookPin, uint64& bishopPin, uint64& enPassant) const {
