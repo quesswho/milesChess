@@ -1288,6 +1288,7 @@ namespace TableBase {
         int wdl = Probe_WDL(board, info, success);
         if (*success == 0) return 0;
 
+        if (wdl == 0) return 0;
 
         struct TBEntry* ptr;
         uint64 idx;

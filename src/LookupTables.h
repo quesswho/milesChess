@@ -649,6 +649,16 @@ namespace Lookup {
         }
     }
 
+    static void PrintIsolatedPawnMask() {
+        for (int i = 0; i < 64; i++) {
+            uint64 map = 0;
+            if((i%8) != 0) for (int j = (i - 1) % 8; j < 64; j += 8) map |= 1ull << j;
+            if ((i % 8) != 7) for (int j = (i + 1) % 8; j < 64; j += 8) map |= 1ull << j;
+            printf("%#018llx, ", map);
+            if ((i + 1) % 4 == 0) printf("\n");
+        }
+    }
+
     // check mask after getting checked by slider [kingsq * 64 + enemysq]
     static constexpr std::array<uint64, 64 * 64> check_mask = {
         000000000000000000, 0x0000000000000002, 0x0000000000000006, 0x000000000000000e,
@@ -3715,6 +3725,15 @@ namespace Lookup {
         0x0038383838383838, 0x0070707070707070, 0x00e0e0e0e0e0e0e0, 0x00c0c0c0c0c0c0c0,
     };
 
+    template<bool white>
+    static constexpr uint64 pawn_passed(int index) {
+        if constexpr (white) {
+            return white_passed[index];
+        } else {
+            return black_passed[index];
+        }
+    }
+
     static constexpr uint64 white_forward[64] = {
         0x0101010101010100, 0x0202020202020200, 0x0404040404040400, 0x0808080808080800,
         0x1010101010101000, 0x2020202020202000, 0x4040404040404000, 0x8080808080808000,
@@ -3751,6 +3770,43 @@ namespace Lookup {
         0x0000101010101010, 0x0000202020202020, 0x0000404040404040, 0x0000808080808080,
         0x0001010101010100, 0x0002020202020202, 0x0004040404040404, 0x0008080808080808,
         0x0010101010101010, 0x0020202020202020, 0x0040404040404040, 0x0080808080808080,
+    };
+
+    template<bool white>
+    static constexpr uint64 pawn_forward(int index) {
+        if constexpr (white) {
+            return white_forward[index];
+        } else {
+            return black_forward[index];
+        }
+    }
+
+    static constexpr uint64 isolated_mask[64] = {
+        0x0202020202020202, 0x0505050505050505, 0x0a0a0a0a0a0a0a0a, 0x1414141414141414,
+        0x2828282828282828, 0x5050505050505050, 0xa0a0a0a0a0a0a0a0, 0x4040404040404040,
+        0x0202020202020202, 0x0505050505050505, 0x0a0a0a0a0a0a0a0a, 0x1414141414141414,
+        0x2828282828282828, 0x5050505050505050, 0xa0a0a0a0a0a0a0a0, 0x4040404040404040,
+        0x0202020202020202, 0x0505050505050505, 0x0a0a0a0a0a0a0a0a, 0x1414141414141414,
+        0x2828282828282828, 0x5050505050505050, 0xa0a0a0a0a0a0a0a0, 0x4040404040404040,
+        0x0202020202020202, 0x0505050505050505, 0x0a0a0a0a0a0a0a0a, 0x1414141414141414,
+        0x2828282828282828, 0x5050505050505050, 0xa0a0a0a0a0a0a0a0, 0x4040404040404040,
+        0x0202020202020202, 0x0505050505050505, 0x0a0a0a0a0a0a0a0a, 0x1414141414141414,
+        0x2828282828282828, 0x5050505050505050, 0xa0a0a0a0a0a0a0a0, 0x4040404040404040,
+        0x0202020202020202, 0x0505050505050505, 0x0a0a0a0a0a0a0a0a, 0x1414141414141414,
+        0x2828282828282828, 0x5050505050505050, 0xa0a0a0a0a0a0a0a0, 0x4040404040404040,
+        0x0202020202020202, 0x0505050505050505, 0x0a0a0a0a0a0a0a0a, 0x1414141414141414,
+        0x2828282828282828, 0x5050505050505050, 0xa0a0a0a0a0a0a0a0, 0x4040404040404040,
+        0x0202020202020202, 0x0505050505050505, 0x0a0a0a0a0a0a0a0a, 0x1414141414141414,
+        0x2828282828282828, 0x5050505050505050, 0xa0a0a0a0a0a0a0a0, 0x4040404040404040
+    };
+
+    constexpr int imbalance_factor[][5] =
+    {   // Pawn  Knight  Bishop  Rook  Queen
+         { 0                               }, // Pawn
+         { 10,    0                        }, // Knight
+         { 6,     1,      0                }, // Bishop
+         { 0,     7,      7,      0        }, // Rook
+         { 0,     9,      10,    -5,    0  }  // Queen
     };
 
     /*

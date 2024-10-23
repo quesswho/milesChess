@@ -9,6 +9,7 @@ using int64 = long long;
 using uint = unsigned int;
 using ushort = unsigned short;
 using ubyte = unsigned char;
+using int8 = int8_t;
 
 #define _COMPILETIME static inline constexpr
 
