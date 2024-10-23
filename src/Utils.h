@@ -13,6 +13,31 @@ using int8 = int8_t;
 
 #define _COMPILETIME static inline constexpr
 
+struct Score {
+    Score()
+        : mg(0), eg(0)
+    {}
+
+    Score(int mg, int eg)
+        : mg(mg), eg(eg)
+    {}
+
+    int mg;
+    int eg;
+
+    Score& operator+=(const Score& other) {
+        mg += other.mg;
+        eg += other.eg;
+        return *this;
+    }
+
+    Score& operator-=(const Score& other) {
+        mg -= other.mg;
+        eg -= other.eg;
+        return *this;
+    }
+};
+
 static inline uint64 PopBit(uint64& val) {
     uint64 result = (val & -val);
     val &= (val - 1);

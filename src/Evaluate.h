@@ -4,22 +4,6 @@
 
 #define TEMPO 20
 
-struct Score {
-    int mg;
-    int eg;
-
-    Score& operator+=(const Score& other) {
-        mg += other.mg;
-        eg += other.eg;
-        return *this;
-    }
-
-    Score& operator-=(const Score& other) {
-        mg -= other.mg;
-        eg -= other.eg;
-        return *this;
-    }
-};
 
 template<bool white>
 static Score Pawn(const Board& board, int pos, int rpos) {
@@ -42,7 +26,8 @@ static Score Pawn(const Board& board, int pos, int rpos) {
         middlegame -= 15;
     }
     if ((Lookup::isolated_mask[pos] & Pawn<white>(board)) == 0) {
-
+        middlegame -= 3;
+        endgame -= 15;
     }
     return Score({ middlegame, endgame });
 }
@@ -50,6 +35,8 @@ static Score Pawn(const Board& board, int pos, int rpos) {
 static Score Pawns(const Board& board) {
     uint64 wp = board.m_WhitePawn, bp = board.m_BlackPawn;
     Score score = { 0, 0 };
+
+
     while (wp > 0) {
         int rpos = PopPos(wp);
         score += Pawn<true>(board, 63 - rpos, rpos);
@@ -63,7 +50,7 @@ static Score Pawns(const Board& board) {
 }
 
 // Relative static evaluation
-static int64 Evaluate(const Board& board, bool white) {
+static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, bool white) {
 
     int64 middlegame = 0, endgame = 0, result = 0;
     Score score = { 0, 0 };
@@ -91,8 +78,16 @@ static int64 Evaluate(const Board& board, bool white) {
         }
     }
 
+
     // Pawns
-    score += Pawns(board);
+
+    PTEntry* pawnStructure = table->Probe(pawnhash);
+    if (pawnStructure != nullptr) {
+        score += pawnStructure->m_Score;
+    } else {
+        Score pawn = Pawns(board);
+        table->Enter(pawnhash, PTEntry(pawnhash, pawn));
+    }
     
     // Knights
     int wkncnt = 0;

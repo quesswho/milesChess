@@ -5,7 +5,7 @@
 // Transposition table entry
 struct TTEntry {
     TTEntry()
-        : m_Hash(0), m_Moves(0), m_Depth(0)
+        : m_Hash(0), m_Moves(0), m_Depth(0), m_Evaluation(0)
     {}
 
     TTEntry(uint64 hash, Move bestmove, int64 eval, int depth, int moves)
@@ -19,44 +19,65 @@ struct TTEntry {
     int64 m_Evaluation;
 };
 
-struct TranspositionTable {
+struct PTEntry {
+    PTEntry()
+        : m_Hash(0)
+    {}
+
+    PTEntry(uint64 hash, Score eval)
+        : m_Hash(hash), m_Score(eval)
+    {}
+
+    uint64 m_Hash;
+    Score m_Score;
+};
+
+template<typename T>
+struct HashTable {
+
     // Size in bytes
-    TranspositionTable(uint64 size) {
-        m_Count = size / sizeof(TTEntry);
+    HashTable(uint64 size) {
+        m_Count = size / sizeof(T);
         m_Count = 1ull << ((uint64)floor(log2(m_Count)));
         m_Indexer = m_Count - 1;
-        m_Table = new TTEntry[m_Count];
+        m_Table = new T[m_Count];
 
         Clear();
     }
-    ~TranspositionTable() {
+    ~HashTable() {
         delete[] m_Table;
     }
 
     // Will clear the table so make sure it's not being used
     void Resize(uint64 size) {
-        m_Count = size / sizeof(TTEntry);
+        m_Count = size / sizeof(T);
         m_Count = 1ull << ((uint64)floor(log2(m_Count)));
         m_Indexer = m_Count - 1;
         delete[] m_Table;
-        m_Table = new TTEntry[m_Count];
+        m_Table = new T[m_Count];
         Clear();
     }
 
-    void Enter(uint64 hash, TTEntry entry) {
+    
+    void Enter(uint64 hash, T entry) {
         uint64 index = hash & m_Indexer;
-        if (m_Table[index].m_Moves + m_Table[index].m_Depth < entry.m_Moves + entry.m_Depth) {
+        if constexpr (std::is_same_v<TTEntry, T>) {
+            if (m_Table[index].m_Moves + m_Table[index].m_Depth < entry.m_Moves + entry.m_Depth) {
+                m_Table[hash & m_Indexer] = entry;
+            }
+        } else {
             m_Table[hash & m_Indexer] = entry;
         }
     }
     void Clear() {
+        // TODO: Why are we not doing memset instead??
         for (uint64 i = 0; i < m_Count; i++) {
             m_Table[i].m_Hash = 0;
-            m_Table[i].m_Moves = 0;
+            //m_Table[i].m_Moves = 0;
         }
     }
 
-    TTEntry* Probe(uint64 hash) {
+    T* Probe(uint64 hash) {
         uint64 index = hash & m_Indexer;
         if (m_Table[index].m_Hash == hash) {
             return &m_Table[index];
@@ -66,8 +87,10 @@ struct TranspositionTable {
 
     // length in 2^(size)
     uint64 m_Count;
-    TTEntry* m_Table;
-
+    T* m_Table;
 private:
     uint64 m_Indexer;
 };
+
+using TranspositionTable = HashTable<TTEntry>;
+using PawnTable = HashTable<PTEntry>;

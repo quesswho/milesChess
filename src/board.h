@@ -11,6 +11,7 @@
 #define GET_SQUARE(X) _tzcnt_u64(X)
 #define COUNT_BIT(X) _mm_popcnt_u64(X)
 
+
 struct BoardInfo {
     BoardInfo()
         : m_WhiteMove(true), m_EnPassant(0), m_WhiteCastleKing(true), m_WhiteCastleQueen(true), m_BlackCastleKing(true), m_BlackCastleQueen(true), m_HalfMoves(0), m_FullMoves(0)
@@ -422,6 +423,24 @@ static uint64 Zobrist_Hash(const Board& board, const BoardInfo& info) {
     if (info.m_BlackCastleKing) result ^= Lookup::zobrist[64 * 12 + 3];
     if (info.m_BlackCastleQueen) result ^= Lookup::zobrist[64 * 12 + 4];
     if (info.m_EnPassant) result ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(info.m_EnPassant) % 8)];
+
+    return result;
+}
+
+static uint64 Zobrist_PawnHash(const Board& board) {
+    uint64 result = 0;
+
+    uint64 wp = board.m_WhitePawn, bp = board.m_BlackPawn;
+
+    while (wp > 0) {
+        int pos = PopPos(wp);
+        result ^= Lookup::zobrist[pos];
+    }
+
+    while (bp > 0) {
+        int pos = PopPos(bp);
+        result ^= Lookup::zobrist[pos + 64];
+    }
 
     return result;
 }
