@@ -298,7 +298,7 @@ public:
         bool moreTime = m_Info[0].m_WhiteMove ? wtime > btime : wtime < btime;
         int64 timeleft = m_Info[0].m_WhiteMove ? wtime : btime;
         int64 timeic = m_Info[0].m_WhiteMove ? winc : binc;
-        int64 target = (timeleft+ (moreTime ? timediff : 0)) / 40 + 200;
+        int64 target = (timeleft+ (moreTime ? timediff : 0)) / 40 + 200 + timeic;
         float x = (m_Info[0].m_FullMoves - 20.0f)/30.0f; 
         float factor = exp(-x*x);   // Bell curve
         sync_printf("info movetime %lli\n", (int64)(target * factor));
