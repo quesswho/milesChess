@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "Types.h"
 
+#include "Types.h"
 
 class Position {
 public:
@@ -38,17 +38,22 @@ public:
 
 
     // Board info
-    Color m_WhiteMove;
-    uint64 m_EnPassant;
+    union {
+        struct {
+            Color m_WhiteMove;
+            uint64 m_EnPassant;
 
-    bool m_WhiteCastleKing;
-    bool m_WhiteCastleQueen;
+            bool m_WhiteCastleKing;
+            bool m_WhiteCastleQueen;
 
-    bool m_BlackCastleKing;
-    bool m_BlackCastleQueen;
+            bool m_BlackCastleKing;
+            bool m_BlackCastleQueen;
 
-    uint64 m_HalfMoves;
-    uint64 m_FullMoves;
+            uint64 m_HalfMoves;
+            uint64 m_FullMoves;
+        };
+        BoardInfo m_BoardInfo;
+    };
 
     // Hash values
     uint64 m_Hash;
@@ -56,10 +61,11 @@ public:
 
     Position(const std::string& FEN);
 
-    Position(BitBoard wp, BitBoard wkn, BitBoard wb, BitBoard wr, BitBoard wq, BitBoard wk, BitBoard bp, BitBoard bkn, BitBoard bb, BitBoard br, BitBoard bq, BitBoard bk, Color color, uint64 enPassant)
+    Position(BitBoard wp, BitBoard wkn, BitBoard wb, BitBoard wr, BitBoard wq, BitBoard wk, BitBoard bp, BitBoard bkn, BitBoard bb, BitBoard br, BitBoard bq, BitBoard bk, const BoardInfo& info, uint64 hash, uint64 pawnhash)
         : m_WhitePawn(wp), m_WhiteKnight(wkn), m_WhiteBishop(wb), m_WhiteRook(wr), m_WhiteQueen(wq), m_WhiteKing(wk),
         m_BlackPawn(bp), m_BlackKnight(bkn), m_BlackBishop(bb), m_BlackRook(br), m_BlackQueen(bq), m_BlackKing(bk),
-        m_White(wp | wkn | wb | wr | wq | wk), m_Black(bp | bkn | bb | br | bq | bk), m_Board(m_White | m_Black)
+        m_White(wp | wkn | wb | wr | wq | wk), m_Black(bp | bkn | bb | br | bq | bk), m_Board(m_White | m_Black), 
+        m_BoardInfo(info), m_Hash(hash), m_PawnHash(pawnhash)
     {}
 
     Position(const Position& other)
@@ -79,3 +85,6 @@ public:
     uint64_t RookXray(int pos, BitBoard occ) const;
     uint64_t BishopXray(int pos, BitBoard occ) const;
 };
+
+static uint64 Zobrist_Hash(const Position& position);
+static uint64 Zobrist_PawnHash(const Position& position);

@@ -7,29 +7,6 @@
 
 #include "LookupTables.h"
 
-
-#define GET_SQUARE(X) _tzcnt_u64(X)
-#define COUNT_BIT(X) _mm_popcnt_u64(X)
-
-
-struct BoardInfo {
-    BoardInfo()
-        : m_WhiteMove(WHITE), m_EnPassant(0), m_WhiteCastleKing(true), m_WhiteCastleQueen(true), m_BlackCastleKing(true), m_BlackCastleQueen(true), m_HalfMoves(0), m_FullMoves(0)
-    {}
-
-    Color m_WhiteMove;
-    uint64 m_EnPassant;
-
-    bool m_WhiteCastleKing;
-    bool m_WhiteCastleQueen;
-
-    bool m_BlackCastleKing;
-    bool m_BlackCastleQueen;
-
-    uint64 m_HalfMoves;
-    uint64 m_FullMoves;
-};
-
 static BoardInfo FenInfo(const std::string& FEN) {
     BoardInfo info = {};
     int i = 0;

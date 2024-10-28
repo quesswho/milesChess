@@ -856,35 +856,35 @@ public:
 
         int kingsq = GET_SQUARE(King<white>(board));
 
-        BitBoard knightPawnCheck = Lookup::knight_attacks[kingsq] & Knight(board, enemy);
+        BitBoard knightPawnCheck = Lookup::knight_attacks[kingsq] & Knight<enemy>(board);
 
 
-        BitBoard pr = PawnRight(board, enemy) & King<white>(board);
-        BitBoard pl = PawnLeft(board, enemy) & King<white>(board);
+        BitBoard pr = PawnRight<enemy>(board) & King<white>(board);
+        BitBoard pl = PawnLeft<enemy>(board) & King<white>(board);
 
-        knightPawnCheck |= PawnAttackLeft(pr, white); // Reverse the pawn attack to find the attacking pawn
-        knightPawnCheck |= PawnAttackRight(pl, white);
+        knightPawnCheck |= PawnAttackLeft<white>(pr); // Reverse the pawn attack to find the attacking pawn
+        knightPawnCheck |= PawnAttackRight<white>(pl);
 
-        BitBoard enPassantCheck = PawnForward((PawnAttackLeft(pr, white) | PawnAttackRight(pl, white)), white) & enPassant;
+        BitBoard enPassantCheck = PawnForward<white>((PawnAttackLeft<white>(pr) | PawnAttackRight<white>(pl))) & enPassant;
 
-        danger = PawnAttack(board, enemy);
+        danger = PawnAttack<enemy>(board);
 
         // Active moves, mask for checks
         active = 0xFFFFFFFFFFFFFFFFull;
-        BitBoard rookcheck = board.RookAttack(kingsq, board.m_Board) & (Rook(board, enemy) | Queen(board, enemy));
+        BitBoard rookcheck = board.RookAttack(kingsq, board.m_Board) & (Rook<enemy>(board) | Queen<enemy>(board));
         if (rookcheck > 0) { // If a rook piece is attacking the king
             active = Lookup::active_moves[kingsq * 64 + GET_SQUARE(rookcheck)];
             danger |= Lookup::check_mask[kingsq * 64 + GET_SQUARE(rookcheck)] & ~rookcheck;
         }
         rookPin = 0;
-        BitBoard rookpinner = board.RookXray(kingsq, board.m_Board) & (Rook(board, enemy) | Queen(board, enemy));
+        BitBoard rookpinner = board.RookXray(kingsq, board.m_Board) & (Rook<enemy>(board) | Queen<enemy>(board));
         while (rookpinner > 0) {
             int pos = PopPos(rookpinner);
             BitBoard mask = Lookup::active_moves[kingsq * 64 + pos];
             if (mask & Player<white>(board)) rookPin |= mask;
         }
 
-        BitBoard bishopcheck = board.BishopAttack(kingsq, board.m_Board) & (Bishop(board, enemy) | Queen(board, enemy));
+        BitBoard bishopcheck = board.BishopAttack(kingsq, board.m_Board) & (Bishop<enemy>(board) | Queen<enemy>(board));
         if (bishopcheck > 0) { // If a bishop piece is attacking the king
             if (active != 0xFFFFFFFFFFFFFFFFull) { // case where rook and bishop checks king
                 active = 0;
@@ -896,7 +896,7 @@ public:
         }
 
         bishopPin = 0;
-        BitBoard bishoppinner = board.BishopXray(kingsq, board.m_Board) & (Bishop(board, enemy) | Queen(board, enemy));
+        BitBoard bishoppinner = board.BishopXray(kingsq, board.m_Board) & (Bishop<enemy>(board) | Queen<enemy>(board));
         while (bishoppinner > 0) {
             int pos = PopPos(bishoppinner);
             BitBoard mask = Lookup::active_moves[kingsq * 64 + pos];
@@ -906,16 +906,16 @@ public:
         }
 
         if (enPassant) {
-            if ((King<white>(board) & Lookup::EnPassantRank(white)) && (Pawn<white>(board) & Lookup::EnPassantRank(white)) && ((Rook(board, enemy) | Queen(board, enemy)) & Lookup::EnPassantRank(white))) {
-                BitBoard REPawn = PawnRight(board, white) & enPassant;
-                BitBoard LEPawn = PawnLeft(board, white) & enPassant;
+            if ((King<white>(board) & Lookup::EnPassantRank<white>()) && (Pawn<white>(board) & Lookup::EnPassantRank<white>()) && ((Rook<enemy>(board) | Queen<enemy>(board)) & Lookup::EnPassantRank<white>())) {
+                BitBoard REPawn = PawnRight<white>(board) & enPassant;
+                BitBoard LEPawn = PawnLeft<white>(board) & enPassant;
                 if (REPawn) {
-                    BitBoard noEPPawn = board.m_Board & ~(PawnForward(enPassant, enemy) | PawnAttackLeft(REPawn, enemy)); // Remove en passanter and en passant target
-                    if (board.RookAttack(kingsq, noEPPawn) & (Rook(board, enemy) | Queen(board, enemy))) enPassant = 0; // If there is a rook or queen attacking king after removing pawns
+                    BitBoard noEPPawn = board.m_Board & ~(PawnForward<enemy>(enPassant) | PawnAttackLeft<enemy>(REPawn)); // Remove en passanter and en passant target
+                    if (board.RookAttack(kingsq, noEPPawn) & (Rook<enemy>(board) | Queen<enemy>(board))) enPassant = 0; // If there is a rook or queen attacking king after removing pawns
                 }
                 if (LEPawn) {
-                    BitBoard noEPPawn = board.m_Board & ~(PawnForward(enPassant, enemy) | PawnAttackRight(LEPawn, enemy)); // Remove en passanter and en passant target
-                    if (board.RookAttack(kingsq, noEPPawn) & (Rook(board, enemy) | Queen(board, enemy))) enPassant = 0; // If there is a rook or queen attacking king after removing pawns
+                    BitBoard noEPPawn = board.m_Board & ~(PawnForward<enemy>(enPassant) | PawnAttackRight<enemy>(LEPawn)); // Remove en passanter and en passant target
+                    if (board.RookAttack(kingsq, noEPPawn) & (Rook<enemy>(board) | Queen<enemy>(board))) enPassant = 0; // If there is a rook or queen attacking king after removing pawns
                 }
             }
         }
@@ -929,25 +929,25 @@ public:
 
 
 
-        BitBoard knights = Knight(board, enemy);
+        BitBoard knights = Knight<enemy>(board);
 
         while (knights > 0) { // Loop each bit
             danger |= Lookup::knight_attacks[PopPos(knights)];
         }
 
-        BitBoard bishops = Bishop(board, enemy) | Queen(board, enemy);
+        BitBoard bishops = Bishop<enemy>(board) | Queen<enemy>(board);
         while (bishops > 0) { // Loop each bit
             int pos = PopPos(bishops);
             danger |= (board.BishopAttack(pos, board.m_Board) & ~(1ull << pos));
         }
-        BitBoard rooks = Rook(board, enemy) | Queen(board, enemy);
+        BitBoard rooks = Rook<enemy>(board) | Queen<enemy>(board);
 
         while (rooks > 0) { // Loop each bit
             int pos = PopPos(rooks);
             danger |= (board.RookAttack(pos, board.m_Board) & ~(1ull << pos));
         }
 
-        danger |= Lookup::king_attacks[GET_SQUARE(King(board, enemy))];
+        danger |= Lookup::king_attacks[GET_SQUARE(King<enemy>(board))];
 
         return enPassantCheck;
    }
@@ -973,7 +973,7 @@ public:
 
         BitBoard FPawns = PawnForward<white>(nonBishopPawn) & (~board.m_Board) & active; // No diagonally pinned pawn can move forward
 
-        BitBoard F2Pawns = PawnForward<white>(nonBishopPawn & Lookup::StartingPawnRank(white)) & ~board.m_Board;
+        BitBoard F2Pawns = PawnForward<white>(nonBishopPawn & Lookup::StartingPawnRank<white>()) & ~board.m_Board;
         F2Pawns = PawnForward<white>(F2Pawns) & (~board.m_Board) & active; // TODO: Use Fpawns to save calculation
 
         BitBoard pinnedFPawns = FPawns & PawnForward<white>(rookPin);
@@ -1398,7 +1398,7 @@ public:
         }
 
 
-        BitBoard F2Pawns = PawnForward<white>(nonBishopPawn & Lookup::StartingPawnRank(white)) & ~board.m_Board;
+        BitBoard F2Pawns = PawnForward<white>(nonBishopPawn & Lookup::StartingPawnRank<white>()) & ~board.m_Board;
         F2Pawns = PawnForward<white>(F2Pawns) & (~board.m_Board) & active; // TODO: Use Fpawns to save calculation
 
         BitBoard pinnedF2Pawns = F2Pawns & Pawn2Forward<white>(rookPin);
@@ -1555,29 +1555,31 @@ public:
         }
     }
 
-    uint64 Danger(Color white, const Board& board) {
-        Color enemy = !white;
-        uint64 danger = PawnAttack(board, enemy);
+    template<Color white>
+    uint64 TDanger(const Board& board) {
+        constexpr Color enemy = !white;
 
-        uint64 knights = Knight(board, enemy);
+        uint64 danger = PawnAttack<enemy>(board);
+
+        uint64 knights = Knight<enemy>(board);
 
         while (knights > 0) { // Loop each bit
             danger |= Lookup::knight_attacks[PopPos(knights)];
         }
 
-        uint64 bishops = Bishop(board, enemy) | Queen(board, enemy);
+        uint64 bishops = Bishop<enemy>(board) | Queen<enemy>(board);
         while (bishops > 0) { // Loop each bit
             int pos = PopPos(bishops);
             danger |= (board.BishopAttack(pos, board.m_Board) & ~(1ull << pos));
         }
-        uint64 rooks = Rook(board, enemy) | Queen(board, enemy);
+        uint64 rooks = Rook<enemy>(board) | Queen<enemy>(board);
 
         while (rooks > 0) { // Loop each bit
             int pos = PopPos(rooks);
             danger |= (board.RookAttack(pos, board.m_Board) & ~(1ull << pos));
         }
 
-        danger |= Lookup::king_attacks[GET_SQUARE(King(board, enemy))];
+        danger |= Lookup::king_attacks[GET_SQUARE(King<enemy>(board))];
 
         return danger;
     }
@@ -1605,7 +1607,12 @@ public:
     }
 
     Move GetMove(std::string str) {
-        const Color white = m_Info[0].m_WhiteMove;
+        return m_Info[0].m_WhiteMove ? TGetMove<WHITE>(str) : TGetMove<BLACK>(str);
+    }
+
+    template<Color white>
+    Move TGetMove(std::string str) {
+        
         const uint64 from = 1ull << ('h' - str[0] + (str[1] - '1') * 8);
         const int posTo = ('h' - str[2] + (str[3] - '1') * 8);
         const uint64 to = 1ull << posTo;
@@ -1628,8 +1635,8 @@ public:
             }
         }
         else {
-            if (Pawn(*m_RootBoard, white) & from) {
-                if (Pawn2Forward(Pawn(*m_RootBoard, white) & from, white) == to) {
+            if (Pawn<white>(*m_RootBoard) & from) {
+                if (Pawn2Forward<white>(Pawn<white>(*m_RootBoard) & from) == to) {
                     type = MoveType::PAWN2;
                 }
                 else if (m_Info[0].m_EnPassant & to) {
@@ -1639,20 +1646,20 @@ public:
                     type = MoveType::PAWN;
                 }
             }
-            else if (Knight(*m_RootBoard, white) & from) {
+            else if (Knight<white>(*m_RootBoard) & from) {
                 type = MoveType::KNIGHT;
             }
-            else if (Bishop(*m_RootBoard, white) & from) {
+            else if (Bishop<white>(*m_RootBoard) & from) {
                 type = MoveType::BISHOP;
             }
-            else if (Rook(*m_RootBoard, white) & from) {
+            else if (Rook<white>(*m_RootBoard) & from) {
                 type = MoveType::ROOK;
             }
-            else if (Queen(*m_RootBoard, white) & from) {
+            else if (Queen<white>(*m_RootBoard) & from) {
                 type = MoveType::QUEEN;
             }
-            else if (King(*m_RootBoard, white) & from) {
-                uint64 danger = Danger(white, *m_RootBoard);
+            else if (King<white>(*m_RootBoard) & from) {
+                uint64 danger = TDanger<white>(*m_RootBoard);
                 if (((from & 0b1000) && (to & 0b10)) || ((from & (0b1000ull << 56)) && (to & (0b10ull << 56)))) {
                     type = MoveType::KCASTLE;
                 } else if (((from & 0b1000) && (to & 0b100000)) || ((from & (0b1000ull << 56)) && (to & (0b100000ull << 56)))) {

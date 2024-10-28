@@ -359,11 +359,13 @@ namespace Lookup {
 
     static constexpr const char* starting_pos = { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" };
 
-    static constexpr uint64 StartingPawnRank(const bool white) {
+    template<Color white>
+    static constexpr uint64 StartingPawnRank() {
         return white ? lines[8 * 4 + 1] : lines[8 * 6 * 4 + 1];
     }
 
-    static constexpr uint64 EnPassantRank(const bool white) {
+    template<Color white>
+    static constexpr uint64 EnPassantRank() {
         return white ? lines[8 * 4 * 4 + 1] : lines[8 * 3 * 4 + 1];
     }
 

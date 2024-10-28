@@ -6,6 +6,9 @@
 
 #include "Types.h"
 
+#define GET_SQUARE(X) _tzcnt_u64(X)
+#define COUNT_BIT(X) _mm_popcnt_u64(X)
+
 struct Score {
     Score()
         : mg(0), eg(0)
@@ -78,6 +81,79 @@ static BitBoard FenToMap(const std::string& FEN, char p) {
         pos--;
     }
     return result;
+}
+
+static BoardInfo FenToBoardInfo(const std::string& FEN) {
+    BoardInfo info = {};
+    int i = 0;
+    while (FEN[i++] != ' ') {
+        // Skip piece placement
+    }
+
+    char ac = FEN[i++]; // Active color
+    switch (ac) {
+    case 'w':
+        info.m_WhiteMove = WHITE;
+        break;
+    case 'b':
+        info.m_WhiteMove = BLACK;
+        break;
+    default:
+        printf("Invalid FEN for active color\n");
+        return info;
+    }
+
+    i++;
+    info.m_BlackCastleKing = false;
+    info.m_BlackCastleQueen = false;
+    info.m_WhiteCastleKing = false;
+    info.m_WhiteCastleQueen = false;
+    char c = {};
+    while ((c = FEN[i++]) != ' ') {
+        if (c == '-') {
+            break;
+        }
+
+        switch (c) {
+        case 'K':
+            info.m_WhiteCastleKing = true;
+            break;
+        case 'Q':
+            info.m_WhiteCastleQueen = true;
+            break;
+        case 'k':
+            info.m_BlackCastleKing = true;
+            break;
+        case 'q':
+            info.m_BlackCastleQueen = true;
+            break;
+        }
+    }
+
+    while ((c = FEN[i]) == ' ') i++;
+    char a = FEN[i++];
+
+    if (a != '-') {
+        if (info.m_WhiteMove) {
+            info.m_EnPassant = 1ull << (40 + ('h' - a)); // TODO: need to be tested
+        } else {
+            info.m_EnPassant = 1ull << (16 + ('h' - a)); // TODO: need to be tested
+        }
+    } else {
+        info.m_EnPassant = 0;
+    }
+
+    info.m_HalfMoves = 0;
+    info.m_FullMoves = 0;
+    int t = 1;
+
+    while ((c = FEN[i++]) != ' ');
+    while ((c = FEN[i++]) != ' ') info.m_HalfMoves = info.m_HalfMoves * 10 + (int)(c - '0');
+    while (i < FEN.size() && FEN[i] >= '0' && FEN[i] <= '9') {
+        c = FEN[i++];
+        info.m_FullMoves = info.m_FullMoves * 10 + (c - '0');
+    }
+    return info;
 }
 
 static void PrintBitBoard(BitBoard map) {

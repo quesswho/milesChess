@@ -30,3 +30,21 @@ enum Color : bool {
 constexpr Color operator!(Color color) {
     return color == WHITE ? BLACK : WHITE;
 }
+
+struct BoardInfo {
+    BoardInfo()
+        : m_WhiteMove(WHITE), m_EnPassant(0), m_WhiteCastleKing(true), m_WhiteCastleQueen(true), m_BlackCastleKing(true), m_BlackCastleQueen(true), m_HalfMoves(0), m_FullMoves(0)
+    {}
+
+    Color m_WhiteMove;
+    BitBoard m_EnPassant;
+
+    bool m_WhiteCastleKing;
+    bool m_WhiteCastleQueen;
+
+    bool m_BlackCastleKing;
+    bool m_BlackCastleQueen;
+
+    uint64 m_HalfMoves;
+    uint64 m_FullMoves;
+};
