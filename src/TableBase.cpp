@@ -1253,7 +1253,7 @@ namespace TableBase {
             TBEntry_piece* entry = (TBEntry_piece*)ptr;
             ubyte* pc = entry->pieces[bside];
             for (i = 0; i < entry->num;) {
-                uint64 bb = board.m_Pieces[pc[i] & 0x07][((pc[i] ^ cmirror) >> 3) & 0x1];
+                BitBoard bb = board.m_Pieces[pc[i] & 0x07][((pc[i] ^ cmirror) >> 3) & 0x1];
                 do {
                     p[i++] = PopPos(bb);
                 } while (bb);
@@ -1263,7 +1263,7 @@ namespace TableBase {
         } else {
             TBEntry_pawn* entry = (TBEntry_pawn*)ptr;
             int k = entry->file[0].pieces[0][0] ^ cmirror;
-            uint64 bb = board.m_Pieces[((k) & 0x07)][(k >> 3) & 0x1];
+            BitBoard bb = board.m_Pieces[k & 0x07][(k >> 3) & 0x1];
             i = 0;
             do {
                 p[i++] = PopPos(bb) ^ mirror;
@@ -1356,7 +1356,7 @@ namespace TableBase {
             }
             ubyte* pc = entry->pieces;
             for (i = 0; i < entry->num;) {
-                uint64 bb = board.m_Pieces[(pc[i] & 0x07)][((pc[i] ^ cmirror) >> 3) & 0x1];
+                BitBoard bb = board.m_Pieces[(pc[i] & 0x07)][((pc[i] ^ cmirror) >> 3) & 0x1];
                 do {
                     p[i++] = PopPos(bb);
                 } while (bb);
@@ -1372,7 +1372,7 @@ namespace TableBase {
         } else {
             DTZEntry_pawn* entry = (DTZEntry_pawn*)ptr;
             int k = entry->file[0].pieces[0] ^ cmirror;
-            uint64 bb = board.m_Pieces[(k & 0x07)][(k >> 3) & 0x1];
+            BitBoard bb = board.m_Pieces[k & 0x07][(k >> 3) & 0x1];
             i = 0;
             do {
                 p[i++] = PopPos(bb) ^ mirror;

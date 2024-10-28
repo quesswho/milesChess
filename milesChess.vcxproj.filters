@@ -59,5 +59,11 @@
     <ClInclude Include="src\TableBase.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Position.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

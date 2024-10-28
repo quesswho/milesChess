@@ -54,7 +54,7 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, boo
 
     int64 middlegame = 0, endgame = 0, result = 0;
     Score score = { 0, 0 };
-    uint64 wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
+    BitBoard wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
         bp = board.m_BlackPawn, bkn = board.m_BlackKnight, bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
 
     const int64 pawnVal = 100, knightVal = 350, bishopVal = 350, rookVal = 525, queenVal = 1000, kingVal = 10000;
@@ -130,7 +130,7 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, boo
         int pos = 63 - rpos;
         middlegame += bishopVal + Lookup::bishop_table[pos];
         endgame += bishopVal + Lookup::bishop_table[pos];
-        uint64 bish_atk = board.BishopAttack(rpos, board.m_Board);
+        BitBoard bish_atk = board.BishopAttack(rpos, board.m_Board);
         if (uint64 temp = Lookup::b_king_safety[blackking] & bish_atk) {
             whiteAttack += 2 * COUNT_BIT(temp);
         }
@@ -147,7 +147,7 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, boo
         int pos = PopPos(bb);
         middlegame -= bishopVal + Lookup::bishop_table[pos];
         endgame -= bishopVal + Lookup::bishop_table[pos];
-        uint64 bish_atk = board.BishopAttack(pos, board.m_Board);
+        BitBoard bish_atk = board.BishopAttack(pos, board.m_Board);
         if (uint64 temp = Lookup::w_king_safety[whiteking] & bish_atk) {
             blackAttack += 2 * COUNT_BIT(temp);
         }
@@ -166,7 +166,7 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, boo
         int pos = 63 - rpos;
         middlegame += rookVal + Lookup::rook_table[pos];
         endgame += rookVal + Lookup::eg_rook_table[pos];
-        uint64 rook_atk = board.RookAttack(rpos, board.m_Board);
+        BitBoard rook_atk = board.RookAttack(rpos, board.m_Board);
         if (uint64 temp = Lookup::b_king_safety[blackking] & rook_atk) {
             whiteAttack += 3 * COUNT_BIT(temp);
         }
@@ -183,7 +183,7 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, boo
         int pos = PopPos(br);
         middlegame -= rookVal + Lookup::rook_table[pos];
         endgame -= rookVal + Lookup::eg_rook_table[pos];
-        uint64 rook_atk = board.RookAttack(pos, board.m_Board);
+        BitBoard rook_atk = board.RookAttack(pos, board.m_Board);
         if (uint64 temp = Lookup::w_king_safety[whiteking] & rook_atk) {
             blackAttack += 3 * COUNT_BIT(temp);
         }
@@ -201,7 +201,7 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, boo
         int pos = 63 - rpos;
         middlegame += queenVal + Lookup::queen_table[pos];
         endgame += queenVal + Lookup::eg_queen_table[pos];
-        uint64 queen_atk = board.QueenAttack(rpos, board.m_Board);
+        BitBoard queen_atk = board.QueenAttack(rpos, board.m_Board);
         if (uint64 temp = Lookup::b_king_safety[blackking] & queen_atk) {
             whiteAttack += 5 * COUNT_BIT(temp);
         }
@@ -220,7 +220,7 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, boo
         middlegame -= queenVal + Lookup::queen_table[pos];
         endgame -= queenVal + Lookup::eg_queen_table[pos];
         phase -= 4;
-        uint64 queen_atk = board.QueenAttack(pos, board.m_Board);
+        BitBoard queen_atk = board.QueenAttack(pos, board.m_Board);
         if (uint64 temp = Lookup::king_attacks[whiteking] & queen_atk) {
             blackAttack += 5 * COUNT_BIT(temp);
         }

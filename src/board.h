@@ -176,35 +176,35 @@ public:
     
     union {
         struct {
-            uint64 m_White;
-            uint64 m_Black;
+            BitBoard m_White;
+            BitBoard m_Black;
 
-            const uint64 m_WhitePawn;
-            const uint64 m_BlackPawn;
+            const BitBoard m_WhitePawn;
+            const BitBoard m_BlackPawn;
 
-            const uint64 m_WhiteKnight;
-            const uint64 m_BlackKnight;
+            const BitBoard m_WhiteKnight;
+            const BitBoard m_BlackKnight;
 
-            const uint64 m_WhiteBishop;
-            const uint64 m_BlackBishop;
+            const BitBoard m_WhiteBishop;
+            const BitBoard m_BlackBishop;
 
-            const uint64 m_WhiteRook;
-            const uint64 m_BlackRook;
+            const BitBoard m_WhiteRook;
+            const BitBoard m_BlackRook;
 
-            const uint64 m_WhiteQueen;
-            const uint64 m_BlackQueen;
+            const BitBoard m_WhiteQueen;
+            const BitBoard m_BlackQueen;
 
-            const uint64 m_WhiteKing;
-            const uint64 m_BlackKing;
+            const BitBoard m_WhiteKing;
+            const BitBoard m_BlackKing;
         };
-        const uint64 m_Pieces[7][2]; // 6 pieces for each color: 0 for white and 1 for black
+        const BitBoard m_Pieces[7][2]; // 6 pieces for each color: 0 for white and 1 for black
         
     };
-    uint64 m_Board;
+    BitBoard m_Board;
 
     Board(const std::string& FEN);
 
-    Board(uint64 wp, uint64 wkn, uint64 wb, uint64 wr, uint64 wq, uint64 wk, uint64 bp, uint64 bkn, uint64 bb, uint64 br, uint64 bq, uint64 bk)
+    Board(BitBoard wp, BitBoard wkn, BitBoard wb, BitBoard wr, BitBoard wq, BitBoard wk, BitBoard bp, BitBoard bkn, BitBoard bb, BitBoard br, BitBoard bq, BitBoard bk)
         : m_WhitePawn(wp), m_WhiteKnight(wkn), m_WhiteBishop(wb), m_WhiteRook(wr), m_WhiteQueen(wq), m_WhiteKing(wk), 
           m_BlackPawn(bp), m_BlackKnight(bkn), m_BlackBishop(bb), m_BlackRook(br), m_BlackQueen(bq), m_BlackKing(bk),
           m_White(wp | wkn | wb | wr | wq | wk), m_Black(bp | bkn | bb | br | bq | bk), m_Board(m_White | m_Black)
@@ -217,12 +217,12 @@ public:
         m_White(other.m_White),m_Black(other.m_Black), m_Board(other.m_Board)
     {}
 
-    uint64 RookAttack(int pos, uint64 occ) const;
-    uint64 BishopAttack(int pos, uint64 occ) const;
-    uint64 QueenAttack(int pos, uint64 occ) const;
+    uint64 RookAttack(int pos, BitBoard occ) const;
+    uint64 BishopAttack(int pos, BitBoard occ) const;
+    uint64 QueenAttack(int pos, BitBoard occ) const;
 
-    uint64_t RookXray(int pos, uint64_t occ) const;
-    uint64_t BishopXray(int pos, uint64_t occ) const;
+    uint64_t RookXray(int pos, BitBoard occ) const;
+    uint64_t BishopXray(int pos, BitBoard occ) const;
 };
 
 static std::string BoardtoFen(const Board& board, const BoardInfo& info) {
@@ -351,7 +351,7 @@ static std::string BoardtoFen(const Board& board, const BoardInfo& info) {
 static uint64 Zobrist_Hash(const Board& board, const BoardInfo& info) {
     uint64 result = 0;
 
-    uint64 wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
+    BitBoard wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
         bp = board.m_BlackPawn, bkn = board.m_BlackKnight, bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
 
     while (wp > 0) {
@@ -430,7 +430,7 @@ static uint64 Zobrist_Hash(const Board& board, const BoardInfo& info) {
 static uint64 Zobrist_PawnHash(const Board& board) {
     uint64 result = 0;
 
-    uint64 wp = board.m_WhitePawn, bp = board.m_BlackPawn;
+    BitBoard wp = board.m_WhitePawn, bp = board.m_BlackPawn;
 
     while (wp > 0) {
         int pos = PopPos(wp);

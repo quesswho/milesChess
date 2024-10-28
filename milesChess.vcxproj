@@ -180,10 +180,12 @@
     <ClInclude Include="src\Evaluate.h" />
     <ClInclude Include="src\LookupTables.h" />
     <ClInclude Include="src\Movelist.h" />
+    <ClInclude Include="src\Position.h" />
     <ClInclude Include="src\Search.h" />
     <ClInclude Include="src\TableBase.h" />
     <ClInclude Include="src\Thread.h" />
     <ClInclude Include="src\Transposition.h" />
+    <ClInclude Include="src\Types.h" />
     <ClInclude Include="src\UCI.h" />
     <ClInclude Include="src\Utils.h" />
   </ItemGroup>
