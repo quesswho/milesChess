@@ -33,6 +33,7 @@ int main() {
 		//search->LoadPosition("r1bqk2r/ppp2ppp/4p3/3p1n2/3PnB2/4QN2/PPP1PPPP/1K1R1B1R w Kkq - 0 1");
 		//search->LoadPosition("1k2r1r1/1p3pp1/1qpb1n1p/p2p1QP1/5P2/4PB2/PPP3KP/R1B4R b - - 0 1"); // Stockfish evaluates this as -4, while milesbot rates it as 0
 		search->LoadPosition("3r2k1/p2r1pp1/2b1p2p/2P5/5Q2/7P/P4PP1/R5K1 w - - 1 25");
+		//search->LoadPosition("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
 		//printf("%llu\n", search.Perft(6));
 		Timer time;
 		time.Start();

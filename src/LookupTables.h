@@ -1,6 +1,8 @@
 #pragma once
 #include <immintrin.h>
 #include <random>
+#include <array>
+
 #include "Utils.h"
 
 namespace Lookup {

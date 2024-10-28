@@ -172,6 +172,7 @@
   <ItemGroup>
     <ClCompile Include="src\board.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Position.cpp" />
     <ClCompile Include="src\TableBase.cpp" />
     <ClCompile Include="src\UCI.cpp" />
   </ItemGroup>

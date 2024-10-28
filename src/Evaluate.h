@@ -5,7 +5,7 @@
 #define TEMPO 20
 
 
-template<bool white>
+template<Color white>
 static Score Pawn(const Board& board, int pos, int rpos) {
     const int64 pawnBaseVal = 100;
 
@@ -39,18 +39,18 @@ static Score Pawns(const Board& board) {
 
     while (wp > 0) {
         int rpos = PopPos(wp);
-        score += Pawn<true>(board, 63 - rpos, rpos);
+        score += Pawn<WHITE>(board, 63 - rpos, rpos);
     }
 
     while (bp > 0) {
         int pos = PopPos(bp);
-        score -= Pawn<false>(board, pos, pos);
+        score -= Pawn<BLACK>(board, pos, pos);
     }
     return score;
 }
 
 // Relative static evaluation
-static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, bool white) {
+static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, Color white) {
 
     int64 middlegame = 0, endgame = 0, result = 0;
     Score score = { 0, 0 };

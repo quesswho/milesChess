@@ -14,10 +14,10 @@
 
 struct BoardInfo {
     BoardInfo()
-        : m_WhiteMove(true), m_EnPassant(0), m_WhiteCastleKing(true), m_WhiteCastleQueen(true), m_BlackCastleKing(true), m_BlackCastleQueen(true), m_HalfMoves(0), m_FullMoves(0)
+        : m_WhiteMove(WHITE), m_EnPassant(0), m_WhiteCastleKing(true), m_WhiteCastleQueen(true), m_BlackCastleKing(true), m_BlackCastleQueen(true), m_HalfMoves(0), m_FullMoves(0)
     {}
 
-    bool m_WhiteMove;
+    Color m_WhiteMove;
     uint64 m_EnPassant;
 
     bool m_WhiteCastleKing;
@@ -40,10 +40,10 @@ static BoardInfo FenInfo(const std::string& FEN) {
     char ac = FEN[i++]; // Active color
     switch (ac) {
     case 'w':
-        info.m_WhiteMove = true;
+        info.m_WhiteMove = WHITE;
         break;
     case 'b':
-        info.m_WhiteMove = false;
+        info.m_WhiteMove = BLACK;
         break;
     default:
         printf("Invalid FEN for active color\n");
@@ -98,7 +98,7 @@ static BoardInfo FenInfo(const std::string& FEN) {
 
     while ((c = FEN[i++]) != ' ');
     while ((c = FEN[i++]) != ' ') info.m_HalfMoves = info.m_HalfMoves * 10 + (int)(c - '0');
-    while (i < FEN.size()) {
+    while (i < FEN.size() && FEN[i] >= '0' && FEN[i] <= '9') {
         c = FEN[i++];
         info.m_FullMoves = info.m_FullMoves * 10 + (c - '0');
     }
@@ -160,16 +160,6 @@ struct Move {
     }
 };
 
-/*
-    Boards start from bottom right and go right to left
-
-    64 63 ... 57 56
-    .
-    .
-    .
-    8 7 ... 3 2 1
-
-*/
 
 class Board {
 public:
@@ -217,12 +207,12 @@ public:
         m_White(other.m_White),m_Black(other.m_Black), m_Board(other.m_Board)
     {}
 
-    uint64 RookAttack(int pos, BitBoard occ) const;
-    uint64 BishopAttack(int pos, BitBoard occ) const;
-    uint64 QueenAttack(int pos, BitBoard occ) const;
+    BitBoard RookAttack(int pos, BitBoard occ) const;
+    BitBoard BishopAttack(int pos, BitBoard occ) const;
+    BitBoard QueenAttack(int pos, BitBoard occ) const;
 
-    uint64_t RookXray(int pos, BitBoard occ) const;
-    uint64_t BishopXray(int pos, BitBoard occ) const;
+    BitBoard RookXray(int pos, BitBoard occ) const;
+    BitBoard BishopXray(int pos, BitBoard occ) const;
 };
 
 static std::string BoardtoFen(const Board& board, const BoardInfo& info) {

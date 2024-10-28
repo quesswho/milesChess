@@ -92,7 +92,7 @@ public:
         return score_a > score_b;
     }
 
-    template<bool white>
+    template<Color white>
 	uint64 Perft_r(const Board& board, int depth) {
         if (!m_Running) return 0;
         assert("Hash is not matched!", Zobrist_Hash(board, m_Info[depth]) != m_Hash[depth]);
@@ -114,7 +114,7 @@ public:
         m_Maxdepth = maxdepth;
 		Timer time;
 		time.Start();
-        uint64 result = m_Info[0].m_WhiteMove ? Perft_r<true>(*m_RootBoard, 0) : Perft_r<false>(*m_RootBoard, 0);
+        uint64 result = m_Info[0].m_WhiteMove ? Perft_r<WHITE>(*m_RootBoard, 0) : Perft_r<BLACK>(*m_RootBoard, 0);
 		float t = time.End();
         if(m_Running) sync_printf("%llu\n%.3fMNodes/s\n", result, (result / 1000000.0f) / t);
         m_Running = false;
@@ -427,7 +427,7 @@ public:
 	Board MovePiece(const Board& board, const Move& move, int ply) {
 		const BitBoard re = ~move.m_To;
 		const BitBoard swp = move.m_From | move.m_To;
-		const bool white = m_Info[ply-1].m_WhiteMove;
+		const Color white = m_Info[ply-1].m_WhiteMove;
 		const BitBoard wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
 			bp = board.m_BlackPawn, bkn = board.m_BlackKnight, bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
 
@@ -702,7 +702,7 @@ public:
     void MoveRootPiece(const Move& move) {
         const BitBoard re = ~move.m_To;
         const BitBoard swp = move.m_From | move.m_To;
-        const bool white = m_Info[0].m_WhiteMove;
+        const Color white = m_Info[0].m_WhiteMove;
         const BitBoard wp = m_RootBoard->m_WhitePawn, wkn = m_RootBoard->m_WhiteKnight, wb = m_RootBoard->m_WhiteBishop, wr = m_RootBoard->m_WhiteRook, wq = m_RootBoard->m_WhiteQueen, wk = m_RootBoard->m_WhiteKing,
             bp = m_RootBoard->m_BlackPawn, bkn = m_RootBoard->m_BlackKnight, bb = m_RootBoard->m_BlackBishop, br = m_RootBoard->m_BlackRook, bq = m_RootBoard->m_BlackQueen, bk = m_RootBoard->m_BlackKing;
 
@@ -846,13 +846,13 @@ public:
         m_History[m_Info[0].m_HalfMoves] = m_Hash[0];
     }
 
-    BitBoard Check(bool white, const Board& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) const {
-        return white ? TCheck<true>(board, danger, active, rookPin, bishopPin, enPassant) : TCheck < false>(board, danger, active, rookPin, bishopPin, enPassant);
+    BitBoard Check(Color white, const Board& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) const {
+        return white ? TCheck<WHITE>(board, danger, active, rookPin, bishopPin, enPassant) : TCheck <BLACK>(board, danger, active, rookPin, bishopPin, enPassant);
     }
 
-    template<bool white>
+    template<Color white>
     BitBoard TCheck(const Board& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) const {
-        constexpr bool enemy = !white;
+        constexpr Color enemy = !white;
 
         int kingsq = GET_SQUARE(King<white>(board));
 
@@ -861,12 +861,9 @@ public:
 
         BitBoard pr = PawnRight(board, enemy) & King<white>(board);
         BitBoard pl = PawnLeft(board, enemy) & King<white>(board);
-        if (pr > 0) {
-            knightPawnCheck |= PawnAttackLeft(pr, white); // Reverse the pawn attack to find the attacking pawn
-        }
-        if (pl > 0) {
-            knightPawnCheck |= PawnAttackRight(pl, white);
-        }
+
+        knightPawnCheck |= PawnAttackLeft(pr, white); // Reverse the pawn attack to find the attacking pawn
+        knightPawnCheck |= PawnAttackRight(pl, white);
 
         BitBoard enPassantCheck = PawnForward((PawnAttackLeft(pr, white) | PawnAttackRight(pl, white)), white) & enPassant;
 
@@ -956,16 +953,15 @@ public:
    }
 
    inline std::vector<Move> GenerateMoves(const Board& board, int depth) {
-       return m_Info[depth].m_WhiteMove ? TGenerateMoves<true>(board, depth) : TGenerateMoves<false>(board, depth);
+       return m_Info[depth].m_WhiteMove ? TGenerateMoves<WHITE>(board, depth) : TGenerateMoves<BLACK>(board, depth);
    }
 
-    template<bool white>
+    template<Color white>
     std::vector<Move> TGenerateMoves(const Board& board, int depth) {
         std::vector<Move> result;
         result.reserve(64); // Pre allocation increases perft by almost 3x
 
-        //const bool white = m_Info[depth].m_WhiteMove;
-        constexpr bool enemy = !white;
+        constexpr Color enemy = !white;
         BitBoard danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[depth].m_EnPassant;
         BitBoard enPassantCheck = TCheck<white>(board, danger, active, rookPin, bishopPin, enPassant);
         BitBoard moveable = ~Player<white>(board) & active;
@@ -986,17 +982,6 @@ public:
         BitBoard movePinF2Pawns = F2Pawns & rookPin;
         FPawns = FPawns & (~pinnedFPawns | movePinFPawns);
         F2Pawns = F2Pawns & (~pinnedF2Pawns | movePinF2Pawns);
-        for (; const uint64 bit = PopBit(FPawns); FPawns > 0) { // Loop each bit
-            if ((bit & FirstRank<enemy>()) > 0) { // If promote
-                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_KNIGHT });
-                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_BISHOP });
-                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_ROOK });
-                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_QUEEN });
-            }
-            else {
-                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::PAWN });
-            }
-        }
 
         for (; const BitBoard bit = PopBit(F2Pawns); F2Pawns > 0) { // Loop each bit
             result.push_back({ Pawn2Forward<enemy>(bit), bit, MoveType::PAWN2 });
@@ -1012,31 +997,52 @@ public:
         BitBoard movePinLPawns = LPawns & bishopPin;
         RPawns = RPawns & (~pinnedRPawns | movePinRPawns);
         LPawns = LPawns & (~pinnedLPawns | movePinLPawns);
+        if ((FPawns | RPawns | LPawns) & FirstRank<enemy>()) {
+            uint64 FPromote = FPawns & FirstRank<enemy>();
+            uint64 RPromote = RPawns & FirstRank<enemy>();
+            uint64 LPromote = LPawns & FirstRank<enemy>();
 
-        for (; BitBoard bit = PopBit(RPawns); RPawns > 0) { // Loop each bit
-            const MoveType capture = GetCaptureType(board, enemy, bit);
-            if ((bit & FirstRank<enemy>()) > 0) { // If promote
+            FPawns = FPawns & ~FirstRank<enemy>();
+            RPawns = RPawns & ~FirstRank<enemy>();
+            LPawns = LPawns & ~FirstRank<enemy>();
+
+            // Add Forward pawns
+            for (; const uint64 bit = PopBit(FPromote); FPromote > 0) {
+                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_KNIGHT });
+                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_BISHOP });
+                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_ROOK });
+                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_QUEEN });
+            }
+
+            for (; BitBoard bit = PopBit(RPromote); RPromote > 0) { // Loop each bit
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_KNIGHT, capture });
                 result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_BISHOP, capture });
                 result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_ROOK, capture });
                 result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_QUEEN, capture });
             }
-            else {
-                result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::PAWN, capture });
-            }
-        }
 
-        for (; BitBoard bit = PopBit(LPawns); LPawns > 0) { // Loop each bit
-            const MoveType capture = GetCaptureType(board, enemy, bit);
-            if ((bit & FirstRank<enemy>()) > 0) { // If promote
+            for (; BitBoard bit = PopBit(LPromote); LPromote > 0) {
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_KNIGHT, capture });
                 result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_BISHOP, capture });
                 result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_ROOK, capture });
                 result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_QUEEN, capture });
             }
-            else {
-                result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::PAWN, capture });
-            }
+        }
+
+        for (; const uint64 bit = PopBit(FPawns); FPawns > 0) {
+            result.push_back({ PawnForward<enemy>(bit), bit, MoveType::PAWN });
+        }
+
+        for (; BitBoard bit = PopBit(RPawns); RPawns > 0) { // Loop each bit
+            const MoveType capture = GetCaptureType<enemy>(board, bit);
+            result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::PAWN, capture });
+        }
+
+        for (; BitBoard bit = PopBit(LPawns); LPawns > 0) {
+            const MoveType capture = GetCaptureType<enemy>(board, bit);
+            result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::PAWN, capture });
         }
 
         // En passant
@@ -1067,7 +1073,7 @@ public:
             int pos = PopPos(knights);
             BitBoard moves = Lookup::knight_attacks[pos] & moveable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::KNIGHT, capture });
             }
         }
@@ -1083,7 +1089,7 @@ public:
             int pos = PopPos(pinnedBishop);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable & bishopPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::BISHOP, capture });
             }
         }
@@ -1092,7 +1098,7 @@ public:
             int pos = PopPos(notPinnedBishop);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::BISHOP, capture });
             }
         }
@@ -1117,7 +1123,7 @@ public:
             int pos = PopPos(pinnedRook);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & moveable & rookPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::ROOK, capture });
             }
         }
@@ -1126,7 +1132,7 @@ public:
             int pos = PopPos(notPinnedRook);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & moveable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::ROOK, capture });
             }
         }
@@ -1144,7 +1150,7 @@ public:
             int pos = PopPos(pinnedStraightQueen);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & moveable & rookPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
             }
         }
@@ -1154,7 +1160,7 @@ public:
             int pos = PopPos(pinnedDiagonalQueen);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable & bishopPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
             }
         }
@@ -1163,7 +1169,7 @@ public:
             int pos = PopPos(notPinnedQueen);
             BitBoard moves = board.QueenAttack(pos, board.m_Board) & moveable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
             }
         }
@@ -1174,7 +1180,7 @@ public:
         moves &= ~danger;
 
         for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-            const MoveType capture = GetCaptureType(board, enemy, bit);
+            const MoveType capture = GetCaptureType<enemy>(board, bit);
             result.push_back({ 1ull << kingpos, bit, MoveType::KING, capture });
         }
 
@@ -1183,15 +1189,15 @@ public:
     }
 
     inline std::vector<Move> GenerateCaptureMoves(const Board& board, int depth) {
-        return m_Info[depth].m_WhiteMove ? TGenerateCaptureMoves<true>(board, depth) : TGenerateCaptureMoves<false>(board, depth);
+        return m_Info[depth].m_WhiteMove ? TGenerateCaptureMoves<WHITE>(board, depth) : TGenerateCaptureMoves<BLACK>(board, depth);
     }
 
-    template<bool white>
+    template<Color white>
     std::vector<Move> TGenerateCaptureMoves(const Board& board, int depth) {
         std::vector<Move> result;
         result.reserve(64); // Pre allocation
 
-        constexpr bool enemy = !white;
+        constexpr Color enemy = !white;
         BitBoard danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[depth].m_EnPassant;
         BitBoard enPassantCheck = TCheck<white>(board, danger, active, rookPin, bishopPin, enPassant);
         BitBoard capturable = ~Player<white>(board) & active & Enemy<white>(board);
@@ -1212,7 +1218,7 @@ public:
         LPawns = LPawns & (~pinnedLPawns | movePinLPawns);
 
         for (; BitBoard bit = PopBit(RPawns); RPawns > 0) { // Loop each bit
-            const MoveType capture = GetCaptureType(board, enemy, bit);
+            const MoveType capture = GetCaptureType<enemy>(board, bit);
             if ((bit & FirstRank<enemy>()) > 0) { // If promote
                 result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_KNIGHT, capture });
                 result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_BISHOP, capture });
@@ -1225,7 +1231,7 @@ public:
         }
 
         for (; BitBoard bit = PopBit(LPawns); LPawns > 0) { // Loop each bit
-            const MoveType capture = GetCaptureType(board, enemy, bit);
+            const MoveType capture = GetCaptureType<enemy>(board, bit);
             if ((bit & FirstRank<enemy>()) > 0) { // If promote
                 result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_KNIGHT, capture });
                 result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_BISHOP, capture });
@@ -1268,7 +1274,7 @@ public:
             int pos = PopPos(knights);
             BitBoard moves = Lookup::knight_attacks[pos] & capturable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::KNIGHT, capture });
             }
         }
@@ -1284,7 +1290,7 @@ public:
             int pos = PopPos(pinnedBishop);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & capturable & bishopPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::BISHOP, capture });
             }
         }
@@ -1293,7 +1299,7 @@ public:
             int pos = PopPos(notPinnedBishop);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & capturable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::BISHOP, capture });
             }
         }
@@ -1308,7 +1314,7 @@ public:
             int pos = PopPos(pinnedRook);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & capturable & rookPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::ROOK, capture });
             }
         }
@@ -1317,7 +1323,7 @@ public:
             int pos = PopPos(notPinnedRook);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & capturable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::ROOK, capture });
             }
         }
@@ -1335,7 +1341,7 @@ public:
             int pos = PopPos(pinnedStraightQueen);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & capturable & rookPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
             }
         }
@@ -1345,7 +1351,7 @@ public:
             int pos = PopPos(pinnedDiagonalQueen);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & capturable & bishopPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
             }
         }
@@ -1354,7 +1360,7 @@ public:
             int pos = PopPos(notPinnedQueen);
             BitBoard moves = board.QueenAttack(pos, board.m_Board) & capturable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
             }
         }
@@ -1365,7 +1371,7 @@ public:
         moves &= ~danger;
 
         for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-            const MoveType capture = GetCaptureType(board, enemy, bit);
+            const MoveType capture = GetCaptureType<enemy>(board, bit);
             result.push_back({ 1ull << kingpos, bit, MoveType::KING, capture });
         }
 
@@ -1413,7 +1419,7 @@ public:
             int pos = PopPos(knights);
             BitBoard moves = Lookup::knight_attacks[pos] & moveable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::KNIGHT, capture });
                 return result;
             }
@@ -1428,7 +1434,7 @@ public:
             int pos = PopPos(pinnedBishop);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable & bishopPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::BISHOP, capture });
                 return result;
             }
@@ -1438,7 +1444,7 @@ public:
             int pos = PopPos(notPinnedBishop);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::BISHOP, capture });
                 return result;
             }
@@ -1463,7 +1469,7 @@ public:
             int pos = PopPos(pinnedRook);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & moveable & rookPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::ROOK, capture });
                 return result;
             }
@@ -1473,7 +1479,7 @@ public:
             int pos = PopPos(notPinnedRook);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & moveable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::ROOK, capture });
                 return result;
             }
@@ -1491,7 +1497,7 @@ public:
             int pos = PopPos(pinnedStraightQueen);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & moveable & rookPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
                 return result;
             }
@@ -1502,7 +1508,7 @@ public:
             int pos = PopPos(pinnedDiagonalQueen);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable & bishopPin;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
                 return result;
             }
@@ -1512,7 +1518,7 @@ public:
             int pos = PopPos(notPinnedQueen);
             BitBoard moves = board.QueenAttack(pos, board.m_Board) & moveable;
             for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType(board, enemy, bit);
+                const MoveType capture = GetCaptureType<enemy>(board, bit);
                 result.push_back({ 1ull << pos, bit, MoveType::QUEEN, capture });
                 return result;
             }
@@ -1523,7 +1529,7 @@ public:
         moves &= ~danger;
 
         for (; BitBoard bit = PopBit(moves); moves > 0) { // Loop each bit
-            const MoveType capture = GetCaptureType(board, enemy, bit);
+            const MoveType capture = GetCaptureType<enemy>(board, bit);
             result.push_back({ 1ull << kingpos, bit, MoveType::KING, capture });
             return result;
         }
@@ -1531,7 +1537,7 @@ public:
         return result;
     }
 
-    template<bool white>
+    template<Color white>
     inline int64 CastleKing(uint64 danger, uint64 board, uint64 rooks, int depth) const {
         if constexpr (white) {
             return((m_Info[depth].m_WhiteCastleKing && (board & 0b110) == 0 && (danger & 0b1110) == 0) && (rooks & 0b1) > 0) * (1ull << 1);
@@ -1540,7 +1546,7 @@ public:
         }
     }
     
-    template<bool white>
+    template<Color white>
     inline int64 CastleQueen(uint64 danger, uint64 board, uint64 rooks, int depth) const {
         if constexpr (white) {
             return ((m_Info[depth].m_WhiteCastleQueen && (board & 0b01110000) == 0 && (danger & 0b00111000) == 0) && (rooks & 0b10000000) > 0) * (1ull << 5);
@@ -1549,8 +1555,8 @@ public:
         }
     }
 
-    uint64 Danger(bool white, const Board& board) {
-        bool enemy = !white;
+    uint64 Danger(Color white, const Board& board) {
+        Color enemy = !white;
         uint64 danger = PawnAttack(board, enemy);
 
         uint64 knights = Knight(board, enemy);
@@ -1576,20 +1582,21 @@ public:
         return danger;
     }
 
-    MoveType GetCaptureType(const Board& board, bool enemy, uint64 bit) {
-        if (Pawn(board, enemy) & bit) {
+    template<Color enemy>
+    MoveType GetCaptureType(const Board& board, uint64 bit) {
+        if (Pawn<enemy>(board) & bit) {
             return MoveType::PAWN;
         } 
-        else if (Knight(board, enemy) & bit) {
+        else if (Knight<enemy>(board) & bit) {
             return MoveType::KNIGHT;
         }
-        else if (Bishop(board, enemy) & bit) {
+        else if (Bishop<enemy>(board) & bit) {
             return MoveType::BISHOP;
         }
-        else if (Rook(board, enemy) & bit) {
+        else if (Rook<enemy>(board) & bit) {
             return MoveType::ROOK;
         }
-        else if (Queen(board, enemy) & bit) {
+        else if (Queen<enemy>(board) & bit) {
             return MoveType::QUEEN;
         }
         else {
@@ -1598,7 +1605,7 @@ public:
     }
 
     Move GetMove(std::string str) {
-        const bool white = m_Info[0].m_WhiteMove;
+        const Color white = m_Info[0].m_WhiteMove;
         const uint64 from = 1ull << ('h' - str[0] + (str[1] - '1') * 8);
         const int posTo = ('h' - str[2] + (str[3] - '1') * 8);
         const uint64 to = 1ull << posTo;
