@@ -125,13 +125,13 @@ struct Move {
         result += 'h' - (t % 8);
         result += '1' + (t / 8);
         if (m_Type == MoveType::P_BISHOP) {
-            result += 'b';
+            result += 'N';
         } else if (m_Type == MoveType::P_KNIGHT) {
-            result += "kn";
+            result += "N";
         } else if (m_Type == MoveType::P_ROOK) {
-            result += "r";
+            result += "R";
         } else if (m_Type == MoveType::P_QUEEN) {
-            result += "q";
+            result += "Q";
         }
         return result;
     }
@@ -407,7 +407,7 @@ static uint64 Zobrist_PawnHash(const Board& board) {
     while (bp > 0) {
         int pos = PopPos(bp);
         result ^= Lookup::zobrist[pos + 64];
-    }
+    } 
 
     return result;
 }
