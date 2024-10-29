@@ -2,22 +2,30 @@
 
 #include "Movelist.h"
 
+enum Bound {
+    UPPER_BOUND,
+    LOWER_BOUND
+};
+
 // Transposition table entry
 struct TTEntry {
     TTEntry()
-        : m_Hash(0), m_Moves(0), m_Depth(0), m_Evaluation(0)
+        : m_Hash(0), m_Moves(0), m_Ply(0), m_Value(0)
     {}
 
-    TTEntry(uint64 hash, Move bestmove, int64 eval, int depth, int moves)
-        : m_Hash(hash), m_BestMove(bestmove), m_Depth(depth), m_Moves(moves), m_Evaluation(eval)
+    TTEntry(uint64 hash, Move bestmove, int64 eval, Bound bound, int ply, int depth, int moves)
+        : m_Hash(hash), m_BestMove(bestmove), m_Bound(bound), m_Ply(ply), m_Depth(depth), m_Moves(moves), m_Value(eval)
     {}
 
     Move m_BestMove;
+    short m_Ply;
     short m_Depth;
     short m_Moves;
     uint64 m_Hash;
-    int64 m_Evaluation;
+    int64 m_Value;
+    Bound m_Bound;
 };
+
 
 struct PTEntry {
     PTEntry()
@@ -62,7 +70,7 @@ struct HashTable {
     void Enter(uint64 hash, T entry) {
         uint64 index = hash & m_Indexer;
         if constexpr (std::is_same_v<TTEntry, T>) {
-            if (m_Table[index].m_Moves + m_Table[index].m_Depth < entry.m_Moves + entry.m_Depth) {
+            if (m_Table[index].m_Moves + m_Table[index].m_Ply < entry.m_Moves + entry.m_Ply) {
                 m_Table[hash & m_Indexer] = entry;
             }
         } else {

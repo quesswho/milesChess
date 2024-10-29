@@ -127,14 +127,22 @@ public:
         *pv = Move();
     }
 
-    int64 Quiesce(const Board& board, int64 alpha, int64 beta, int ply) {
+    int64 Quiesce(const Board& board, int64 alpha, int64 beta, int ply, int depth) {
         m_NodeCnt++;
         int64 bestScore = Evaluate(board, m_PawnTable, m_PawnHash[ply], m_Info[ply].m_WhiteMove);
-        if (bestScore >= beta) { // fail soft
+        if (bestScore >= beta) { // Return if we fail soft
             return bestScore;
         }
         if (alpha < bestScore) {
             alpha = bestScore;
+        }
+
+        // Probe Transposition table
+        TTEntry* entry = m_Table->Probe(m_Hash[ply]);
+        if (entry != nullptr) {
+            if (entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
+                return entry->m_Value;
+            }
         }
 
         std::vector<Move> moves = GenerateCaptureMoves(board, ply);
@@ -145,7 +153,6 @@ public:
             return -MATE_SCORE + ply; // Mate in 0 is 10000 centipawns worth
         }
 
-        TTEntry* entry = m_Table->Probe(m_Hash[ply]);
         if (entry != nullptr) {
             const Move hashMove = entry->m_BestMove;
             std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
@@ -166,7 +173,7 @@ public:
         Move bestMove;
         for (const Move& move : moves) {
             if (move.m_Capture == MoveType::NONE) continue; // Only analyze capturing moves
-            int64 score = -Quiesce(MovePiece(board, move, ply + 1), -beta, -alpha, ply + 1);
+            int64 score = -Quiesce(MovePiece(board, move, ply + 1), -beta, -alpha, ply + 1, depth - 1);
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = move;
@@ -179,7 +186,11 @@ public:
             }
         }
         if (bestMove.m_Type != MoveType::NONE) {
-            m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, ply, m_Info[ply].m_FullMoves));
+            if (bestScore >= beta) {
+                m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, LOWER_BOUND, ply, depth, m_Info[ply].m_FullMoves));
+            } else {
+                m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, UPPER_BOUND, ply, depth, m_Info[ply].m_FullMoves));
+            }
         }
 
         return bestScore;
@@ -194,6 +205,16 @@ public:
         depth = std::min(depth, MAX_DEPTH - 1);
 
 
+        // Probe Transposition table
+        Move hashMove = Move();
+        TTEntry* entry = m_Table->Probe(m_Hash[ply]);
+        if (entry != nullptr) {
+            if (entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
+                return entry->m_Value;
+            }
+            hashMove = entry->m_BestMove;
+        }
+
         // Probe the tablebase
         int success;
         int v = TableBase::Probe_DTZ(board, m_Info[ply], &success);
@@ -204,7 +225,7 @@ public:
 
         // Quiesce search if we reached the bottom
         if (depth <= 1) {
-			return Quiesce(board, alpha, beta, ply);
+			return Quiesce(board, alpha, beta, ply, depth);
 		}
 
         uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[ply].m_EnPassant;
@@ -224,7 +245,6 @@ public:
             if (m_History[i] == m_Hash[ply]) {
                 return 0;
             }
-
         }
         
 		int64 bestScore = -MATE_SCORE;
@@ -244,12 +264,7 @@ public:
             });
         }
         
-        Move hashMove = Move();
-        TTEntry* entry = m_Table->Probe(m_Hash[ply]);
-        if (entry != nullptr) {
-            hashMove = entry->m_BestMove;
-        }
-
+        int64 old_alpha = alpha;
         Move bestMove = moves[0];
 		for (const Move& move : moves) {
             int newdepth = depth - 1;
@@ -284,7 +299,11 @@ public:
 				break;
 			}
 		}
-        m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, ply, m_Info[ply].m_FullMoves));
+        if (bestScore >= beta) {
+            m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, LOWER_BOUND, ply, depth, m_Info[ply].m_FullMoves));
+        } else {
+            m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, UPPER_BOUND, ply, depth, m_Info[ply].m_FullMoves));
+        }
 
 		return bestScore;
 	}
@@ -298,7 +317,7 @@ public:
         bool moreTime = m_Info[0].m_WhiteMove ? wtime > btime : wtime < btime;
         int64 timeleft = m_Info[0].m_WhiteMove ? wtime : btime;
         int64 timeic = m_Info[0].m_WhiteMove ? winc : binc;
-        int64 target = (timeleft+ (moreTime ? timediff : 0)) / 40 + 200 + timeic;
+        int64 target = (timeleft + (moreTime ? timediff : 0)) / 40 + 200 + timeic;
         float x = (m_Info[0].m_FullMoves - 20.0f)/30.0f; 
         float factor = exp(-x*x);   // Bell curve
         sync_printf("info movetime %lli\n", (int64)(target * factor));
@@ -362,8 +381,8 @@ public:
 
             TTEntry* entry = m_Table->Probe(m_Hash[0]);
             if (entry != nullptr) {
-                rootAlpha = entry->m_Evaluation - m_RootDelta;
-                rootBeta = entry->m_Evaluation + m_RootDelta;
+                rootAlpha = entry->m_Value - m_RootDelta;
+                rootBeta = entry->m_Value + m_RootDelta;
             }
             int failHigh = 0;
             while (true) {
@@ -414,9 +433,13 @@ public:
 
             finalMove = bestMove;
             
+            if (bestScore >= beta) {
+                m_Table->Enter(m_Hash[0], TTEntry(m_Hash[0], bestMove, bestScore, LOWER_BOUND, 0, m_Maxdepth, m_Info[0].m_FullMoves));
+            } else {
+                m_Table->Enter(m_Hash[0], TTEntry(m_Hash[0], bestMove, bestScore, UPPER_BOUND, 0, m_Maxdepth, m_Info[0].m_FullMoves));
+            }
 
-            m_Table->Enter(m_Hash[0], TTEntry(m_Hash[0], bestMove, bestScore, 0, m_Info[0].m_FullMoves));
-
+            
             if (m_Timer.EndMs() * 2 >= m_MaxTime) break; // We won't have enough time to calculate more depth anyway
             if (bestScore >= MATE_SCORE - MAX_DEPTH || bestScore <= -MATE_SCORE + MAX_DEPTH) break; // Position is solved so exit out
         }
