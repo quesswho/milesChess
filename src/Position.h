@@ -1,9 +1,8 @@
 #pragma once
 
-#include <string>
+#include "Move.h"
 
 
-#include "Types.h"
 
 class Position {
 public:
@@ -13,29 +12,30 @@ public:
             BitBoard m_White;
             BitBoard m_Black;
 
-            const BitBoard m_WhitePawn;
-            const BitBoard m_BlackPawn;
+            BitBoard m_WhitePawn;
+            BitBoard m_BlackPawn;
 
-            const BitBoard m_WhiteKnight;
-            const BitBoard m_BlackKnight;
+            BitBoard m_WhiteKnight;
+            BitBoard m_BlackKnight;
 
-            const BitBoard m_WhiteBishop;
-            const BitBoard m_BlackBishop;
+            BitBoard m_WhiteBishop;
+            BitBoard m_BlackBishop;
 
-            const BitBoard m_WhiteRook;
-            const BitBoard m_BlackRook;
+            BitBoard m_WhiteRook;
+            BitBoard m_BlackRook;
 
-            const BitBoard m_WhiteQueen;
-            const BitBoard m_BlackQueen;
+            BitBoard m_WhiteQueen;
+            BitBoard m_BlackQueen;
 
-            const BitBoard m_WhiteKing;
-            const BitBoard m_BlackKing;
+            BitBoard m_WhiteKing;
+            BitBoard m_BlackKing;
         };
-        const BitBoard m_Pieces[7][2]; // 6 pieces for each color: 0 for white and 1 for black
+        BitBoard m_Pieces[7][2]; // 6 pieces for each color: 0 for white and 1 for black
 
     };
     BitBoard m_Board;
 
+    ColoredPieceType m_Squares[64];
 
     // Board info
     union {
@@ -78,6 +78,8 @@ public:
         m_Hash(other.m_Hash), m_PawnHash(other.m_PawnHash)
     {}
 
+    void MovePiece(Move move);
+
     uint64 RookAttack(int pos, BitBoard occ) const;
     uint64 BishopAttack(int pos, BitBoard occ) const;
     uint64 QueenAttack(int pos, BitBoard occ) const;
@@ -88,3 +90,5 @@ public:
 
 static uint64 Zobrist_Hash(const Position& position);
 static uint64 Zobrist_PawnHash(const Position& position);
+
+static Move GetMove(const Position& position, std::string str);

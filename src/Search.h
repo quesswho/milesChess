@@ -228,6 +228,14 @@ public:
 			return Quiesce(board, alpha, beta, ply, depth);
 		}
 
+        // We count any repetion as draw
+        // TODO: Maybe employ hashing to make this O(1) instead of O(n)
+        for (int i = 0; i < m_Info[ply].m_HalfMoves; i++) {
+            if (m_History[i] == m_Hash[ply]) {
+                return 0;
+            }
+        }
+
         uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[ply].m_EnPassant;
         Check(m_Info[ply].m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
         bool inCheck = false;
@@ -236,16 +244,9 @@ public:
 		std::vector<Move> moves = GenerateMoves(board, ply);
 		if (moves.size() == 0) {
             if (!inCheck) return 0; // Draw
-			return -MATE_SCORE + ply; // Mate in 0 is 10000 centipawns worth
+			return -MATE_SCORE + ply; // Mate in 0 is worth MATE_SCORE centipawns
 		}
 
-        // We count any repetion as draw
-        // TODO: Maybe employ hashing to make this O(1) instead of O(n)
-        for (int i = 0; i < m_Info[ply].m_HalfMoves; i++) {
-            if (m_History[i] == m_Hash[ply]) {
-                return 0;
-            }
-        }
         
 		int64 bestScore = -MATE_SCORE;
         if (*stack->m_PV != Move()) {
@@ -1210,6 +1211,11 @@ public:
 
         return result;
     }
+
+    enum GenerateType {
+        ALL,
+        CAPTURE
+    };
 
     inline std::vector<Move> GenerateCaptureMoves(const Board& board, int depth) {
         return m_Info[depth].m_WhiteMove ? TGenerateCaptureMoves<WHITE>(board, depth) : TGenerateCaptureMoves<BLACK>(board, depth);

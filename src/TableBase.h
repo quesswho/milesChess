@@ -33,7 +33,7 @@ namespace TableBase {
         int blocksize;
         int idxbits;
         int min_len;
-        uint base[1];
+        uint32 base[1];
     };
 
     struct TBEntry {

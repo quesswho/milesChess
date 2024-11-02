@@ -37,6 +37,194 @@ BitBoard Position::BishopXray(int pos, BitBoard occ) const {
     return attacks ^ BishopAttack(pos, occ ^ (attacks & occ));
 }
 
+void Position::MovePiece(Move move) {
+    const int tPos = To(move);
+    const int fPos = From(move);
+    const BitBoard to = (1ull << tPos);
+    const BitBoard from = (1ull << fPos);
+    const BitBoard re = ~(to);
+    const BitBoard swp = (from) | (to);
+
+    m_HalfMoves++;
+    if (!m_WhiteMove) m_FullMoves++;
+
+    if (m_EnPassant) { // Remove old en passant
+        m_Hash ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(m_EnPassant) & 0x7)];
+    }
+
+
+    m_EnPassant = 0;
+    m_WhiteMove = !m_WhiteMove;
+
+    m_Hash ^= Lookup::zobrist[64 * 12]; // White Move
+    m_PawnHash ^= Lookup::zobrist[64 * 12];
+
+
+    const ColoredPieceType type = CaptureType(move);
+
+    assert("Cant move to same color piece", move.m_To & m_White);
+    switch (type) {
+    case WPAWN:
+        if (tPos - fPos == 16) {
+            m_EnPassant = to >> 8;
+            m_Hash ^= Lookup::zobrist[tPos] ^ Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 12 + 5 + (tPos % 8)];
+            m_PawnHash ^= Lookup::zobrist[tPos] ^ Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 12 + 5 + (tPos % 8)];
+        } else {
+            m_Hash ^= Lookup::zobrist[tPos] ^ Lookup::zobrist[fPos];
+            m_PawnHash ^= Lookup::zobrist[tPos] ^ Lookup::zobrist[fPos];
+        }
+        m_WhitePawn ^= swp;
+        m_HalfMoves = 0;
+        break;
+    case WKNIGHT:
+        m_Hash ^= Lookup::zobrist[64 * 2 + tPos] ^ Lookup::zobrist[64 * 2 + fPos];
+        m_WhiteKnight ^= swp;
+    case WBISHOP:
+        m_Hash ^= Lookup::zobrist[64 * 4 + tPos] ^ Lookup::zobrist[64 * 4 + fPos];
+        m_WhiteBishop ^= swp;
+    case WROOK:
+        if (from == 0b1ull) {
+            m_WhiteCastleKing = false;
+            if (m_WhiteCastleKing) {
+                m_Hash ^= Lookup::zobrist[64 * 12 + 1];
+            }
+        } else if (from == 0b10000000ull) {
+            m_WhiteCastleQueen = false;
+            if (m_WhiteCastleQueen) {
+                m_Hash ^= Lookup::zobrist[64 * 12 + 2];
+            }
+        }
+        m_Hash ^= Lookup::zobrist[64 * 6 + tPos] ^ Lookup::zobrist[64 * 6 + fPos];
+        m_WhiteRook ^= swp;
+    case WQUEEN:
+        m_Hash ^= Lookup::zobrist[64 * 8 + tPos] ^ Lookup::zobrist[64 * 8 + fPos];
+        m_WhiteQueen ^= swp;
+    case WKING:
+        m_WhiteCastleQueen = false;
+        m_WhiteCastleKing = false;
+        if (m_Info[ply - 1].m_WhiteCastleQueen) {
+            m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 2];
+        }
+        if (m_Info[ply - 1].m_WhiteCastleKing) {
+            m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 1];
+        }
+        m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 10 + tPos] ^ Lookup::zobrist[64 * 10 + fPos];
+        return Board(wp, wkn, wb, wr, wq, wk ^ swp, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
+    case EPASSANT:
+        m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[tPos] ^ Lookup::zobrist[fPos];
+        m_PawnHash[ply] = m_PawnHash[ply] ^ Lookup::zobrist[tPos] ^ Lookup::zobrist[fPos];
+        return Board(wp ^ swp, wkn, wb, wr, wq, wk, bp & ~(move.m_To >> 8), bkn, bb, br, bq, bk);
+    case KCASTLE:
+        m_Info[ply].m_WhiteCastleQueen = false;
+        m_Info[ply].m_WhiteCastleKing = false;
+        if (m_Info[ply - 1].m_WhiteCastleQueen) {
+            m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 2];
+        }
+        if (m_Info[ply - 1].m_WhiteCastleKing) {
+            m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 1];
+        }
+        m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 10 + 1] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6] ^ Lookup::zobrist[64 * 6 + 2];
+        return Board(wp, wkn, wb, wr ^ 0b101ull, wq, wk ^ swp, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
+    case QCASTLE:
+        m_Info[ply].m_WhiteCastleQueen = false;
+        m_Info[ply].m_WhiteCastleKing = false;
+        if (m_Info[ply - 1].m_WhiteCastleQueen) {
+            m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 2];
+        }
+        if (m_Info[ply - 1].m_WhiteCastleKing) {
+            m_Hash[ply] ^= Lookup::zobrist[64 * 12 + 1];
+        }
+        m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[64 * 10 + 5] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6 + 7] ^ Lookup::zobrist[64 * 6 + 4];
+        return Board(wp, wkn, wb, wr ^ 0b10010000ull, wq, wk ^ swp, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
+    case P_KNIGHT:
+        m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 2 + tPos];
+        m_PawnHash[ply] = m_PawnHash[ply] ^ Lookup::zobrist[fPos];
+        return Board(wp & (~move.m_From), wkn | move.m_To, wb, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
+    case P_BISHOP:
+        m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 4 + tPos];
+        m_PawnHash[ply] = m_PawnHash[ply] ^ Lookup::zobrist[fPos];
+        return Board(wp & (~move.m_From), wkn, wb | move.m_To, wr, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
+    case P_ROOK:
+        m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 6 + tPos];
+        m_PawnHash[ply] = m_PawnHash[ply] ^ Lookup::zobrist[fPos];
+        return Board(wp & (~move.m_From), wkn, wb, wr | move.m_To, wq, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
+    case P_QUEEN:
+        m_Hash[ply] = m_Hash[ply] ^ Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 8 + tPos];
+        m_PawnHash[ply] = m_PawnHash[ply] ^ Lookup::zobrist[fPos];
+        return Board(wp & (~move.m_From), wkn, wb, wr, wq | move.m_To, wk, bp & re, bkn & re, bb & re, br & re, bq & re, bk);
+    case MoveType::NONE:
+        assert("Invalid move!");
+        break;
+    }
+
+    const ColoredPieceType capture = CaptureType(move);
+
+    if (capture != NONE) m_HalfMoves = 0;
+
+    switch (capture) {
+        // White pieces
+    case BPAWN:
+        if (EnPassant(move)) {
+            m_Hash ^= Lookup::zobrist[56 + tPos];
+            m_PawnHash ^= Lookup::zobrist[56 + tPos];
+            m_BlackPawn &= ~(to >> 8);
+        } else {
+            m_Hash ^= Lookup::zobrist[64 + tPos];
+            m_PawnHash ^= Lookup::zobrist[64 + tPos];
+            m_BlackPawn &= re;
+        }
+        break;
+    case BKNIGHT:
+        m_Hash ^= Lookup::zobrist[64 * 3 + tPos];
+        m_BlackKnight &= re;
+        break;
+    case BBISHOP:
+        m_Hash ^= Lookup::zobrist[64 * 5 + tPos];
+        m_BlackBishop &= re;
+        break;
+    case BROOK:
+        m_Hash ^= Lookup::zobrist[64 * 7 + tPos];
+        m_BlackRook &= re;
+        break;
+    case BQUEEN:
+        m_Hash ^= Lookup::zobrist[64 * 9 + tPos];
+        m_BlackQueen &= re;
+        break;
+        // Black pieces
+    case WPAWN:
+        if (EnPassant(move)) {
+            m_Hash ^= Lookup::zobrist[8 + tPos];
+            m_PawnHash ^= Lookup::zobrist[8 + tPos];
+            m_WhitePawn &= ~(to << 8);
+        } else {
+            m_Hash ^= Lookup::zobrist[tPos];
+            m_PawnHash ^= Lookup::zobrist[tPos];
+            m_WhitePawn &= re;
+        }
+        break;
+    case WKNIGHT:
+        m_Hash ^= Lookup::zobrist[64 * 2 + tPos];
+        m_WhiteKnight &= re;
+        break;
+    case WBISHOP:
+        m_Hash ^= Lookup::zobrist[64 * 4 + tPos];
+        m_WhiteBishop &= re;
+        break;
+    case WROOK:
+        m_Hash ^= Lookup::zobrist[64 * 6 + tPos];
+        m_WhiteRook &= re;
+        break;
+    case WQUEEN:
+        m_Hash ^= Lookup::zobrist[64 * 8 + tPos];
+        m_WhiteQueen &= re;
+        break;
+    case NONE:
+        // No capture
+        break;
+    }
+    m_History[m_Info[ply].m_HalfMoves] = m_Hash[ply];
+}
+
 uint64 Zobrist_Hash(const Position& position) {
     uint64 result = 0;
 
@@ -129,6 +317,45 @@ static uint64 Zobrist_PawnHash(const Position& position) {
     while (bp > 0) {
         int pos = PopPos(bp);
         result ^= Lookup::zobrist[pos + 64];
+    }
+
+    return result;
+}
+
+static Move GetMove(const Position& position, std::string str) {
+
+    const uint32 from = ('h' - str[0] + (str[1] - '1') * 8);
+    const uint32 to = ('h' - str[2] + (str[3] - '1') * 8);
+    Move result = from | (to << 6);
+
+    uint32 moveFlag = 0;
+    if (str.size() > 4) {
+        switch (str[4]) {
+        case 'k':
+            result |= 0x200000;
+            break;
+        case 'b':
+            result |= 0x400000;
+            break;
+        case 'r':
+            result |= 0x800000;
+            break;
+        case 'q':
+            result |= 0x1000000;
+            break;
+        }
+    }
+    ColoredPieceType move = position.m_Squares[from];
+    result |= move << 12;
+    ColoredPieceType capture = position.m_Squares[to];
+    result |= capture << 16;
+    if((move == WPAWN || move == BPAWN) && position.m_EnPassant & (1ull << to)) {
+        result |= 0x100000;
+    }
+    if (move == WKING || move == BKING) {
+        if ((from & 0x7) + (to & 0x7) > 1) { // If piece moved two squares horizontally
+            result |= 0x200000;
+        }
     }
 
     return result;

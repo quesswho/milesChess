@@ -310,17 +310,17 @@ namespace TableBase {
 
         int blocksize = data[1];
         int idxbits = data[2];
-        int real_num_blocks = *(uint*)(&data[4]);
+        int real_num_blocks = *(uint32*)(&data[4]);
         int num_blocks = real_num_blocks + *(ubyte*)(&data[3]);
         int max_len = data[8];
         int min_len = data[9];
         int h = max_len - min_len + 1;
         int num_syms = *(ushort*)(&data[10 + 2 * h]);
-        d = (struct PairsData*)malloc(sizeof(struct PairsData) + (h - 1) * sizeof(uint) + num_syms);
+        d = (struct PairsData*)malloc(sizeof(struct PairsData) + (h - 1) * sizeof(uint32) + num_syms);
         d->blocksize = blocksize;
         d->idxbits = idxbits;
         d->offset = (ushort*)(&data[10]);
-        d->symlen = ((ubyte*)d) + sizeof(struct PairsData) + (h - 1) * sizeof(uint);
+        d->symlen = ((ubyte*)d) + sizeof(struct PairsData) + (h - 1) * sizeof(uint32);
         d->sympat = &data[12 + 2 * h];
         d->min_len = min_len;
         *next = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
@@ -411,7 +411,7 @@ namespace TableBase {
         }
 
         ubyte* data = (ubyte*)entry->data;
-        if (((uint*)data)[0] != WDL_MAGIC) {
+        if (((uint32*)data)[0] != WDL_MAGIC) {
             printf("Corrupted table.\n");
             Unmap_TB(entry->data, entry->mapping);
             entry->data = 0;
@@ -520,7 +520,7 @@ namespace TableBase {
         if (!data)
             return 0;
 
-        if (((uint*)data)[0] != DTZ_MAGIC) {
+        if (((uint32*)data)[0] != DTZ_MAGIC) {
             printf("Corrupted table.\n");
             return 0;
         }
@@ -1127,9 +1127,9 @@ namespace TableBase {
         if (!d->idxbits)
             return d->min_len;
 
-        uint mainidx = idx >> d->idxbits;
+        uint32 mainidx = idx >> d->idxbits;
         int litidx = (idx & ((1 << d->idxbits) - 1)) - (1 << (d->idxbits - 1));
-        uint block = *(uint*)(d->indextable + 6 * mainidx);
+        uint32 block = *(uint32*)(d->indextable + 6 * mainidx);
         litidx += *(ushort*)(d->indextable + 6 * mainidx + 4);
         if (litidx < 0) {
             do {
@@ -1140,16 +1140,16 @@ namespace TableBase {
                 litidx -= d->sizetable[block++] + 1;
         }
 
-        uint* ptr = (uint*)(d->data + (block << d->blocksize));
+        uint32* ptr = (uint32*)(d->data + (block << d->blocksize));
 
         int m = d->min_len;
         ushort* offset = d->offset;
-        uint* base = d->base - m;
+        uint32* base = d->base - m;
         ubyte* symlen = d->symlen;
         int sym, bitcnt;
 
-        uint next = 0;
-        uint code = _byteswap_ulong(*ptr++);
+        uint32 next = 0;
+        uint32 code = _byteswap_ulong(*ptr++);
         bitcnt = 0; // number of bits in next
         for (;;) {
             int l = m;
