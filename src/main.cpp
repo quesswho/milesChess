@@ -34,13 +34,13 @@ int main() {
 		//search->LoadPosition("1k2r1r1/1p3pp1/1qpb1n1p/p2p1QP1/5P2/4PB2/PPP3KP/R1B4R b - - 0 1"); // Stockfish evaluates this as -4, while milesbot rates it as 0
 		//search->LoadPosition("1k2r2r/1pb5/1qp5/p2p4/8/3Q4/PPP1p1RP/R1B4K w - - 0 11");
 		//search->LoadPosition("rnnk1b1r/p3pppB/2b5/6N1/8/2N5/1P3PPP/R1B2RK1 b - - 1 15");
-		search->LoadPosition("5k2/8/8/8/3b4/5K2/3r4/7R w - - 72 115"); // TODO: Figure out why it's doing incorrect move h1g1
+		//search->LoadPosition("5k2/8/8/8/3b4/5K2/3r4/7R w - - 72 115"); // TODO: Figure out why it's doing incorrect move h1g1
 		//printf("%llu\n", search.Perft(6));
 		Timer time;
 		time.Start();
 		search->m_MaxTime = 10000;
-		search->UCIMove_async();
-		//search->Perft(6); // 55-58
+		//search->UCIMove_async();
+		search->Perft(2); // 55-58
 		printf("%.3fs\n", time.End());
 		
 		//while (true) {

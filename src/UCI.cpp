@@ -43,7 +43,7 @@ void UCI::Start() {
                 if (token == "moves") {
                     while (!istream.eof()) {
                         GetToken(istream, token);
-                        Move move = m_Search.GetMove(token);
+                        MoveData move = m_Search.GetMove(token);
                         m_Search.MoveRootPiece(move);
                     }
                     printf("info %s\n", BoardtoFen(*m_Search.m_RootBoard, m_Search.m_Info[0]).c_str());

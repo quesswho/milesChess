@@ -4,6 +4,9 @@
 #include <chrono>
 #include <stdarg.h>
 
+#define NOMINMAX
+#include <Windows.h> // _mm_popcnt_u64(...)
+
 #include "Types.h"
 
 #define GET_SQUARE(X) _tzcnt_u64(X)

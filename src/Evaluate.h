@@ -6,7 +6,7 @@
 
 
 template<Color white>
-static Score Pawn(const Board& board, int pos, int rpos) {
+static Score Pawn(const Position& board, int pos, int rpos) {
     const int64 pawnBaseVal = 100;
 
     int middlegame = pawnBaseVal + Lookup::pawn_table[pos];
@@ -32,7 +32,7 @@ static Score Pawn(const Board& board, int pos, int rpos) {
     return Score({ middlegame, endgame });
 }
 
-static Score Pawns(const Board& board) {
+static Score Pawns(const Position& board) {
     uint64 wp = board.m_WhitePawn, bp = board.m_BlackPawn;
     Score score = { 0, 0 };
 
@@ -50,7 +50,7 @@ static Score Pawns(const Board& board) {
 }
 
 // Relative static evaluation
-static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, Color white) {
+static int64 Evaluate(const Position& board, PawnTable* table) {
 
     int64 middlegame = 0, endgame = 0, result = 0;
     Score score = { 0, 0 };
@@ -65,7 +65,7 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, Col
 
     int whiteAttack = 0, blackAttack = 0;
 
-    middlegame += white ? TEMPO : -TEMPO;
+    middlegame += board.m_WhiteMove ? TEMPO : -TEMPO;
 
     // Calculate material imbalance
     for (int i = PieceType::PAWN; i < PieceType::QUEEN; i++) {
@@ -81,12 +81,12 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, Col
 
     // Pawns
 
-    PTEntry* pawnStructure = table->Probe(pawnhash);
+    PTEntry* pawnStructure = table->Probe(board.m_PawnHash);
     if (pawnStructure != nullptr) {
         score += pawnStructure->m_Score;
     } else {
         Score pawn = Pawns(board);
-        table->Enter(pawnhash, PTEntry(pawnhash, pawn));
+        table->Enter(board.m_PawnHash, PTEntry(board.m_PawnHash, pawn));
     }
     
     // Knights
@@ -250,5 +250,5 @@ static int64 Evaluate(const Board& board, PawnTable* table, uint64 pawnhash, Col
 
     phase = (phase * 256) / 16;
     result += (middlegame * (256 - phase) + endgame * phase) / 256;
-    return white ? result : -result;
+    return board.m_WhiteMove ? result : -result;
 }

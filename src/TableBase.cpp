@@ -4,6 +4,7 @@
 */
 
 #include "TableBase.h"
+#include "LookupTables.h"
 
 #include <windows.h>
 
@@ -31,7 +32,7 @@ namespace TableBase {
 
     // Given a position return the table base string such as KQPvKRP
 
-    static void TB_Str(const Board& board, char* str, bool mirror) {
+    static void TB_Str(const Position& board, char* str, bool mirror) {
         bool color = mirror;
         int pt;
         int i;
@@ -51,7 +52,7 @@ namespace TableBase {
         *str++ = 0;
     }
 
-    static uint64 Material_Key(const Board& board) {
+    static uint64 Material_Key(const Position& board) {
         const uint8_t wp = COUNT_BIT(board.m_WhitePawn), wkn = COUNT_BIT(board.m_WhiteKnight), wb = COUNT_BIT(board.m_WhiteBishop), wr = COUNT_BIT(board.m_WhiteRook), wq = COUNT_BIT(board.m_WhiteQueen), wk = COUNT_BIT(board.m_WhiteKing),
             bp = COUNT_BIT(board.m_BlackPawn), bkn = COUNT_BIT(board.m_BlackKnight), bb = COUNT_BIT(board.m_BlackBishop), br = COUNT_BIT(board.m_BlackRook), bq = COUNT_BIT(board.m_BlackQueen), bk = COUNT_BIT(board.m_BlackKing);
         
@@ -94,7 +95,7 @@ namespace TableBase {
         return key;
     }
 
-    static uint64 Material_Key(const Board& board, bool mirror) {
+    static uint64 Material_Key(const Position& board, bool mirror) {
         bool color = mirror;
         int pt;
         int i;
@@ -1186,7 +1187,7 @@ namespace TableBase {
         return *(sympat + 3 * sym);
     }
 
-    int TableBase::Probe_WDL(const Board& board, const BoardInfo& info, int* success) {
+    int TableBase::Probe_WDL(const Position& board, int* success) {
         *success = 1;
 
         TBEntry* ptr;
@@ -1235,14 +1236,14 @@ namespace TableBase {
             if (key != ptr->key) {
                 cmirror = 8;
                 mirror = 0x38;
-                bside = (info.m_WhiteMove);
+                bside = (board.m_WhiteMove);
             } else {
                 cmirror = mirror = 0;
-                bside = !(info.m_WhiteMove);
+                bside = !(board.m_WhiteMove);
             }
         } else {
-            cmirror = info.m_WhiteMove ? 0 : 8;
-            mirror = info.m_WhiteMove ? 0 : 0x38;
+            cmirror = board.m_WhiteMove ? 0 : 8;
+            mirror = board.m_WhiteMove ? 0 : 0x38;
             bside = 0;
         }
 
@@ -1283,9 +1284,9 @@ namespace TableBase {
         return ((int)res) - 2;
     }
 
-    int TableBase::Probe_DTZ(const Board& board, const BoardInfo& info, int* success) {
+    int TableBase::Probe_DTZ(const Position& board, int* success) {
         // Probe WDL first
-        int wdl = Probe_WDL(board, info, success);
+        int wdl = Probe_WDL(board, success);
         if (*success == 0) return 0;
 
         if (wdl == 0) return 0;
@@ -1337,14 +1338,14 @@ namespace TableBase {
             if (key != ptr->key) {
                 cmirror = 8;
                 mirror = 0x38;
-                bside = (info.m_WhiteMove);
+                bside = (board.m_WhiteMove);
             } else {
                 cmirror = mirror = 0;
-                bside = !(info.m_WhiteMove);
+                bside = !(board.m_WhiteMove);
             }
         } else {
-            cmirror = info.m_WhiteMove ? 0 : 8;
-            mirror = info.m_WhiteMove ? 0 : 0x38;
+            cmirror = board.m_WhiteMove ? 0 : 8;
+            mirror = board.m_WhiteMove ? 0 : 0x38;
             bside = 0;
         }
 

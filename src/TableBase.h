@@ -1,5 +1,5 @@
 #pragma once
-#include "board.h"
+#include "Position.h"
 
 
 
@@ -129,6 +129,6 @@ namespace TableBase {
 
 	void Init(std::string path);
 
-    int Probe_WDL(const Board& board, const BoardInfo& info, int* success);
-    int Probe_DTZ(const Board& board, const BoardInfo& info, int* success);
+    int Probe_WDL(const Position& board, int* success);
+    int Probe_DTZ(const Position& board, int* success);
 }

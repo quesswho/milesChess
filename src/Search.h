@@ -3,6 +3,7 @@
 #include "Transposition.h"
 #include "Evaluate.h"
 #include "TableBase.h"
+#include "Position.h"
 
 #include <unordered_map>
 #include <algorithm>
@@ -35,6 +36,7 @@ public:
 	std::unique_ptr<Board> m_RootBoard;
     int64 m_MaxTime;
 private:
+    Position m_Position;
 	uint64 m_Hash[MAX_DEPTH];
     uint64 m_PawnHash[MAX_DEPTH];
     uint64 m_History[256];
@@ -78,6 +80,7 @@ public:
         m_PawnHash[0] = Zobrist_PawnHash(*m_RootBoard);
         m_Table->Clear();
         m_History[0] = m_Hash[0];
+        m_Position.SetPosition(fen);
 	}
 
 
@@ -86,25 +89,27 @@ public:
     static bool Move_Order(const Move& a, const Move& b) {
         int64 score_a = 0;
         int64 score_b = 0;
-        if ((int)a.m_Capture) score_a += 9 + Lookup::pieceValue[(int)a.m_Capture] - Lookup::pieceValue[(int)a.m_Type];
-        if ((int)b.m_Capture) score_b += 9 + Lookup::pieceValue[(int)b.m_Capture] - Lookup::pieceValue[(int)b.m_Type];
+        if ((int)CaptureType(a)) score_a += 9 + Lookup::pieceValue[(int)CaptureType(a)] - Lookup::pieceValue[(int)MovePieceType(a)];
+        if ((int)CaptureType(b)) score_b += 9 + Lookup::pieceValue[(int)CaptureType(b)] - Lookup::pieceValue[(int)MovePieceType(b)];
 
         return score_a > score_b;
     }
 
     template<Color white>
-	uint64 Perft_r(const Board& board, int depth) {
+	uint64 Perft_r(Position& pos, int depth) {
         if (!m_Running) return 0;
-        assert("Hash is not matched!", Zobrist_Hash(board, m_Info[depth]) != m_Hash[depth]);
-		const std::vector<Move> moves = TGenerateMoves<white>(board, depth);
+        assert("Hash is not matched!", Zobrist_Hash(pos) != pos->m_Hash);
+		const std::vector<Move> moves = TGenerateMoves<white>(pos, depth);
 		if (depth == m_Maxdepth-1) return moves.size();
 		int64 result = 0;
 		for (const Move& move : moves) {
-			int64 count = Perft_r<!white>(MovePiece(board, move, depth + 1), depth + 1);
+            pos->MovePiece(move);
+			int64 count = Perft_r<!white>(pos, depth + 1);
 			result += count;
 			if (depth == 0) {
-                if(m_Running) sync_printf("%s: %llu: %s\n", move.toString().c_str(), count, BoardtoFen(MovePiece(board, move, depth + 1), m_Info[depth+1]).c_str());
+                if(m_Running) sync_printf("%s: %llu: %s\n", move.toString().c_str(), count, m_Position.toFen());
 			}
+            pos->UndoMove(move);
 		}
 		return result;
 	}
@@ -114,7 +119,7 @@ public:
         m_Maxdepth = maxdepth;
 		Timer time;
 		time.Start();
-        uint64 result = m_Info[0].m_WhiteMove ? Perft_r<WHITE>(*m_RootBoard, 0) : Perft_r<BLACK>(*m_RootBoard, 0);
+        uint64 result = m_Position.m_WhiteMove ? Perft_r<WHITE>(m_Position, 0) : Perft_r<BLACK>(m_Position, 0);
 		float t = time.End();
         if(m_Running) sync_printf("%llu\n%.3fMNodes/s\n", result, (result / 1000000.0f) / t);
         m_Running = false;
@@ -127,9 +132,9 @@ public:
         *pv = Move();
     }
 
-    int64 Quiesce(const Board& board, int64 alpha, int64 beta, int ply, int depth) {
+    int64 Quiesce(Position& board, int64 alpha, int64 beta, int ply, int depth) {
         m_NodeCnt++;
-        int64 bestScore = Evaluate(board, m_PawnTable, m_PawnHash[ply], m_Info[ply].m_WhiteMove);
+        int64 bestScore = Evaluate(board, m_PawnTable);
         if (bestScore >= beta) { // Return if we fail soft
             return bestScore;
         }
@@ -170,10 +175,12 @@ public:
             });
         }
 
-        Move bestMove;
+        Move bestMove = 0;
         for (const Move& move : moves) {
-            if (move.m_Capture == MoveType::NONE) continue; // Only analyze capturing moves
-            int64 score = -Quiesce(MovePiece(board, move, ply + 1), -beta, -alpha, ply + 1, depth - 1);
+            if (CaptureType(move) == ColoredPieceType::NOPIECE) continue; // Only analyze capturing moves
+            board.MovePiece(move);
+            int64 score = -Quiesce(board, -beta, -alpha, ply + 1, depth - 1);
+            board.UndoMove(move);
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = move;
@@ -185,7 +192,7 @@ public:
                 break;
             }
         }
-        if (bestMove.m_Type != MoveType::NONE) {
+        if (bestMove != 0) {
             if (bestScore >= beta) {
                 m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, LOWER_BOUND, ply, depth, m_Info[ply].m_FullMoves));
             } else {
@@ -196,7 +203,7 @@ public:
         return bestScore;
     }
 
-	int64 AlphaBeta(const Board& board, MoveStack* stack, int64 alpha, int64 beta, int ply, int depth) {
+	int64 AlphaBeta(Position& board, MoveStack* stack, int64 alpha, int64 beta, int ply, int depth) {
         m_NodeCnt++;
         if (!m_Running || m_Timer.EndMs() >= m_MaxTime) return 0;
 
@@ -217,7 +224,7 @@ public:
 
         // Probe the tablebase
         int success;
-        int v = TableBase::Probe_DTZ(board, m_Info[ply], &success);
+        int v = TableBase::Probe_DTZ(board, &success);
         if (success) {
             return Signum(v) * (MATE_SCORE-v);
         }
@@ -273,7 +280,7 @@ public:
             int delta = beta - alpha;
             if (inCheck && ply < MAX_DEPTH) extension++;
 
-            if (ply >= 4 && move.m_Capture == MoveType::NONE && !inCheck) {
+            if (ply >= 4 && CaptureType(move) == ColoredPieceType::NOPIECE && !inCheck) {
                 int reduction = (1500 - delta * 800 / m_RootDelta) / 1024 * std::log(ply);
                 // If we are on pv node then decrease reduction
                 if (*stack->m_PV != Move()) reduction -= 1;
@@ -286,8 +293,9 @@ public:
             }
 
             newdepth += extension;
-            
-			int64 score = -AlphaBeta(MovePiece(board, move, ply + 1), stack+1, -beta, -alpha, ply + 1, newdepth);
+            board.MovePiece(move); // Need to fix eventually
+			int64 score = -AlphaBeta(board, stack+1, -beta, -alpha, ply + 1, newdepth);
+            board.UndoMove(move);
 			if (score > bestScore) {
 				bestScore = score;
                 bestMove = move;
@@ -347,7 +355,7 @@ public:
         }
 
         // Move the moves into rootmoves
-        std::vector<Move> generatedMoves = GenerateMoves(*m_RootBoard, 0);
+        std::vector<Move> generatedMoves = GenerateMoves(m_Position, 0);
         m_RootMoves.clear();
         m_RootMoves.reserve(generatedMoves.size());  // Reserve space for efficiency
 
@@ -392,7 +400,9 @@ public:
                 bestScore = -MATE_SCORE;
                 std::stable_sort(m_RootMoves.begin(), m_RootMoves.end());
                 for (RootMove& move : m_RootMoves) {
-                    int64 score = -AlphaBeta(MovePiece(*m_RootBoard, move.move, 1), stack+1, -beta, -alpha, 1, std::max(1, m_Maxdepth - failHigh));
+                    m_Position.MovePiece(move.move);
+                    int64 score = -AlphaBeta(m_Position, stack+1, -beta, -alpha, 1, std::max(1, m_Maxdepth - failHigh));
+                    m_Position.UndoMove(move.move);
                     assert("Evaluation is unreasonably big\n", score >= 72057594);
                     if (score > bestScore) {
                         bestScore = score;
@@ -448,7 +458,7 @@ public:
         delete[] stack;
     }
 
-	Board MovePiece(const Board& board, const Move& move, int ply) {
+	Board MovePiece(const Board& board, const MoveData& move, int ply) {
 		const BitBoard re = ~move.m_To;
 		const BitBoard swp = move.m_From | move.m_To;
 		const Color white = m_Info[ply-1].m_WhiteMove;
@@ -723,7 +733,7 @@ public:
         m_History[m_Info[ply].m_HalfMoves] = m_Hash[ply];
 	}
 
-    void MoveRootPiece(const Move& move) {
+    void MoveRootPiece(const MoveData& move) {
         const BitBoard re = ~move.m_To;
         const BitBoard swp = move.m_From | move.m_To;
         const Color white = m_Info[0].m_WhiteMove;
@@ -870,12 +880,12 @@ public:
         m_History[m_Info[0].m_HalfMoves] = m_Hash[0];
     }
 
-    BitBoard Check(Color white, const Board& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) const {
+    BitBoard Check(Color white, const Position& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) const {
         return white ? TCheck<WHITE>(board, danger, active, rookPin, bishopPin, enPassant) : TCheck <BLACK>(board, danger, active, rookPin, bishopPin, enPassant);
     }
 
     template<Color white>
-    BitBoard TCheck(const Board& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) const {
+    BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) const {
         constexpr Color enemy = !white;
 
         int kingsq = GET_SQUARE(King<white>(board));
@@ -976,14 +986,14 @@ public:
         return enPassantCheck;
    }
 
-   inline std::vector<Move> GenerateMoves(const Board& board, int depth) {
-       return m_Info[depth].m_WhiteMove ? TGenerateMoves<WHITE>(board, depth) : TGenerateMoves<BLACK>(board, depth);
+   inline std::vector<Move> GenerateMoves(const Position& board, int depth) {
+       return board.m_WhiteMove ? TGenerateMoves<WHITE>(board, depth) : TGenerateMoves<BLACK>(board, depth);
    }
 
     template<Color white>
-    std::vector<Move> TGenerateMoves(const Board& board, int depth) {
+    std::vector<Move> TGenerateMoves(const Position& board, int depth) {
         std::vector<Move> result;
-        result.reserve(64); // Pre allocation increases perft by almost 3x
+        result.reserve(64); // Pre allocation increases perft speed by almost 3x
 
         constexpr Color enemy = !white;
         BitBoard danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[depth].m_EnPassant;
@@ -1007,8 +1017,8 @@ public:
         FPawns = FPawns & (~pinnedFPawns | movePinFPawns);
         F2Pawns = F2Pawns & (~pinnedF2Pawns | movePinF2Pawns);
 
-        for (; const BitBoard bit = PopBit(F2Pawns); F2Pawns > 0) { // Loop each bit
-            result.push_back({ Pawn2Forward<enemy>(bit), bit, MoveType::PAWN2 });
+        for (; const BoardPos pos = PopPos(F2Pawns); F2Pawns > 0) { // Loop each bit
+            result.push_back(BuildMove(PawnPos2Forward<enemy>(pos), pos, GetColoredPiece<white, PAWN>()));
         }
 
         const BitBoard nonRookPawns = pawns & ~rookPin;
@@ -1031,42 +1041,42 @@ public:
             LPawns = LPawns & ~FirstRank<enemy>();
 
             // Add Forward pawns
-            for (; const uint64 bit = PopBit(FPromote); FPromote > 0) {
-                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_KNIGHT });
-                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_BISHOP });
-                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_ROOK });
-                result.push_back({ PawnForward<enemy>(bit), bit, MoveType::P_QUEEN });
+            for (; const BoardPos pos = PopPos(FPromote); FPromote > 0) {
+                result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), NONE, 0b000100 ));
+                result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), NONE, 0b001000 ));
+                result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), NONE, 0b010000 ));
+                result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), NONE, 0b100000 ));
             }
 
-            for (; BitBoard bit = PopBit(RPromote); RPromote > 0) { // Loop each bit
-                const MoveType capture = GetCaptureType<enemy>(board, bit);
-                result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_KNIGHT, capture });
-                result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_BISHOP, capture });
-                result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_ROOK, capture });
-                result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::P_QUEEN, capture });
+            for (; const BoardPos pos = PopPos(RPromote); RPromote > 0) { // Loop each bit
+                const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << pos);
+                result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture, 0b000100));
+                result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture, 0b001000));
+                result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture, 0b010000));
+                result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture, 0b100000));
             }
 
-            for (; BitBoard bit = PopBit(LPromote); LPromote > 0) {
-                const MoveType capture = GetCaptureType<enemy>(board, bit);
-                result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_KNIGHT, capture });
-                result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_BISHOP, capture });
-                result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_ROOK, capture });
-                result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::P_QUEEN, capture });
+            for (; const BoardPos pos = PopPos(LPromote); LPromote > 0) {
+                const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << pos);
+                result.push_back(BuildMove(PawnPosRight<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture, 0b000100));
+                result.push_back(BuildMove(PawnPosRight<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture, 0b001000));
+                result.push_back(BuildMove(PawnPosRight<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture, 0b010000));
+                result.push_back(BuildMove(PawnPosRight<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture, 0b100000));
             }
         }
 
-        for (; const uint64 bit = PopBit(FPawns); FPawns > 0) {
-            result.push_back({ PawnForward<enemy>(bit), bit, MoveType::PAWN });
+        for (; const BoardPos pos = PopPos(FPawns); FPawns > 0) {
+            result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, GetColoredPiece<white, PAWN>()));
         }
 
-        for (; BitBoard bit = PopBit(RPawns); RPawns > 0) { // Loop each bit
-            const MoveType capture = GetCaptureType<enemy>(board, bit);
-            result.push_back({ PawnAttackLeft<enemy>(bit), bit, MoveType::PAWN, capture });
+        for (; const BoardPos pos = PopPos(RPawns); RPawns > 0) { // Loop each bit
+            const MoveType capture = GetCaptureType<enemy>(board, 1ull << pos);
+            result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture));
         }
 
-        for (; BitBoard bit = PopBit(LPawns); LPawns > 0) {
-            const MoveType capture = GetCaptureType<enemy>(board, bit);
-            result.push_back({ PawnAttackRight<enemy>(bit), bit, MoveType::PAWN, capture });
+        for (; const BoardPos pos = PopPos(LPawns); LPawns > 0) {
+            const MoveType capture = GetCaptureType<enemy>(board, 1ull << pos);
+            result.push_back(BuildMove(PawnPosRight<enemy>(pos), pos, GetColoredPiece<white, PAWN>(), capture));
         }
 
         // En passant
@@ -1217,12 +1227,12 @@ public:
         CAPTURE
     };
 
-    inline std::vector<Move> GenerateCaptureMoves(const Board& board, int depth) {
-        return m_Info[depth].m_WhiteMove ? TGenerateCaptureMoves<WHITE>(board, depth) : TGenerateCaptureMoves<BLACK>(board, depth);
+    inline std::vector<Move> GenerateCaptureMoves(const Position& board, int depth) {
+        return board.m_WhiteMove ? TGenerateCaptureMoves<WHITE>(board, depth) : TGenerateCaptureMoves<BLACK>(board, depth);
     }
 
     template<Color white>
-    std::vector<Move> TGenerateCaptureMoves(const Board& board, int depth) {
+    std::vector<Move> TGenerateCaptureMoves(const Position& board, int depth) {
         std::vector<Move> result;
         result.reserve(64); // Pre allocation
 
@@ -1585,7 +1595,7 @@ public:
     }
 
     template<Color white>
-    uint64 TDanger(const Board& board) {
+    uint64 TDanger(const Position& board) {
         constexpr Color enemy = !white;
 
         uint64 danger = PawnAttack<enemy>(board);
@@ -1614,33 +1624,33 @@ public:
     }
 
     template<Color enemy>
-    MoveType GetCaptureType(const Board& board, uint64 bit) {
+    ColoredPieceType GetCaptureType(const Position& board, uint64 bit) {
         if (Pawn<enemy>(board) & bit) {
-            return MoveType::PAWN;
+            return GetColoredPiece<enemy, PAWN>();
         } 
         else if (Knight<enemy>(board) & bit) {
-            return MoveType::KNIGHT;
+            return GetColoredPiece<enemy, KNIGHT>();
         }
         else if (Bishop<enemy>(board) & bit) {
-            return MoveType::BISHOP;
+            return GetColoredPiece<enemy, BISHOP>();
         }
         else if (Rook<enemy>(board) & bit) {
-            return MoveType::ROOK;
+            return GetColoredPiece<enemy, ROOK>();
         }
         else if (Queen<enemy>(board) & bit) {
-            return MoveType::QUEEN;
+            return GetColoredPiece<enemy, QUEEN>();
         }
         else {
-            return MoveType::NONE;
+            return GetColoredPiece<enemy, NONE>();
         }
     }
 
-    Move GetMove(std::string str) {
+    MoveData GetMove(std::string str) {
         return m_Info[0].m_WhiteMove ? TGetMove<WHITE>(str) : TGetMove<BLACK>(str);
     }
 
     template<Color white>
-    Move TGetMove(std::string str) {
+    MoveData TGetMove(std::string str) {
         
         const uint64 from = 1ull << ('h' - str[0] + (str[1] - '1') * 8);
         const int posTo = ('h' - str[2] + (str[3] - '1') * 8);
@@ -1700,7 +1710,7 @@ public:
         }
 
         assert("Could not read move", type == MoveType::NONE);
-        return Move(from, to, type);
+        return MoveData(from, to, type);
     }
 
     std::string GetFen() const {

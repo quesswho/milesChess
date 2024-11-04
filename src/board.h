@@ -82,28 +82,24 @@ static BoardInfo FenInfo(const std::string& FEN) {
     return info;
 }
 
-enum PieceType : int {
-    NONE = 0, PAWN = 1, KNIGHT = 2, BISHOP = 3, ROOK = 4, QUEEN = 5, KING = 6
-};
-
-enum class MoveType{ // Ordering is based on capture value
+enum class MoveType { // Ordering is based on capture value
     NONE, PAWN, PAWN2, EPASSANT, KNIGHT, BISHOP, ROOK, QUEEN, KING,
     KCASTLE, QCASTLE, P_KNIGHT, P_BISHOP, P_ROOK, P_QUEEN
 };
 
 
 
-struct Move {
+struct MoveData {
 
-    Move()
+    MoveData()
         : m_From(0), m_To(0), m_Type(MoveType::NONE), m_Capture(MoveType::NONE)
     {}
 
-    Move(uint64 from, uint64 to, MoveType movetype)
+    MoveData(uint64 from, uint64 to, MoveType movetype)
         : m_From(from), m_To(to), m_Type(movetype), m_Capture(MoveType::NONE)
     {}
 
-    Move(uint64 from, uint64 to, MoveType movetype, MoveType capture)
+    MoveData(uint64 from, uint64 to, MoveType movetype, MoveType capture)
         : m_From(from), m_To(to), m_Type(movetype), m_Capture(capture)
     {}
 
@@ -112,7 +108,7 @@ struct Move {
     MoveType m_Type;
     MoveType m_Capture;
 
-    bool operator==(const Move& other) const {
+    bool operator==(const MoveData& other) const {
         return m_From == other.m_From && m_To == other.m_To && m_Type == other.m_Type; // Capture should not be necessary
     }
 
