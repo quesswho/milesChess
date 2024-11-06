@@ -8,7 +8,7 @@
 #define CASTLE_BLACKQUEEN 0b1000
 
 struct IrreversibleState {
-    uint8 m_CastleRights; // 0: WhiteKing, 1: WhiteQueen, 2: BlackKing, 3: BlackQueen
+    uint8 m_CastleRights; // bitfield 0: WhiteKing, 1: WhiteQueen, 2: BlackKing, 3: BlackQueen
     uint8 m_HalfMoves;
     BitBoard m_EnPassant; // Todo: Maybe make this to position instead of bitboard to save bytes
     uint64 m_Hash; // Stored here for the sake of counting repetition
@@ -94,6 +94,8 @@ public:
 
     uint64_t RookXray(int pos, BitBoard occ) const;
     uint64_t BishopXray(int pos, BitBoard occ) const;
+
+    std::string ToFen() const;
 private:
     void SetState(const std::string& FEN);
 };

@@ -682,6 +682,133 @@ uint64 Zobrist_Hash(const Position& position) {
     return result;
 }
 
+std::string Position::ToFen() const {
+    std::string FEN;
+    FEN.reserve(27); // Shortest FEN could be: k7/8/8/8/8/8/8/7K w - - 0 1
+
+    // Board
+    int skip = 0; // Count number of empty positions in each rank
+    for (int i = 63; i >= 0; i--) {
+        uint64 pos = 1ull << i;
+
+        if (i % 8 == 7) {
+            if (skip > 0) {
+                FEN += (char)('0' + skip);
+                skip = 0;
+            }
+            if (i != 63) FEN += '/';
+        }
+
+        if (!(m_Board & pos)) {
+            skip++;
+            continue;
+        }
+        else if (skip > 0) {
+            FEN += (char)('0' + skip);
+            skip = 0;
+        }
+
+        if ((m_BlackPawn & pos) > 0) {
+            FEN += "p";
+            continue;
+        }
+        if ((m_BlackKnight & pos) > 0) {
+            FEN += "n";
+            continue;
+        }
+        if ((m_BlackBishop & pos) > 0) {
+            FEN += "b";
+            continue;
+        }
+        if ((m_BlackRook & pos) > 0) {
+            FEN += "r";
+            continue;
+        }
+        if ((m_BlackQueen & pos) > 0) {
+            FEN += "q";
+            continue;
+        }
+        if ((m_BlackKing & pos) > 0) {
+            FEN += "k";
+            continue;
+        }
+        if ((m_WhitePawn & pos) > 0) {
+            FEN += "P";
+            continue;
+        }
+        if ((m_WhiteKnight & pos) > 0) {
+            FEN += "N";
+            continue;
+        }
+        if ((m_WhiteBishop & pos) > 0) {
+            FEN += "B";
+            continue;
+        }
+        if ((m_WhiteRook & pos) > 0) {
+            FEN += "R";
+            continue;
+        }
+        if ((m_WhiteQueen & pos) > 0) {
+            FEN += "Q";
+            continue;
+        }
+        if ((m_WhiteKing & pos) > 0) {
+            FEN += "K";
+            continue;
+        }
+    }
+
+    if (skip > 0) {
+        FEN += (char)('0' + skip);
+        skip = 0;
+    }
+    
+
+    if (m_WhiteMove) {
+        FEN += " w ";
+    }
+    else {
+        FEN += " b ";
+    }
+
+    // Castle rights
+    uint8 castling = m_States[m_Ply].m_CastleRights;
+    if (castling & 0b1) {
+        FEN += "K";
+    }
+    if (castling & 0b10) {
+        FEN += "Q";
+    }
+    if (castling & 0b100) {
+        FEN += "k";
+    }
+    if (castling & 0b1000) {
+        FEN += "q";
+    }
+    if (!castling) {
+        FEN += '-';
+    }
+
+    FEN += ' ';
+    if (m_States[m_Ply].m_EnPassant > 0) {
+        char pos = 'h' - ((int)(log2(m_States[m_Ply].m_EnPassant)) % 8);
+        if (m_WhiteMove) {
+            FEN += pos + std::to_string(6);
+        }
+        else {
+            FEN += pos + std::to_string(3);
+        }
+    }
+    else {
+        FEN += '-';
+    }
+
+    FEN += ' ' + std::to_string(m_States[m_Ply].m_HalfMoves);
+    FEN += ' ' + std::to_string(m_FullMoves);
+
+    return FEN;
+}
+
 static uint64 Zobrist_PawnHash(const Position& position) {
     uint64 result = 0;
 
