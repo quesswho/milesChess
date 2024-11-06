@@ -877,7 +877,7 @@ public:
         }
     }
 
-    MoveData GetMove(std::string str) {
+    Move GetMove(std::string str) {
         return m_Position.m_WhiteMove ? TGetMove<WHITE>(str) : TGetMove<BLACK>(str);
     }
 
