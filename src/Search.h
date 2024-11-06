@@ -101,7 +101,7 @@ public:
 			int64 count = Perft_r<!white>(pos, depth + 1);
 			result += count;
 			if (depth == 0) {
-                if(m_Running) sync_printf("%s: %llu: %s\n", MoveToString(move).c_str(), count, m_Position.ToFen());
+                if(m_Running) sync_printf("%s: %llu: %s\n", MoveToString(move).c_str(), count, m_Position.ToFen().c_str());
 			}
             pos.UndoMove(move);
 		}
@@ -568,7 +568,7 @@ public:
         result.reserve(64); // Pre allocation increases perft speed by almost 3x
 
         constexpr Color enemy = !white;
-        BitBoard danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Info[depth].m_EnPassant;
+        BitBoard danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = board.m_States[board.m_Ply].m_EnPassant;
         BitBoard enPassantCheck = TCheck<white>(board, danger, active, rookPin, bishopPin, enPassant);
         BitBoard moveable = ~Player<white>(board) & active;
 
@@ -811,18 +811,18 @@ public:
     template<Color white>
     inline int64 CastleKing(uint64 danger, uint64 board, uint64 rooks, int depth) const {
         if constexpr (white) {
-            return((m_Info[depth].m_WhiteCastleKing && (board & 0b110) == 0 && (danger & 0b1110) == 0) && (rooks & 0b1) > 0) * (1ull << 1);
+            return (((m_Position.m_States[m_Position.m_Ply].m_CastleRights & 1) && (board & 0b110) == 0 && (danger & 0b1110) == 0) && (rooks & 0b1) > 0) * (1ull << 1);
         } else {
-            return (m_Info[depth].m_BlackCastleKing && ((board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0) && (rooks & 0b1ull << 56) > 0) * (1ull << 57);
+            return ((m_Position.m_States[m_Position.m_Ply].m_CastleRights & 0b100) && ((board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0) && (rooks & 0b1ull << 56) > 0) * (1ull << 57);
         }
     }
     
     template<Color white>
     inline int64 CastleQueen(uint64 danger, uint64 board, uint64 rooks, int depth) const {
         if constexpr (white) {
-            return ((m_Info[depth].m_WhiteCastleQueen && (board & 0b01110000) == 0 && (danger & 0b00111000) == 0) && (rooks & 0b10000000) > 0) * (1ull << 5);
+            return (((m_Position.m_States[m_Position.m_Ply].m_CastleRights & 0b10) && (board & 0b01110000) == 0 && (danger & 0b00111000) == 0) && (rooks & 0b10000000) > 0) * (1ull << 5);
         } else {
-            return (m_Info[depth].m_BlackCastleQueen && ((board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0) && (rooks & (0b10000000ull << 56)) > 0) * (1ull << 61);
+            return ((m_Position.m_States[m_Position.m_Ply].m_CastleRights & 0b1000) && ((board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0) && (rooks & (0b10000000ull << 56)) > 0) * (1ull << 61);
         }
     }
 
@@ -877,72 +877,71 @@ public:
         }
     }
 
-    MoveData GetMove(std::string str) {
+    Move GetMove(std::string str) {
         return m_Position.m_WhiteMove ? TGetMove<WHITE>(str) : TGetMove<BLACK>(str);
     }
 
     template<Color white>
-    MoveData TGetMove(std::string str) {
+    Move TGetMove(std::string str) {
         
-        const uint64 from = 1ull << ('h' - str[0] + (str[1] - '1') * 8);
-        const int posTo = ('h' - str[2] + (str[3] - '1') * 8);
-        const uint64 to = 1ull << posTo;
+        const BoardPos fromPos = ('h' - str[0] + (str[1] - '1') * 8);
+        const BitBoard from = 1ull << fromPos;
+        const BoardPos toPos = ('h' - str[2] + (str[3] - '1') * 8);
+        const BitBoard to = 1ull << toPos;
 
-        MoveType type = MoveType::NONE;
+        uint8 flags = 0;
+
+        ColoredPieceType type = NOPIECE;
         if (str.size() > 4) {
             switch (str[4]) {
             case 'k':
-                type = MoveType::P_KNIGHT;
+                flags |= 0b100;
                 break;
             case 'b':
-                type = MoveType::P_BISHOP;
+                flags |= 0b1000;
                 break;
             case 'r':
-                type = MoveType::P_ROOK;
+                flags |= 0b10000;
                 break;
             case 'q':
-                type = MoveType::P_QUEEN;
+                flags |= 0b100000;
                 break;
             }
         }
-        else {
-            if (Pawn<white>(m_Position) & from) {
-                if (Pawn2Forward<white>(Pawn<white>(m_Position) & from) == to) {
-                    type = MoveType::PAWN2;
-                }
-                else if (m_Position.m_States[0].m_EnPassant & to) {
-                    type = MoveType::EPASSANT;
-                }
-                else {
-                    type = MoveType::PAWN;
-                }
-            }
-            else if (Knight<white>(m_Position) & from) {
-                type = MoveType::KNIGHT;
-            }
-            else if (Bishop<white>(m_Position) & from) {
-                type = MoveType::BISHOP;
-            }
-            else if (Rook<white>(m_Position) & from) {
-                type = MoveType::ROOK;
-            }
-            else if (Queen<white>(m_Position) & from) {
-                type = MoveType::QUEEN;
-            }
-            else if (King<white>(m_Position) & from) {
-                uint64 danger = TDanger<white>(m_Position);
-                if (((from & 0b1000) && (to & 0b10)) || ((from & (0b1000ull << 56)) && (to & (0b10ull << 56)))) {
-                    type = MoveType::KCASTLE;
-                } else if (((from & 0b1000) && (to & 0b100000)) || ((from & (0b1000ull << 56)) && (to & (0b100000ull << 56)))) {
-                    type = MoveType::QCASTLE;
-                } else {
-                    type = MoveType::KING;
-                }
+        if (Pawn<white>(m_Position) & from) {
+            type = GetColoredPiece<white>(PAWN);
+            if (m_Position.m_States[m_Position.m_Ply].m_EnPassant & to) {
+                flags |= 0b1;
             }
         }
+        else if (Knight<white>(m_Position) & from) {
+            type = GetColoredPiece<white>(KNIGHT);
+        }
+        else if (Bishop<white>(m_Position) & from) {
+            type = GetColoredPiece<white>(BISHOP);
+        }
+        else if (Rook<white>(m_Position) & from) {
+            type = GetColoredPiece<white>(ROOK);
+        }
+        else if (Queen<white>(m_Position) & from) {
+            type = GetColoredPiece<white>(QUEEN);
+        }
+        else if (King<white>(m_Position) & from) {
+            type = GetColoredPiece<white>(KING);
+            if (((from & 0b1000) && (to & 0b10)) 
+                || ((from & (0b1000ull << 56)) && (to & (0b10ull << 56)))
+                || ((from & 0b1000) && (to & 0b100000)) 
+                || ((from & (0b1000ull << 56)) && (to & (0b100000ull << 56)))) {
+
+                flags |= 0b10;
+            } 
+        }
+
+        const ColoredPieceType capture = GetCaptureType<!white>(m_Position, 1ull << toPos);
+        
 
         assert("Could not read move", type == MoveType::NONE);
-        return MoveData(from, to, type);
+        return fromPos | toPos << 6 | type << 12 | capture << 16 | flags << 20;
     }
 
     std::string GetFen() const {
