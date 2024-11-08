@@ -35,9 +35,9 @@ public:
     int64 m_MaxTime;
     Position m_Position;
 private:
-	uint64 m_Hash[MAX_DEPTH];
-    uint64 m_PawnHash[MAX_DEPTH];
-    uint64 m_History[256];
+	//uint64 m_Hash[MAX_DEPTH];
+    //uint64 m_PawnHash[MAX_DEPTH];
+    //uint64 m_History[256];
     std::vector<std::unique_ptr<std::thread>> m_Threads;
     bool m_Running;
     Timer m_Timer;
@@ -73,7 +73,6 @@ public:
 
 	void LoadPosition(std::string fen) {
         m_Table->Clear();
-        m_History[0] = m_Hash[0];
         m_Position.SetPosition(fen);
 	}
 
@@ -137,7 +136,7 @@ public:
         }
 
         // Probe Transposition table
-        TTEntry* entry = m_Table->Probe(m_Hash[ply]);
+        TTEntry* entry = m_Table->Probe(board.m_Hash);
         if (entry != nullptr) {
             if (entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
                 return entry->m_Value;
@@ -188,9 +187,9 @@ public:
         }
         if (bestMove != 0) {
             if (bestScore >= beta) {
-                m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, LOWER_BOUND, ply, depth, board.m_FullMoves));
+                m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, ply, depth, board.m_FullMoves));
             } else {
-                m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, UPPER_BOUND, ply, depth, board.m_FullMoves));
+                m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, UPPER_BOUND, ply, depth, board.m_FullMoves));
             }
         }
 
@@ -231,8 +230,8 @@ public:
 
         // We count any repetion as draw
         // TODO: Maybe employ hashing to make this O(1) instead of O(n)
-        for (int i = 0; i < board.m_States[ply].m_HalfMoves; i++) {
-            if (m_History[i] == m_Hash[ply]) {
+        for (int i = 0; i < board.m_States[ply].m_HalfMoves && i < board.m_Ply; i++) {
+            if (board.m_States[i].m_Hash == board.m_Hash) {
                 return 0;
             }
         }
@@ -303,9 +302,9 @@ public:
 			}
 		}
         if (bestScore >= beta) {
-            m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, LOWER_BOUND, ply, depth, board.m_FullMoves));
+            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, ply, depth, board.m_FullMoves));
         } else {
-            m_Table->Enter(m_Hash[ply], TTEntry(m_Hash[ply], bestMove, bestScore, UPPER_BOUND, ply, depth, board.m_FullMoves));
+            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, UPPER_BOUND, ply, depth, board.m_FullMoves));
         }
 
 		return bestScore;
@@ -382,7 +381,7 @@ public:
             m_Maxdepth++;
             if (m_RootMoves.size() == 1) break;
 
-            TTEntry* entry = m_Table->Probe(m_Hash[0]);
+            TTEntry* entry = m_Table->Probe(m_Position.m_Hash);
             if (entry != nullptr) {
                 rootAlpha = entry->m_Value - m_RootDelta;
                 rootBeta = entry->m_Value + m_RootDelta;
@@ -439,9 +438,9 @@ public:
             finalMove = bestMove;
             
             if (bestScore >= beta) {
-                m_Table->Enter(m_Hash[0], TTEntry(m_Hash[0], bestMove, bestScore, LOWER_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));
+                m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore, LOWER_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));
             } else {
-                m_Table->Enter(m_Hash[0], TTEntry(m_Hash[0], bestMove, bestScore, UPPER_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));
+                m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore, UPPER_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));
             }
 
             
