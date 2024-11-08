@@ -4,12 +4,57 @@
 
 #define TEMPO 20
 
+
+template<Color white>
+static Score Pawn(const Position& board, int pos, int rpos) {
+    const int64 pawnBaseVal = 100;
+
+    int middlegame = pawnBaseVal + Lookup::pawn_table[pos];
+    int endgame = pawnBaseVal + Lookup::eg_pawn_table[pos];
+    if ((Lookup::pawn_passed<white>(rpos) & Pawn<!white>(board)) == 0) { // pawn is passed
+        int64 bit = 1ull << rpos;
+        if ((PawnAttackRight<white>(bit) & Pawn<white>(board)) || (PawnAttackLeft<white>(bit) & Pawn<white>(board))) { // If passed pawn is defended too
+            endgame += Lookup::passed_pawn_table[pos] * 1.3;
+            middlegame += 20 * 1.3;
+        } else {
+            endgame += Lookup::passed_pawn_table[pos];
+            middlegame += 20;
+        }
+    }
+    if ((Lookup::pawn_forward<white>(pos) & Pawn<white>(board)) != 0) { // if doubled
+        endgame -= 50;
+        middlegame -= 15;
+    }
+    if ((Lookup::isolated_mask[pos] & Pawn<white>(board)) == 0) {
+        middlegame -= 3;
+        endgame -= 15;
+    }
+    return Score({ middlegame, endgame });
+}
+
+static Score Pawns(const Position& board) {
+    uint64 wp = board.m_WhitePawn, bp = board.m_BlackPawn;
+    Score score = { 0, 0 };
+
+
+    while (wp > 0) {
+        int rpos = PopPos(wp);
+        score += Pawn<WHITE>(board, 63 - rpos, rpos);
+    }
+
+    while (bp > 0) {
+        int pos = PopPos(bp);
+        score -= Pawn<BLACK>(board, pos, pos);
+    }
+    return score;
+}
+
 // Relative static evaluation
-static int64 Evaluate(const Board& board, bool white) {
+static int64 Evaluate(const Position& board, PawnTable* table) {
 
     int64 middlegame = 0, endgame = 0, result = 0;
-
-    uint64 wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
+    Score score = { 0, 0 };
+    BitBoard wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
         bp = board.m_BlackPawn, bkn = board.m_BlackKnight, bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
 
     const int64 pawnVal = 100, knightVal = 350, bishopVal = 350, rookVal = 525, queenVal = 1000, kingVal = 10000;
@@ -20,50 +65,30 @@ static int64 Evaluate(const Board& board, bool white) {
 
     int whiteAttack = 0, blackAttack = 0;
 
-    middlegame += white ? TEMPO : -TEMPO;
+    middlegame += board.m_WhiteMove ? TEMPO : -TEMPO;
+
+    // Calculate material imbalance
+    for (int i = PieceType::PAWN; i < PieceType::QUEEN; i++) {
+        for (int j = PieceType::PAWN; j < i; j++) {
+            // TODO: separate imbalance factor for mg and eg
+            middlegame += Lookup::imbalance_factor[i-1][j-1]*(COUNT_BIT(board.m_Pieces[i][0]) * COUNT_BIT(board.m_Pieces[j][0])
+                - COUNT_BIT(board.m_Pieces[i][1])* COUNT_BIT(board.m_Pieces[j][1]));
+            endgame += Lookup::imbalance_factor[i][j] * (COUNT_BIT(board.m_Pieces[i][0]) * COUNT_BIT(board.m_Pieces[j][0])
+                - COUNT_BIT(board.m_Pieces[i][1]) * COUNT_BIT(board.m_Pieces[j][1]));
+        }
+    }
+
 
     // Pawns
-    while (wp > 0) {
-        int rpos = PopPos(wp);
-        int pos = 63 - rpos;
-        middlegame += pawnVal + Lookup::pawn_table[pos];
-        endgame += pawnVal + Lookup::eg_pawn_table[pos];
-        if ((Lookup::white_passed[rpos] & board.m_BlackPawn) == 0) { // pawn is passed
-            int64 bit = 1ull << rpos;
-            if ((PawnAttackRight<false>(bit) & board.m_WhitePawn) || (PawnAttackLeft<false>(bit) & board.m_WhitePawn)) { // If passed pawn is defended too
-                endgame += Lookup::passed_pawn_table[pos] * 1.3;
-                middlegame += 20 * 1.3;
-            } else {
-                endgame += Lookup::passed_pawn_table[pos];
-                middlegame += 20;
-            }
-        }
-        if ((Lookup::white_forward[pos] & board.m_WhitePawn) != 0) { // if doubled
-            endgame -= 20;
-            middlegame -= 10;
-        }
-    }
 
-    while (bp > 0) {
-        int pos = PopPos(bp);
-        middlegame -= pawnVal + Lookup::pawn_table[pos];
-        endgame -= pawnVal + Lookup::eg_pawn_table[pos];
-        if ((Lookup::black_passed[pos] & board.m_WhitePawn) == 0) { // pawn is passed
-            int64 bit = 1ull << pos;
-            if ((PawnAttackRight<true>(bit) & board.m_BlackPawn) || (PawnAttackLeft<true>(bit) & board.m_BlackPawn)) { // If passed pawn is defended too
-                endgame -= Lookup::passed_pawn_table[pos] * 1.3;
-                middlegame -= 20 * 1.3;
-            } else {
-                endgame -= Lookup::passed_pawn_table[pos];
-                middlegame -= 20;
-            }
-        }
-        if ((Lookup::black_forward[pos] & board.m_BlackPawn) != 0) { // if doubled
-            endgame -= 20;
-            middlegame -= 10;
-        }
+    PTEntry* pawnStructure = table->Probe(board.m_PawnHash);
+    if (pawnStructure != nullptr) {
+        score += pawnStructure->m_Score;
+    } else {
+        Score pawn = Pawns(board);
+        table->Enter(board.m_PawnHash, PTEntry(board.m_PawnHash, pawn));
     }
-
+    
     // Knights
     int wkncnt = 0;
     while (wkn > 0) {
@@ -105,7 +130,7 @@ static int64 Evaluate(const Board& board, bool white) {
         int pos = 63 - rpos;
         middlegame += bishopVal + Lookup::bishop_table[pos];
         endgame += bishopVal + Lookup::bishop_table[pos];
-        uint64 bish_atk = board.BishopAttack(rpos, board.m_Board);
+        BitBoard bish_atk = board.BishopAttack(rpos, board.m_Board);
         if (uint64 temp = Lookup::b_king_safety[blackking] & bish_atk) {
             whiteAttack += 2 * COUNT_BIT(temp);
         }
@@ -122,7 +147,7 @@ static int64 Evaluate(const Board& board, bool white) {
         int pos = PopPos(bb);
         middlegame -= bishopVal + Lookup::bishop_table[pos];
         endgame -= bishopVal + Lookup::bishop_table[pos];
-        uint64 bish_atk = board.BishopAttack(pos, board.m_Board);
+        BitBoard bish_atk = board.BishopAttack(pos, board.m_Board);
         if (uint64 temp = Lookup::w_king_safety[whiteking] & bish_atk) {
             blackAttack += 2 * COUNT_BIT(temp);
         }
@@ -141,7 +166,7 @@ static int64 Evaluate(const Board& board, bool white) {
         int pos = 63 - rpos;
         middlegame += rookVal + Lookup::rook_table[pos];
         endgame += rookVal + Lookup::eg_rook_table[pos];
-        uint64 rook_atk = board.RookAttack(rpos, board.m_Board);
+        BitBoard rook_atk = board.RookAttack(rpos, board.m_Board);
         if (uint64 temp = Lookup::b_king_safety[blackking] & rook_atk) {
             whiteAttack += 3 * COUNT_BIT(temp);
         }
@@ -158,7 +183,7 @@ static int64 Evaluate(const Board& board, bool white) {
         int pos = PopPos(br);
         middlegame -= rookVal + Lookup::rook_table[pos];
         endgame -= rookVal + Lookup::eg_rook_table[pos];
-        uint64 rook_atk = board.RookAttack(pos, board.m_Board);
+        BitBoard rook_atk = board.RookAttack(pos, board.m_Board);
         if (uint64 temp = Lookup::w_king_safety[whiteking] & rook_atk) {
             blackAttack += 3 * COUNT_BIT(temp);
         }
@@ -176,7 +201,7 @@ static int64 Evaluate(const Board& board, bool white) {
         int pos = 63 - rpos;
         middlegame += queenVal + Lookup::queen_table[pos];
         endgame += queenVal + Lookup::eg_queen_table[pos];
-        uint64 queen_atk = board.QueenAttack(rpos, board.m_Board);
+        BitBoard queen_atk = board.QueenAttack(rpos, board.m_Board);
         if (uint64 temp = Lookup::b_king_safety[blackking] & queen_atk) {
             whiteAttack += 5 * COUNT_BIT(temp);
         }
@@ -195,7 +220,7 @@ static int64 Evaluate(const Board& board, bool white) {
         middlegame -= queenVal + Lookup::queen_table[pos];
         endgame -= queenVal + Lookup::eg_queen_table[pos];
         phase -= 4;
-        uint64 queen_atk = board.QueenAttack(pos, board.m_Board);
+        BitBoard queen_atk = board.QueenAttack(pos, board.m_Board);
         if (uint64 temp = Lookup::king_attacks[whiteking] & queen_atk) {
             blackAttack += 5 * COUNT_BIT(temp);
         }
@@ -220,7 +245,10 @@ static int64 Evaluate(const Board& board, bool white) {
         endgame -= kingVal + Lookup::eg_king_table[blackking];
     }
 
+    middlegame += score.mg;
+    endgame += score.eg;
+
     phase = (phase * 256) / 16;
     result += (middlegame * (256 - phase) + endgame * phase) / 256;
-    return white ? result : -result;
+    return board.m_WhiteMove ? result : -result;
 }

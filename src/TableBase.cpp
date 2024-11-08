@@ -4,6 +4,7 @@
 */
 
 #include "TableBase.h"
+#include "LookupTables.h"
 
 #include <windows.h>
 
@@ -31,7 +32,7 @@ namespace TableBase {
 
     // Given a position return the table base string such as KQPvKRP
 
-    static void TB_Str(const Board& board, char* str, bool mirror) {
+    static void TB_Str(const Position& board, char* str, bool mirror) {
         bool color = mirror;
         int pt;
         int i;
@@ -51,7 +52,7 @@ namespace TableBase {
         *str++ = 0;
     }
 
-    static uint64 Material_Key(const Board& board) {
+    static uint64 Material_Key(const Position& board) {
         const uint8_t wp = COUNT_BIT(board.m_WhitePawn), wkn = COUNT_BIT(board.m_WhiteKnight), wb = COUNT_BIT(board.m_WhiteBishop), wr = COUNT_BIT(board.m_WhiteRook), wq = COUNT_BIT(board.m_WhiteQueen), wk = COUNT_BIT(board.m_WhiteKing),
             bp = COUNT_BIT(board.m_BlackPawn), bkn = COUNT_BIT(board.m_BlackKnight), bb = COUNT_BIT(board.m_BlackBishop), br = COUNT_BIT(board.m_BlackRook), bq = COUNT_BIT(board.m_BlackQueen), bk = COUNT_BIT(board.m_BlackKing);
         
@@ -94,7 +95,7 @@ namespace TableBase {
         return key;
     }
 
-    static uint64 Material_Key(const Board& board, bool mirror) {
+    static uint64 Material_Key(const Position& board, bool mirror) {
         bool color = mirror;
         int pt;
         int i;
@@ -310,17 +311,17 @@ namespace TableBase {
 
         int blocksize = data[1];
         int idxbits = data[2];
-        int real_num_blocks = *(uint*)(&data[4]);
+        int real_num_blocks = *(uint32*)(&data[4]);
         int num_blocks = real_num_blocks + *(ubyte*)(&data[3]);
         int max_len = data[8];
         int min_len = data[9];
         int h = max_len - min_len + 1;
         int num_syms = *(ushort*)(&data[10 + 2 * h]);
-        d = (struct PairsData*)malloc(sizeof(struct PairsData) + (h - 1) * sizeof(uint) + num_syms);
+        d = (struct PairsData*)malloc(sizeof(struct PairsData) + (h - 1) * sizeof(uint32) + num_syms);
         d->blocksize = blocksize;
         d->idxbits = idxbits;
         d->offset = (ushort*)(&data[10]);
-        d->symlen = ((ubyte*)d) + sizeof(struct PairsData) + (h - 1) * sizeof(uint);
+        d->symlen = ((ubyte*)d) + sizeof(struct PairsData) + (h - 1) * sizeof(uint32);
         d->sympat = &data[12 + 2 * h];
         d->min_len = min_len;
         *next = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
@@ -411,7 +412,7 @@ namespace TableBase {
         }
 
         ubyte* data = (ubyte*)entry->data;
-        if (((uint*)data)[0] != WDL_MAGIC) {
+        if (((uint32*)data)[0] != WDL_MAGIC) {
             printf("Corrupted table.\n");
             Unmap_TB(entry->data, entry->mapping);
             entry->data = 0;
@@ -520,7 +521,7 @@ namespace TableBase {
         if (!data)
             return 0;
 
-        if (((uint*)data)[0] != DTZ_MAGIC) {
+        if (((uint32*)data)[0] != DTZ_MAGIC) {
             printf("Corrupted table.\n");
             return 0;
         }
@@ -1127,9 +1128,9 @@ namespace TableBase {
         if (!d->idxbits)
             return d->min_len;
 
-        uint mainidx = idx >> d->idxbits;
+        uint32 mainidx = idx >> d->idxbits;
         int litidx = (idx & ((1 << d->idxbits) - 1)) - (1 << (d->idxbits - 1));
-        uint block = *(uint*)(d->indextable + 6 * mainidx);
+        uint32 block = *(uint32*)(d->indextable + 6 * mainidx);
         litidx += *(ushort*)(d->indextable + 6 * mainidx + 4);
         if (litidx < 0) {
             do {
@@ -1140,16 +1141,16 @@ namespace TableBase {
                 litidx -= d->sizetable[block++] + 1;
         }
 
-        uint* ptr = (uint*)(d->data + (block << d->blocksize));
+        uint32* ptr = (uint32*)(d->data + (block << d->blocksize));
 
         int m = d->min_len;
         ushort* offset = d->offset;
-        uint* base = d->base - m;
+        uint32* base = d->base - m;
         ubyte* symlen = d->symlen;
         int sym, bitcnt;
 
-        uint next = 0;
-        uint code = _byteswap_ulong(*ptr++);
+        uint32 next = 0;
+        uint32 code = _byteswap_ulong(*ptr++);
         bitcnt = 0; // number of bits in next
         for (;;) {
             int l = m;
@@ -1186,7 +1187,7 @@ namespace TableBase {
         return *(sympat + 3 * sym);
     }
 
-    int TableBase::Probe_WDL(const Board& board, const BoardInfo& info, int* success) {
+    int TableBase::Probe_WDL(const Position& board, int* success) {
         *success = 1;
 
         TBEntry* ptr;
@@ -1235,14 +1236,14 @@ namespace TableBase {
             if (key != ptr->key) {
                 cmirror = 8;
                 mirror = 0x38;
-                bside = (info.m_WhiteMove);
+                bside = (board.m_WhiteMove);
             } else {
                 cmirror = mirror = 0;
-                bside = !(info.m_WhiteMove);
+                bside = !(board.m_WhiteMove);
             }
         } else {
-            cmirror = info.m_WhiteMove ? 0 : 8;
-            mirror = info.m_WhiteMove ? 0 : 0x38;
+            cmirror = board.m_WhiteMove ? 0 : 8;
+            mirror = board.m_WhiteMove ? 0 : 0x38;
             bside = 0;
         }
 
@@ -1253,7 +1254,7 @@ namespace TableBase {
             TBEntry_piece* entry = (TBEntry_piece*)ptr;
             ubyte* pc = entry->pieces[bside];
             for (i = 0; i < entry->num;) {
-                uint64 bb = board.m_Pieces[pc[i] & 0x07][((pc[i] ^ cmirror) >> 3) & 0x1];
+                BitBoard bb = board.m_Pieces[pc[i] & 0x07][((pc[i] ^ cmirror) >> 3) & 0x1];
                 do {
                     p[i++] = PopPos(bb);
                 } while (bb);
@@ -1263,7 +1264,7 @@ namespace TableBase {
         } else {
             TBEntry_pawn* entry = (TBEntry_pawn*)ptr;
             int k = entry->file[0].pieces[0][0] ^ cmirror;
-            uint64 bb = board.m_Pieces[((k) & 0x07)][(k >> 3) & 0x1];
+            BitBoard bb = board.m_Pieces[k & 0x07][(k >> 3) & 0x1];
             i = 0;
             do {
                 p[i++] = PopPos(bb) ^ mirror;
@@ -1283,11 +1284,12 @@ namespace TableBase {
         return ((int)res) - 2;
     }
 
-    int TableBase::Probe_DTZ(const Board& board, const BoardInfo& info, int* success) {
+    int TableBase::Probe_DTZ(const Position& board, int* success) {
         // Probe WDL first
-        int wdl = Probe_WDL(board, info, success);
+        int wdl = Probe_WDL(board, success);
         if (*success == 0) return 0;
 
+        if (wdl == 0) return 0;
 
         struct TBEntry* ptr;
         uint64 idx;
@@ -1336,14 +1338,14 @@ namespace TableBase {
             if (key != ptr->key) {
                 cmirror = 8;
                 mirror = 0x38;
-                bside = (info.m_WhiteMove);
+                bside = (board.m_WhiteMove);
             } else {
                 cmirror = mirror = 0;
-                bside = !(info.m_WhiteMove);
+                bside = !(board.m_WhiteMove);
             }
         } else {
-            cmirror = info.m_WhiteMove ? 0 : 8;
-            mirror = info.m_WhiteMove ? 0 : 0x38;
+            cmirror = board.m_WhiteMove ? 0 : 8;
+            mirror = board.m_WhiteMove ? 0 : 0x38;
             bside = 0;
         }
 
@@ -1355,7 +1357,7 @@ namespace TableBase {
             }
             ubyte* pc = entry->pieces;
             for (i = 0; i < entry->num;) {
-                uint64 bb = board.m_Pieces[(pc[i] & 0x07)][((pc[i] ^ cmirror) >> 3) & 0x1];
+                BitBoard bb = board.m_Pieces[(pc[i] & 0x07)][((pc[i] ^ cmirror) >> 3) & 0x1];
                 do {
                     p[i++] = PopPos(bb);
                 } while (bb);
@@ -1371,7 +1373,7 @@ namespace TableBase {
         } else {
             DTZEntry_pawn* entry = (DTZEntry_pawn*)ptr;
             int k = entry->file[0].pieces[0] ^ cmirror;
-            uint64 bb = board.m_Pieces[(k & 0x07)][(k >> 3) & 0x1];
+            BitBoard bb = board.m_Pieces[k & 0x07][(k >> 3) & 0x1];
             i = 0;
             do {
                 p[i++] = PopPos(bb) ^ mirror;

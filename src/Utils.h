@@ -4,13 +4,38 @@
 #include <chrono>
 #include <stdarg.h>
 
-using uint64 = unsigned long long;
-using int64 = long long;
-using uint = unsigned int;
-using ushort = unsigned short;
-using ubyte = unsigned char;
+#define NOMINMAX
+#include <Windows.h> // _mm_popcnt_u64(...)
 
-#define _COMPILETIME static inline constexpr
+#include "Types.h"
+
+#define GET_SQUARE(X) _tzcnt_u64(X)
+#define COUNT_BIT(X) _mm_popcnt_u64(X)
+
+struct Score {
+    Score()
+        : mg(0), eg(0)
+    {}
+
+    Score(int mg, int eg)
+        : mg(mg), eg(eg)
+    {}
+
+    int mg;
+    int eg;
+
+    Score& operator+=(const Score& other) {
+        mg += other.mg;
+        eg += other.eg;
+        return *this;
+    }
+
+    Score& operator-=(const Score& other) {
+        mg -= other.mg;
+        eg -= other.eg;
+        return *this;
+    }
+};
 
 static inline uint64 PopBit(uint64& val) {
     uint64 result = (val & -val);
@@ -24,7 +49,7 @@ static inline int LSB(uint64& val) {
     return r;
 }
 
-static inline int PopPos(uint64& val) {
+static inline int PopPos(BitBoard& val) {
     int index = int(LSB(val)); // 0 returns 0
     //int index = int(_tzcnt_u64(val));
     val &= val - 1;
@@ -35,14 +60,14 @@ static inline int Signum(int val) {
     return (0 < val) - (val < 0);
 }
 
-static uint64 FenToMap(const std::string& FEN, char p) {
+static BitBoard FenToMap(const std::string& FEN, char p) {
     int i = 0;
     char c = {};
     int pos = 63;
 
-    uint64 result = 0;
+    BitBoard result = 0;
     while ((c = FEN[i++]) != ' ') {
-        uint64 P = 1ull << pos;
+        BitBoard P = 1ull << pos;
         switch (c) {
         case '/': pos += 1; break;
         case '1': break;
@@ -61,7 +86,80 @@ static uint64 FenToMap(const std::string& FEN, char p) {
     return result;
 }
 
-static void PrintMap(uint64 map) {
+static BoardInfo FenToBoardInfo(const std::string& FEN) {
+    BoardInfo info = {};
+    int i = 0;
+    while (FEN[i++] != ' ') {
+        // Skip piece placement
+    }
+
+    char ac = FEN[i++]; // Active color
+    switch (ac) {
+    case 'w':
+        info.m_WhiteMove = WHITE;
+        break;
+    case 'b':
+        info.m_WhiteMove = BLACK;
+        break;
+    default:
+        printf("Invalid FEN for active color\n");
+        return info;
+    }
+
+    i++;
+    info.m_BlackCastleKing = false;
+    info.m_BlackCastleQueen = false;
+    info.m_WhiteCastleKing = false;
+    info.m_WhiteCastleQueen = false;
+    char c = {};
+    while ((c = FEN[i++]) != ' ') {
+        if (c == '-') {
+            break;
+        }
+
+        switch (c) {
+        case 'K':
+            info.m_WhiteCastleKing = true;
+            break;
+        case 'Q':
+            info.m_WhiteCastleQueen = true;
+            break;
+        case 'k':
+            info.m_BlackCastleKing = true;
+            break;
+        case 'q':
+            info.m_BlackCastleQueen = true;
+            break;
+        }
+    }
+
+    while ((c = FEN[i]) == ' ') i++;
+    char a = FEN[i++];
+
+    if (a != '-') {
+        if (info.m_WhiteMove) {
+            info.m_EnPassant = 1ull << (40 + ('h' - a)); // TODO: need to be tested
+        } else {
+            info.m_EnPassant = 1ull << (16 + ('h' - a)); // TODO: need to be tested
+        }
+    } else {
+        info.m_EnPassant = 0;
+    }
+
+    info.m_HalfMoves = 0;
+    info.m_FullMoves = 0;
+    int t = 1;
+
+    while ((c = FEN[i++]) != ' ');
+    while ((c = FEN[i++]) != ' ') info.m_HalfMoves = info.m_HalfMoves * 10 + (int)(c - '0');
+    while (i < FEN.size() && FEN[i] >= '0' && FEN[i] <= '9') {
+        c = FEN[i++];
+        info.m_FullMoves = info.m_FullMoves * 10 + (c - '0');
+    }
+    return info;
+}
+
+static void PrintBitBoard(BitBoard map) {
     for (int i = 63; i >= 0; i--) {
         if ((map & (1ull << i)) > 0) {
             printf("X ");
@@ -112,17 +210,17 @@ public:
 #define GetUpper(S) (0xFFFFFFFFFFFFFFFF << (S))
 
 struct lineEx {
-    uint64_t lower;
-    uint64_t upper;
-    uint64_t uni;
+    BitBoard lower;
+    BitBoard upper;
+    BitBoard uni;
 
-    constexpr uint64_t init_low(int sq, uint64_t line) {
-        uint64_t lineEx = line ^ (1ull << sq);
+    constexpr BitBoard init_low(int sq, BitBoard line) {
+        BitBoard lineEx = line ^ (1ull << sq);
         return GetLower(sq) & lineEx;
     }
 
-    constexpr uint64_t init_up(int sq, uint64_t line) {
-        uint64_t lineEx = line ^ (1ull << sq);
+    constexpr BitBoard init_up(int sq, BitBoard line) {
+        BitBoard lineEx = line ^ (1ull << sq);
         return GetUpper(sq) & lineEx;
     }
 
@@ -130,23 +228,9 @@ struct lineEx {
 
     }
 
-    constexpr lineEx(int sq, uint64_t line) : lower(init_low(sq, line)), upper(init_up(sq, line)), uni(init_low(sq, line) | init_up(sq, line))
+    constexpr lineEx(int sq, BitBoard line) : lower(init_low(sq, line)), upper(init_up(sq, line)), uni(init_low(sq, line) | init_up(sq, line))
     {}
 };
 
 #undef GetLower
 #undef GetUpper
-
-/*
- * @author Michael Hoffmann, Daniel Infuehr
- * Obstruction difference slider algorithm
- */
-static uint64 Slide(uint64 pos, lineEx line, uint64 block) {
-    uint64_t lower = (line.lower & block) | 1;
-    uint64_t upper = line.upper & block;
-    uint64_t msb = (0x8000000000000000) >> std::countl_zero(lower);
-    uint64_t lsb = upper & -upper;
-    uint64_t oDif = lsb * 2 - msb;
-    return line.uni & oDif;
-}
-
