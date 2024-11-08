@@ -23,7 +23,7 @@ int main() {
 	// Game against me & erik, we won
 	// 1. e4 e5 2. d3 Nf6 3. Nc3 Bb4 4. Ne2 d5 5. a3 Bxc3+ 6. Nxc3 dxe4 7. dxe4 Qxd1+ 8. Kxd1 O-O 9. h3 Rd8+ 10. Bd3 b6 11. g3 Ba6 12. f4 Bxd3 13. cxd3 Rxd3+ 14. Ke2 Rxg3 15. fxe5 Nfd7 16. Nd5 Na6 17. b4 c6 18. Ne7+ Kf8 19. Nxc6 Nc7 20. h4 Nb5 21. a4 Nc3+ 22. Ke1 Nxe4 23. Rf1 Rc8 24. e6 Ndf6 25. e7+ Ke8 26. b5 Rc3 27. Ba3 Rc7 28. Rd1 Re3#
 
-	if (true) {
+	if (false) {
 		UCI uci;
 		uci.Start();
 	} else {
@@ -31,18 +31,19 @@ int main() {
 		Search* search = new Search();
 		//search.LoadPosition(g_StartingFEN);
 		//search->LoadPosition("r1bqk2r/ppp2ppp/4p3/3p1n2/3PnB2/4QN2/PPP1PPPP/1K1R1B1R w Kkq - 0 1");
-		//search->LoadPosition("1k2r1r1/1p3pp1/1qpb1n1p/p2p1QP1/5P2/4PB2/PPP3KP/R1B4R b - - 0 1"); // Stockfish evaluates this as -4, while milesbot rates it as 0
+		search->LoadPosition("1k2r1r1/1p3pp1/1qpb1n1p/p2p1QP1/5P2/4PB2/PPP3KP/R1B4R b - - 0 1"); // Stockfish evaluates this as -4, while milesbot rates it as 0
 		//search->LoadPosition("1k2r2r/1pb5/1qp5/p2p4/8/3Q4/PPP1p1RP/R1B4K w - - 0 11");
 		//search->LoadPosition("rnnk1b1r/p3pppB/2b5/6N1/8/2N5/1P3PPP/R1B2RK1 b - - 1 15");
 		//search->LoadPosition("5k2/8/8/8/3b4/5K2/3r4/7R w - - 72 115"); // TODO: Figure out why it's doing incorrect move h1g1
 		//printf("%llu\n", search.Perft(6));
-		//search->LoadPosition("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10");
+		//search->LoadPosition("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
 		//search->LoadPosition("r3k2r/p1ppqpb1/bn2pnp1/3PN3/Pp2P3/2N2Q1p/1PPBBPPP/R3K2R b KQkq a3 0 1");
 		Timer time;
 		time.Start();
 		search->m_MaxTime = 10000;
-		//search->UCIMove_async();
-		search->Perft(5); // 55-58
+		search->UCIMove_async(); // 3580-3770
+		//search->Perft(6); // 102-105.5
+						  // 102.3-105.3
 		printf("%.3fs\n", time.End());
 		
 		//while (true) {

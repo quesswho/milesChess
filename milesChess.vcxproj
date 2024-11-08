@@ -179,6 +179,7 @@
     <ClInclude Include="src\Evaluate.h" />
     <ClInclude Include="src\LookupTables.h" />
     <ClInclude Include="src\Move.h" />
+    <ClInclude Include="src\MoveGen.h" />
     <ClInclude Include="src\Movelist.h" />
     <ClInclude Include="src\Position.h" />
     <ClInclude Include="src\Search.h" />
