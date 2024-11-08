@@ -15,14 +15,13 @@ void Position::SetPosition(const std::string& FEN) {
     m_BlackRook = FenToMap(FEN, 'r');
     m_BlackQueen = FenToMap(FEN, 'q');
     m_BlackKing = FenToMap(FEN, 'k');
-    SetState(FEN);
     m_Black = (m_BlackPawn | m_BlackKnight | m_BlackBishop | m_BlackRook | m_BlackQueen | m_BlackKing);
     m_White = (m_WhitePawn | m_WhiteKnight | m_WhiteBishop | m_WhiteRook | m_WhiteQueen | m_WhiteKing);
     m_Board = (m_White | m_Black);
+    SetState(FEN);
     m_Hash = Zobrist_Hash(*this);
     m_PawnHash = Zobrist_PawnHash(*this);
     m_States[m_Ply].m_Hash = m_Hash;
-
 }
 
 void Position::SetState(const std::string& FEN) {
@@ -120,13 +119,19 @@ BitBoard Position::BishopXray(int pos, BitBoard occ) const {
 }
 
 void Position::MovePiece(Move move) {
-    const int tPos = To(move);
     const int fPos = From(move);
+    const int tPos = To(move);
     const BitBoard to = (1ull << tPos);
     const BitBoard from = (1ull << fPos);
     const BitBoard re = ~(to);
     const BitBoard swp = (from) | (to);
     const int promotion = Promotion(move);
+    const bool enPassant = EnPassant(move);
+
+
+    if (m_States[m_Ply].m_EnPassant) { // Remove old en passant from hash
+        m_Hash ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(m_States[m_Ply].m_EnPassant) & 0x7)];
+    }
 
     m_Ply++;
     m_States[m_Ply] = m_States[m_Ply - 1];
@@ -134,9 +139,6 @@ void Position::MovePiece(Move move) {
     m_States[m_Ply].m_HalfMoves++;
     if (!m_WhiteMove) m_FullMoves++;
 
-    if (m_States[m_Ply].m_EnPassant) { // Remove old en passant from hash
-        m_Hash ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(m_States[m_Ply].m_EnPassant) & 0x7)];
-    }
 
     m_States[m_Ply].m_EnPassant = 0;
 
@@ -156,25 +158,25 @@ void Position::MovePiece(Move move) {
             m_WhitePawn ^= swp;
         } else if (promotion) {
             switch (promotion) {
-            case 0b1:
+            case 0x400000:
                 m_Hash ^= Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 2 + tPos];
                 m_PawnHash ^= Lookup::zobrist[fPos];
                 m_WhitePawn ^= from;
                 m_WhiteKnight ^= to;
                 break;
-            case 0b10:
+            case 0x800000:
                 m_Hash ^= Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 4 + tPos];
                 m_PawnHash ^= Lookup::zobrist[fPos];
                 m_WhitePawn ^= from;
                 m_WhiteBishop ^= to;
                 break;
-            case 0b100:
+            case 0x1000000:
                 m_Hash ^= Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 6 + tPos];
                 m_PawnHash ^= Lookup::zobrist[fPos];
                 m_WhitePawn ^= from;
                 m_WhiteRook ^= to;
                 break;
-            case 0b1000:
+            case 0x2000000:
                 m_Hash ^= Lookup::zobrist[fPos] ^ Lookup::zobrist[64 * 8 + tPos];
                 m_PawnHash ^= Lookup::zobrist[fPos];
                 m_WhitePawn ^= from;
@@ -248,25 +250,25 @@ void Position::MovePiece(Move move) {
         }
         else if (promotion) {
             switch (promotion) {
-            case 0b1:
+            case 0x400000:
                 m_Hash ^= Lookup::zobrist[64 + fPos] ^ Lookup::zobrist[64 * 3 + tPos];
                 m_PawnHash ^= Lookup::zobrist[64 + fPos];
                 m_BlackPawn ^= from;
                 m_BlackKnight ^= to;
                 break;
-            case 0b10:
+            case 0x800000:
                 m_Hash ^= Lookup::zobrist[64 + fPos] ^ Lookup::zobrist[64 * 5 + tPos];
                 m_PawnHash ^= Lookup::zobrist[64 + fPos];
                 m_BlackPawn ^= from;
                 m_BlackBishop ^= to;
                 break;
-            case 0b100:
+            case 0x1000000:
                 m_Hash ^= Lookup::zobrist[64 + fPos] ^ Lookup::zobrist[64 * 7 + tPos];
                 m_PawnHash ^= Lookup::zobrist[64 + fPos];
                 m_BlackPawn ^= from;
                 m_BlackRook ^= to;
                 break;
-            case 0b1000:
+            case 0x2000000:
                 m_Hash ^= Lookup::zobrist[64 + fPos] ^ Lookup::zobrist[64 * 9 + tPos];
                 m_PawnHash ^= Lookup::zobrist[64 + fPos];
                 m_BlackPawn ^= from;
@@ -320,7 +322,7 @@ void Position::MovePiece(Move move) {
         }
         m_BlackKing ^= swp;
         if (Castle(move)) {
-            if (to == 0b10) { // King side castle
+            if (to == 0b10ull << 56) { // King side castle
                 m_Hash ^= Lookup::zobrist[64 * 11 + 57] ^ Lookup::zobrist[64 * 11 + 59] ^ Lookup::zobrist[64 * 7 + 56] ^ Lookup::zobrist[64 * 7 + 58];
                 m_BlackRook ^= (0b101ull << 56);
             }
@@ -342,7 +344,7 @@ void Position::MovePiece(Move move) {
     switch (capture) {
         // White pieces
     case BPAWN:
-        if (EnPassant(move)) {
+        if (enPassant) {
             m_Hash ^= Lookup::zobrist[56 + tPos];
             m_PawnHash ^= Lookup::zobrist[56 + tPos];
             m_BlackPawn &= ~(to >> 8);
@@ -370,7 +372,7 @@ void Position::MovePiece(Move move) {
         break;
         // Black pieces
     case WPAWN:
-        if (EnPassant(move)) {
+        if (enPassant) {
             m_Hash ^= Lookup::zobrist[8 + tPos];
             m_PawnHash ^= Lookup::zobrist[8 + tPos];
             m_WhitePawn &= ~(to << 8);
@@ -400,6 +402,10 @@ void Position::MovePiece(Move move) {
         // No capture
         break;
     }
+    m_Black = (m_BlackPawn | m_BlackKnight | m_BlackBishop | m_BlackRook | m_BlackQueen | m_BlackKing);
+    m_White = (m_WhitePawn | m_WhiteKnight | m_WhiteBishop | m_WhiteRook | m_WhiteQueen | m_WhiteKing);
+    m_Board = (m_White | m_Black);
+
     m_WhiteMove = !m_WhiteMove;
     m_States[m_Ply].m_Hash = m_Hash;
 }
@@ -409,41 +415,40 @@ void Position::UndoMove(Move move) {
     const int fPos = From(move);
     const BitBoard to = (1ull << tPos);
     const BitBoard from = (1ull << fPos);
-    const BitBoard re = ~(to);
     const BitBoard swp = (from) | (to);
     const int promotion = Promotion(move);
 
     m_Ply--;
     m_Hash = m_States[m_Ply].m_Hash;
 
-    m_WhiteMove = !m_WhiteMove;
+    if (m_WhiteMove) m_FullMoves--;
 
     m_PawnHash ^= Lookup::zobrist[64 * 12];
 
 
-    const ColoredPieceType type = CaptureType(move);
+    const ColoredPieceType type = MovePieceType(move);
 
     assert("Cant move to same color piece", move.m_To & m_White);
     switch (type) {
     case WPAWN:
         if (promotion) {
             switch (promotion) {
-            case 0b1:
+            case 0x400000:
                 m_PawnHash ^= Lookup::zobrist[fPos];
                 m_WhitePawn ^= from;
                 m_WhiteKnight ^= to;
                 break;
-            case 0b10:
+            case 0x800000:
                 m_PawnHash ^= Lookup::zobrist[fPos];
                 m_WhitePawn ^= from;
                 m_WhiteBishop ^= to;
                 break;
-            case 0b100:
+            case 0x1000000:
                 m_PawnHash ^= Lookup::zobrist[fPos];
                 m_WhitePawn ^= from;
                 m_WhiteRook ^= to;
                 break;
-            case 0b1000:
+            case 0x2000000:
                 m_PawnHash ^= Lookup::zobrist[fPos];
                 m_WhitePawn ^= from;
                 m_WhiteQueen ^= to;
@@ -481,22 +486,22 @@ void Position::UndoMove(Move move) {
     case BPAWN:
         if (promotion) {
             switch (promotion) {
-            case 0b1:
+            case 0x400000:
                 m_PawnHash ^= Lookup::zobrist[64 + fPos];
                 m_BlackPawn ^= from;
                 m_BlackKnight ^= to;
                 break;
-            case 0b10:
+            case 0x800000:
                 m_PawnHash ^= Lookup::zobrist[64 + fPos];
                 m_BlackPawn ^= from;
                 m_BlackBishop ^= to;
                 break;
-            case 0b100:
+            case 0x1000000:
                 m_PawnHash ^= Lookup::zobrist[64 + fPos];
                 m_BlackPawn ^= from;
                 m_BlackRook ^= to;
                 break;
-            case 0b1000:
+            case 0x2000000:
                 m_PawnHash ^= Lookup::zobrist[64 + fPos];
                 m_BlackPawn ^= from;
                 m_BlackQueen ^= to;
@@ -523,7 +528,7 @@ void Position::UndoMove(Move move) {
     case BKING:
         m_BlackKing ^= swp;
         if (Castle(move)) {
-            if (to == 0b10) { // King side castle
+            if (to == 0b10ull << 56) { // King side castle
                 m_BlackRook ^= (0b101ull << 56);
             }
             else {
@@ -573,21 +578,27 @@ void Position::UndoMove(Move move) {
         }
         break;
     case WKNIGHT:
-        m_WhiteKnight ^= re;
+        m_WhiteKnight ^= to;
         break;
     case WBISHOP:
-        m_WhiteBishop ^= re;
+        m_WhiteBishop ^= to;
         break;
     case WROOK:
-        m_WhiteRook ^= re;
+        m_WhiteRook ^= to;
         break;
     case WQUEEN:
-        m_WhiteQueen ^= re;
+        m_WhiteQueen ^= to;
         break;
     case NOPIECE:
         // No capture
         break;
     }
+
+    m_Black = (m_BlackPawn | m_BlackKnight | m_BlackBishop | m_BlackRook | m_BlackQueen | m_BlackKing);
+    m_White = (m_WhitePawn | m_WhiteKnight | m_WhiteBishop | m_WhiteRook | m_WhiteQueen | m_WhiteKing);
+    m_Board = (m_White | m_Black);
+
+    m_WhiteMove = !m_WhiteMove;
 }
 
 uint64 Zobrist_Hash(const Position& position) {

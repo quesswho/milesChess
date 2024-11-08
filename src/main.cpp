@@ -36,11 +36,13 @@ int main() {
 		//search->LoadPosition("rnnk1b1r/p3pppB/2b5/6N1/8/2N5/1P3PPP/R1B2RK1 b - - 1 15");
 		//search->LoadPosition("5k2/8/8/8/3b4/5K2/3r4/7R w - - 72 115"); // TODO: Figure out why it's doing incorrect move h1g1
 		//printf("%llu\n", search.Perft(6));
+		search->LoadPosition("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10");
+		//search->LoadPosition("r3k2r/p1ppqpb1/bn2pnp1/3PN3/Pp2P3/2N2Q1p/1PPBBPPP/R3K2R b KQkq a3 0 1");
 		Timer time;
 		time.Start();
 		search->m_MaxTime = 10000;
 		//search->UCIMove_async();
-		search->Perft(2); // 55-58
+		search->Perft(5); // 55-58
 		printf("%.3fs\n", time.End());
 		
 		//while (true) {

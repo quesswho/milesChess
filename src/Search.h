@@ -596,7 +596,8 @@ public:
         FPawns = FPawns & (~pinnedFPawns | movePinFPawns);
         F2Pawns = F2Pawns & (~pinnedF2Pawns | movePinF2Pawns);
 
-        for (; const BoardPos pos = PopPos(F2Pawns); F2Pawns > 0) { // Loop each bit
+        while(F2Pawns > 0) { // Loop each bit
+            const BoardPos pos = PopPos(F2Pawns);
             result.push_back(BuildMove(PawnPos2Forward<enemy>(pos), pos, pawntype));
         }
 
@@ -620,15 +621,16 @@ public:
             LPawns = LPawns & ~FirstRank<enemy>();
 
             // Add Forward pawns
-            for (; const BoardPos pos = PopPos(FPromote); FPromote > 0) {
-                
+            while (FPromote > 0) {
+                const BoardPos pos = PopPos(FPromote);
                 result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b000100));
                 result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b001000));
                 result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b010000));
                 result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b100000));
             }
 
-            for (; const BoardPos pos = PopPos(RPromote); RPromote > 0) { // Loop each bit
+            while (RPromote > 0) { // Loop each bit
+                const BoardPos pos = PopPos(RPromote);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << pos);
                 result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b000100));
                 result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b001000));
@@ -636,7 +638,8 @@ public:
                 result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b100000));
             }
 
-            for (; const BoardPos pos = PopPos(LPromote); LPromote > 0) {
+            while (LPromote > 0) {
+                const BoardPos pos = PopPos(LPromote);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << pos);
                 result.push_back(BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b000100));
                 result.push_back(BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b001000));
@@ -645,16 +648,19 @@ public:
             }
         }
 
-        for (; const BoardPos pos = PopPos(FPawns); FPawns > 0) {
+        while (FPawns > 0) {
+            const BoardPos pos = PopPos(FPawns);
             result.push_back(BuildMove(PawnPosForward<enemy>(pos), pos, pawntype));
         }
 
-        for (; const BoardPos pos = PopPos(RPawns); RPawns > 0) { // Loop each bit
+        while (RPawns > 0) { // Loop each bit
+            const BoardPos pos = PopPos(RPawns);
             const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << pos);
             result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture));
         }
 
-        for (; const BoardPos pos = PopPos(LPawns); LPawns > 0) {
+        while (LPawns > 0) {
+            const BoardPos pos = PopPos(LPawns);
             const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << pos);
             result.push_back(BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture));
         }
@@ -667,16 +673,16 @@ public:
         BitBoard stillPinREPawns = REPawns & bishopPin;
         REPawns = REPawns & (~pinnedREPawns | stillPinREPawns);
         if (REPawns > 0) {
-            BoardPos pos = PopPos(REPawns);
-            result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, pawntype, 0b000001));
+            const BoardPos pos = PopPos(REPawns);
+            result.push_back(BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, GetColoredPiece<enemy>(PAWN), 0b000001));
         }
 
         BitBoard pinnedLEPawns = LEPawns & PawnAttackLeft<white>(bishopPin);
         BitBoard stillPinLEPawns = LEPawns & bishopPin;
         LEPawns = LEPawns & (~pinnedLEPawns | stillPinLEPawns);
         if (LEPawns > 0) {
-            BoardPos pos = PopPos(LEPawns);
-            result.push_back(BuildMove(PawnAttackRight<enemy>(pos), pos, pawntype, pawntype, 0b000001));
+            const BoardPos pos = PopPos(LEPawns);
+            result.push_back(BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, GetColoredPiece<enemy>(PAWN), 0b000001));
         }
 
         // Kinghts
@@ -686,7 +692,8 @@ public:
         while (knights > 0) { // Loop each bit
             int pos = PopPos(knights);
             BitBoard moves = Lookup::knight_attacks[pos] & moveable;
-            for (; BoardPos toPos = PopPos(moves); moves > 0) { // Loop each bit
+            while (moves > 0) { // Loop each bit
+                const BoardPos toPos = PopPos(moves);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << toPos);
                 result.push_back(BuildMove(pos, toPos, knighttype, capture));
             }
@@ -702,7 +709,8 @@ public:
         while (pinnedBishop > 0) {
             int pos = PopPos(pinnedBishop);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable & bishopPin;
-            for (; BoardPos toPos = PopPos(moves); moves > 0) { // Loop each bit
+            while (moves > 0) { // Loop each bit
+                const BoardPos toPos = PopPos(moves);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << toPos);
                 result.push_back(BuildMove(pos, toPos, bishoptype, capture));
             }
@@ -711,7 +719,8 @@ public:
         while (notPinnedBishop > 0) {
             int pos = PopPos(notPinnedBishop);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable;
-            for (; BoardPos toPos = PopPos(moves); moves > 0) { // Loop each bit
+            while (moves > 0) { // Loop each bit
+                const BoardPos toPos = PopPos(moves);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << toPos);
                 result.push_back(BuildMove(pos, toPos, bishoptype, capture));
             }
@@ -737,7 +746,8 @@ public:
         while (pinnedRook > 0) {
             int pos = PopPos(pinnedRook);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & moveable & rookPin;
-            for (; BoardPos toPos = PopPos(moves); moves > 0) { // Loop each bit
+            while (moves > 0) { // Loop each bit
+                const BoardPos toPos = PopPos(moves);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << toPos);
                 result.push_back(BuildMove(pos, toPos, rooktype, capture));
             }
@@ -746,7 +756,8 @@ public:
         while (notPinnedRook > 0) {
             int pos = PopPos(notPinnedRook);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & moveable;
-            for (; BoardPos toPos = PopPos(moves); moves > 0) { // Loop each bit
+            while (moves > 0) { // Loop each bit
+                const BoardPos toPos = PopPos(moves);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << toPos);
                 result.push_back(BuildMove(pos, toPos, rooktype, capture));
             }
@@ -764,7 +775,8 @@ public:
         while (pinnedStraightQueen > 0) {
             int pos = PopPos(pinnedStraightQueen);
             BitBoard moves = board.RookAttack(pos, board.m_Board) & moveable & rookPin;
-            for (; BoardPos toPos = PopPos(moves); moves > 0) { // For each move
+            while (moves > 0) { // For each move
+                const BoardPos toPos = PopPos(moves);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << toPos);
                 result.push_back(BuildMove(pos, toPos, queentype, capture));
             }
@@ -774,7 +786,8 @@ public:
         while (pinnedDiagonalQueen > 0) {
             int pos = PopPos(pinnedDiagonalQueen);
             BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable & bishopPin;
-            for (; BoardPos toPos = PopPos(moves); moves > 0) { // For each move
+            while (moves > 0) { // For each move
+                const BoardPos toPos = PopPos(moves);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << toPos);
                 result.push_back(BuildMove(pos, toPos, queentype, capture));
             }
@@ -783,7 +796,8 @@ public:
         while (notPinnedQueen > 0) {
             int pos = PopPos(notPinnedQueen);
             BitBoard moves = board.QueenAttack(pos, board.m_Board) & moveable;
-            for (; BoardPos toPos = PopPos(moves); moves > 0) { // For each move
+            while (moves > 0) { // For each move
+                const BoardPos toPos = PopPos(moves);
                 const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << toPos);
                 result.push_back(BuildMove(pos, toPos, queentype, capture));
             }
@@ -794,7 +808,8 @@ public:
         BitBoard moves = Lookup::king_attacks[kingpos] & ~Player<white>(board);
         moves &= ~danger;
 
-        for (; BoardPos toPos = PopPos(moves); moves > 0) { // For each move
+        while (moves > 0) { // For each move
+            const BoardPos toPos = PopPos(moves);
             const ColoredPieceType capture = GetCaptureType<enemy>(board, 1ull << toPos);
             result.push_back(BuildMove(kingpos, toPos, kingtype, capture));
         }

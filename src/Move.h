@@ -14,8 +14,8 @@ enum ColoredPieceType : uint8 {
 template<Color c>
 static inline constexpr ColoredPieceType GetColoredPiece(PieceType T) {
     constexpr ColoredPieceType pieceMap[2][7] = {
-        { NOPIECE, WPAWN, WKNIGHT, WBISHOP, WROOK, WQUEEN, WKING },
-        { NOPIECE, BPAWN, BKNIGHT, BBISHOP, BROOK, BQUEEN, BKING }
+        { NOPIECE, BPAWN, BKNIGHT, BBISHOP, BROOK, BQUEEN, BKING },
+        { NOPIECE, WPAWN, WKNIGHT, WBISHOP, WROOK, WQUEEN, WKING }
     };
     return pieceMap[c][T];
 }
@@ -99,16 +99,16 @@ static inline std::string MoveToString(Move move) {
     int promotion = Promotion(move);
     switch (promotion) {
     case 0x400000:
-        result += 'N';
+        result += 'n';
         break;
     case 0x800000:
-        result += 'B';
+        result += 'b';
         break;
     case 0x1000000:
-        result += 'R';
+        result += 'r';
         break;
     case 0x2000000:
-        result += 'Q';
+        result += 'q';
         break;
     case 0: // No promotion
         break;
