@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Board.h"
 #include "Position.h"
+#include "LookupTables.h"
 
 template<Color white>
 _COMPILETIME BitBoard FirstRank() {
