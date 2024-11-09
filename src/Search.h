@@ -76,26 +76,21 @@ public:
         m_Position.SetPosition(fen);
 	}
 
-
-
-    // Simple Most Valuable Victim - Least Valuable Aggressor sorting function
-    static bool Move_Order(const Move& a, const Move& b) {
-        int64 score_a = 0;
-        int64 score_b = 0;
-        if ((int)CaptureType(a)) score_a += 9 + Lookup::pieceValue[(int)CaptureType(a)] - Lookup::pieceValue[(int)MovePieceType(a)];
-        if ((int)CaptureType(b)) score_b += 9 + Lookup::pieceValue[(int)CaptureType(b)] - Lookup::pieceValue[(int)MovePieceType(b)];
-
-        return score_a > score_b;
-    }
-
     template<Color white>
 	uint64 Perft_r(Position& pos, int depth) {
         if (!m_Running) return 0;
         assert("Hash is not matched!", Zobrist_Hash(pos) != pos.m_Hash);
-		const std::vector<Move> moves = TGenerateMoves<ALL, white>(pos);
-		if (depth == m_Maxdepth-1) return moves.size();
+		//const std::vector<Move> moves = TGenerateMoves<ALL, white>(pos);
+        MoveGen moveGen(pos, 0, false);
+        if (depth == m_Maxdepth - 1) {
+            uint64 count = 0;
+            while ((moveGen.Next()) != 0) count++;
+            return count;
+        }
 		int64 result = 0;
-		for (const Move& move : moves) {
+		//for (const Move& move : moves) {
+        Move move;
+        while ((move = moveGen.Next()) != 0) {
             pos.MovePiece(move);
 			int64 count = Perft_r<!white>(pos, depth + 1);
 			result += count;
@@ -136,44 +131,30 @@ public:
         }
 
         // Probe Transposition table
+        Move hashMove = Move();
         TTEntry* entry = m_Table->Probe(board.m_Hash);
         if (entry != nullptr) {
             if (entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
                 return entry->m_Value;
             }
+            hashMove = entry->m_BestMove;
         }
 
-        std::vector<Move> moves = GenerateMoves<QUIESCENCE>(board);
-        if (moves.size() == 0) {
-            uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = board.m_States[ply].m_EnPassant;
-            Check(board.m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
-            if (active != 0xFFFFFFFFFFFFFFFFull) { // If we are in check, find out if its mate
-                std::vector<Move> mate = GenerateMoves<ALL>(board);
-                if (mate.size() == 0) return -MATE_SCORE + ply; // Mate in 0 is 10000 centipawns worth
-            }
-            return bestScore;
-        }
+        uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = board.m_States[ply].m_EnPassant;
+        Check(board.m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
+        bool inCheck = false;
+        if (active != 0xFFFFFFFFFFFFFFFFull) inCheck = true;
 
-        if (entry != nullptr) {
-            const Move hashMove = entry->m_BestMove;
-            std::sort(moves.begin(), moves.end(), [hashMove](const Move& a, const Move& b) {
-                if (a == hashMove) {
-                    return true;
-                } else if (b == hashMove) {
-                    return false;
-                }
-                return Move_Order(a, b);
-                });
-        }
-        else {
-            std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
-                return Move_Order(a, b);
-            });
-        }
 
         Move bestMove = 0;
-        for (const Move& move : moves) {
+        int movecnt = 0;
+
+        MoveGen moveGen(board, hashMove, true);
+        Move move;
+        while ((move = moveGen.Next()) != 0) {
+            movecnt++;
             if (CaptureType(move) == ColoredPieceType::NOPIECE) continue; // Only analyze capturing moves
+
             board.MovePiece(move);
             int64 score = -Quiesce(board, -beta, -alpha, ply + 1, depth - 1);
             board.UndoMove(move);
@@ -188,6 +169,18 @@ public:
                 break;
             }
         }
+
+        // Check for mate or stalemate
+        if (!movecnt) {
+            if (inCheck) {
+                std::vector<Move> mate = GenerateMoves<ALL>(board); // TODO: Generate evasions in Quiescense which will give mate or draw if movecnt == 0
+                if(mate.size() == 0) bestScore = -MATE_SCORE + ply;
+            } else { // Commented out because it yields better performance without it even though it may not be correct
+                //std::vector<Move> mate = GenerateMoves<ALL>(board);
+                //if (mate.size() == 0) bestScore = 0;
+            }
+        }
+
         if (bestMove != 0) {
             if (bestScore >= beta) {
                 m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, ply, depth, board.m_FullMoves));
@@ -244,33 +237,17 @@ public:
         bool inCheck = false;
         if (active != 0xFFFFFFFFFFFFFFFFull) inCheck = true;
 
-		std::vector<Move> moves = GenerateMoves<ALL>(board);
-		if (moves.size() == 0) {
-            if (!inCheck) return 0; // Draw
-			return -MATE_SCORE + ply; // Mate in 0 is worth MATE_SCORE centipawns
-		}
-
         
 		int64 bestScore = -MATE_SCORE;
-        if (*stack->m_PV != Move()) {
-            const Move pvMove = *stack->m_PV;
-            std::sort(moves.begin(), moves.end(), [pvMove](const Move& a, const Move& b) {
-                if (a == pvMove) {
-                    return true;
-                } else if (b == pvMove) {
-                    return false;
-                }
-                return Move_Order(a, b);
-            });
-        } else {
-            std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) {
-                return Move_Order(a, b);
-            });
-        }
-        
         int64 old_alpha = alpha;
-        Move bestMove = moves[0];
-		for (const Move& move : moves) {
+        Move bestMove = 0;
+
+        int movecnt = 0;
+
+        MoveGen moveGen(board, hashMove, false);
+        Move move;
+		while ((move = moveGen.Next()) != 0) {
+            movecnt++;
             int newdepth = depth - 1;
             int extension = 0;
             int delta = beta - alpha;
@@ -304,6 +281,16 @@ public:
 				break;
 			}
 		}
+
+        // Check for mate or stalemate
+        if (!movecnt) {
+            if (inCheck) {
+                bestScore = -MATE_SCORE + ply;
+            } else {
+                bestScore = 0;
+            }
+        }
+
         if (bestScore >= beta) {
             m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, ply, depth, board.m_FullMoves));
         } else {

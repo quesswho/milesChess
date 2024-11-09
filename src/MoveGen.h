@@ -494,12 +494,13 @@ struct ScoreMove {
 enum MoveGenStage {
     TT_MOVE,
     CAPTURE_INIT, // Includes promotions
-    CAPTURE_MOVE,
+    GOODCAPTURE_MOVE,
     QUIET_INIT,
     QUIET_MOVE,
+    BADCAPTURES_MOVE,
 
     QUIESCENCE_TT,
-    QUIESCENCE_INIT,
+    QUIESCENCE_INIT, // TODO: Generate evasions if in check
     QUIESCENCE_MOVE,
 };
 
@@ -517,8 +518,10 @@ private:
     ScoreMove* m_Current;
     ScoreMove* m_End;
     MoveGenStage m_Stage;
+    ScoreMove* m_CapturesEnd;
+    ScoreMove* m_BadCapture;
 public:
-    MoveGen(Position& position, Move hashmove);
+    MoveGen(Position& position, Move hashmove, bool quiescence);
 
     Move Next();
 
