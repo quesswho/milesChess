@@ -1,10 +1,11 @@
 #pragma once
 #include "Position.h"
-
+#include "Movelist.h"
 
 enum MoveGenType {
 	ALL,
-    QUIESCENCE
+    QUIESCENCE,
+    SILENT
 };
 
 template<Color white>
@@ -420,7 +421,6 @@ static std::vector<Move> TGenerateMoves(const Position& board) {
         }
     }
 
-    // TODO: Put this in bishop and rook loops instead perhaps
     while (pinnedDiagonalQueen > 0) {
         int pos = PopPos(pinnedDiagonalQueen);
         BitBoard moves = board.BishopAttack(pos, board.m_Board) & moveable & bishopPin;
@@ -485,12 +485,416 @@ static inline std::vector<Move> GenerateMoves(const Position& board) {
     return board.m_WhiteMove ? TGenerateMoves<T, WHITE>(board) : TGenerateMoves<T, BLACK>(board);
 }
 
-template<MoveGenType T>
+struct ScoreMove {
+    Move move;
+    int score;
+};
+
+
+enum MoveGenStage {
+    TT_MOVE,
+    CAPTURE_INIT, // Includes promotions
+    CAPTURE_MOVE,
+    QUIET_INIT,
+    QUIET_MOVE,
+
+    QUIESCENCE_TT,
+    QUIESCENCE_INIT,
+    QUIESCENCE_MOVE,
+};
+
+constexpr MoveGenStage operator++(MoveGenStage& cur, int) {
+    cur = (MoveGenStage)((int)(cur)+1);
+    return cur;
+}
+
+// https://www.chessprogramming.org/Move_List#Search_Lists
 class MoveGen {
 private:
 	Position& m_Position;
 	Move m_HashMove;
+    ScoreMove m_Moves[256] = { 0 }; // Will likely cause a crash on ludicrous positions with more than 256 moves QQQQQQQQ/Q6Q/Q6Q/Q6Q/Q6Q/K6Q/BR5Q/kBQQQQQQ w - - 0 1
+    ScoreMove* m_Current;
+    ScoreMove* m_End;
+    MoveGenStage m_Stage;
 public:
-	MoveGen(Position& position, Move hashmove);
+    MoveGen(Position& position, Move hashmove);
 
+    Move Next();
+
+private:
+    inline int ScoreCapture(ColoredPieceType aggressor, ColoredPieceType victim) {
+        return OrderingPieceValue(victim) - OrderingPieceValue(aggressor);
+    }
+    
+    inline void pushMove(const ScoreMove& move) {
+        *(m_End++) = move;
+    }
+
+    template<MoveGenType T>
+    inline void GenerateMoves() {
+        m_Position.m_WhiteMove ? TGenerateMoves<WHITE, T>() : TGenerateMoves<BLACK, T>();
+    }
+
+    template<Color white, MoveGenType T>
+    void TGenerateMoves() {
+        constexpr Color enemy = !white;
+        BitBoard danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Position.m_States[m_Position.m_Ply].m_EnPassant;
+        BitBoard enPassantCheck = TCheck<white>(m_Position, danger, active, rookPin, bishopPin, enPassant);
+        BitBoard moveable = ~Player<white>(m_Position) & active;
+
+        constexpr ColoredPieceType pawntype = GetColoredPiece<white>(PAWN);
+        constexpr ColoredPieceType knighttype = GetColoredPiece<white>(KNIGHT);
+        constexpr ColoredPieceType bishoptype = GetColoredPiece<white>(BISHOP);
+        constexpr ColoredPieceType rooktype = GetColoredPiece<white>(ROOK);
+        constexpr ColoredPieceType queentype = GetColoredPiece<white>(QUEEN);
+        constexpr ColoredPieceType kingtype = GetColoredPiece<white>(KING);
+
+        // Pawns
+
+        BitBoard pawns = Pawn<white>(m_Position);
+        BitBoard nonBishopPawn = pawns & ~bishopPin;
+
+        BitBoard FPawns = PawnForward<white>(nonBishopPawn) & (~m_Position.m_Board) & active; // No diagonally pinned pawn can move forward
+
+        if constexpr (T == SILENT) {
+            BitBoard F2Pawns = PawnForward<white>(nonBishopPawn & Lookup::StartingPawnRank<white>()) & ~m_Position.m_Board;
+            F2Pawns = PawnForward<white>(F2Pawns) & (~m_Position.m_Board) & active; // TODO: Use Fpawns to save calculation
+
+            BitBoard pinnedF2Pawns = F2Pawns & Pawn2Forward<white>(rookPin);
+            BitBoard movePinF2Pawns = F2Pawns & rookPin;
+            F2Pawns = F2Pawns & (~pinnedF2Pawns | movePinF2Pawns);
+
+            while (F2Pawns > 0) { // Loop each bit
+                const BoardPos pos = PopPos(F2Pawns);
+                pushMove({ BuildMove(PawnPos2Forward<enemy>(pos), pos, pawntype), 0 });
+            }
+        }
+
+        BitBoard pinnedFPawns = FPawns & PawnForward<white>(rookPin);
+        BitBoard movePinFPawns = FPawns & rookPin; // Pinned after moving
+        FPawns = FPawns & (~pinnedFPawns | movePinFPawns);
+
+        const BitBoard nonRookPawns = pawns & ~rookPin;
+        BitBoard RPawns = PawnAttackRight<white>(nonRookPawns) & Enemy<white>(m_Position) & active;
+        BitBoard LPawns = PawnAttackLeft<white>(nonRookPawns) & Enemy<white>(m_Position) & active;
+
+        BitBoard pinnedRPawns = RPawns & PawnAttackRight<white>(bishopPin);
+        BitBoard pinnedLPawns = LPawns & PawnAttackLeft<white>(bishopPin);
+        BitBoard movePinRPawns = RPawns & bishopPin; // is it pinned after move
+        BitBoard movePinLPawns = LPawns & bishopPin;
+        RPawns = RPawns & (~pinnedRPawns | movePinRPawns);
+        LPawns = LPawns & (~pinnedLPawns | movePinLPawns);
+
+        if ((FPawns | RPawns | LPawns) & FirstRank<enemy>()) { // Reduces two conditional statements
+            uint64 FPromote = FPawns & FirstRank<enemy>();
+            uint64 RPromote = RPawns & FirstRank<enemy>();
+            uint64 LPromote = LPawns & FirstRank<enemy>();
+
+            FPawns = FPawns & ~FirstRank<enemy>();
+            RPawns = RPawns & ~FirstRank<enemy>();
+            LPawns = LPawns & ~FirstRank<enemy>();
+
+            if constexpr (T == QUIESCENCE) {
+                // Add Forward pawns
+                while (FPromote > 0) {
+                    const BoardPos pos = PopPos(FPromote);
+                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b000100), ScoreCapture(pawntype, WBISHOP) });
+                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b001000), ScoreCapture(pawntype, WKNIGHT) });
+                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b010000), ScoreCapture(pawntype, WROOK) });
+                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b100000), ScoreCapture(pawntype, WQUEEN) });
+                }
+
+                while (RPromote > 0) { // Loop each bit
+                    const BoardPos pos = PopPos(RPromote);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << pos);
+                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b000100), ScoreCapture(pawntype, WBISHOP) });
+                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b001000), ScoreCapture(pawntype, WKNIGHT) });
+                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b010000), ScoreCapture(pawntype, WROOK) });
+                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b100000), ScoreCapture(pawntype, WQUEEN) });
+                }
+
+                while (LPromote > 0) {
+                    const BoardPos pos = PopPos(LPromote);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << pos);
+                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b000100), ScoreCapture(pawntype, WBISHOP) });
+                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b001000), ScoreCapture(pawntype, WKNIGHT) });
+                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b010000), ScoreCapture(pawntype, WROOK) });
+                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b100000), ScoreCapture(pawntype, WQUEEN) });
+                }
+            }
+        }
+
+        if constexpr (T == SILENT) {
+            while (FPawns > 0) {
+                const BoardPos pos = PopPos(FPawns);
+                pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype), 0 });
+            }
+        }
+
+
+        if constexpr (T == QUIESCENCE) {
+            while (RPawns > 0) { // Loop each bit
+                const BoardPos pos = PopPos(RPawns);
+                const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << pos);
+                pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture), ScoreCapture(pawntype, capture) });
+            }
+
+            while (LPawns > 0) {
+                const BoardPos pos = PopPos(LPawns);
+                const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << pos);
+                pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture), ScoreCapture(pawntype, capture) });
+            }
+
+            // En passant
+
+            BitBoard REPawns = PawnAttackRight<white>(nonRookPawns) & enPassant & (active | enPassantCheck);
+            BitBoard LEPawns = PawnAttackLeft<white>(nonRookPawns) & enPassant & (active | enPassantCheck);
+            BitBoard pinnedREPawns = REPawns & PawnAttackRight<white>(bishopPin);
+            BitBoard stillPinREPawns = REPawns & bishopPin;
+            REPawns = REPawns & (~pinnedREPawns | stillPinREPawns);
+            if (REPawns > 0) {
+                const BoardPos pos = PopPos(REPawns);
+                pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, GetColoredPiece<enemy>(PAWN), 0b000001), OrderingPieceValue(WPAWN) }); // En passant is usually a good move so we give it a bonus
+            }
+
+            BitBoard pinnedLEPawns = LEPawns & PawnAttackLeft<white>(bishopPin);
+            BitBoard stillPinLEPawns = LEPawns & bishopPin;
+            LEPawns = LEPawns & (~pinnedLEPawns | stillPinLEPawns);
+            if (LEPawns > 0) {
+                const BoardPos pos = PopPos(LEPawns);
+                pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, GetColoredPiece<enemy>(PAWN), 0b000001), OrderingPieceValue(WPAWN) }); // En passant is usually a good move so we give it a bonus
+            }
+        }
+
+        // Kinghts
+
+        BitBoard knights = Knight<white>(m_Position) & ~(rookPin | bishopPin); // Pinned knights can not move
+
+        while (knights > 0) { // Loop each bit
+            int pos = PopPos(knights);
+            BitBoard moves = Lookup::knight_attacks[pos] & moveable;
+            if constexpr (T == QUIESCENCE) {
+                BitBoard qmove = moves & Enemy<white>(m_Position);
+                while (qmove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(qmove);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << toPos);
+                    pushMove({ BuildMove(pos, toPos, knighttype, capture), ScoreCapture(knighttype, capture) });
+                }
+            }
+
+            if constexpr (T == SILENT) {
+                BitBoard smove = moves & ~Enemy<white>(m_Position);
+                while (smove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(smove);
+                    pushMove({ BuildMove(pos, toPos, knighttype), 0 });
+                }
+            }
+        }
+
+        // Bishops
+
+        BitBoard bishops = Bishop<white>(m_Position) & ~rookPin; // A rook pinned bishop can not move
+
+        BitBoard pinnedBishop = bishopPin & bishops;
+        BitBoard notPinnedBishop = bishops ^ pinnedBishop;
+
+        while (pinnedBishop > 0) {
+            int pos = PopPos(pinnedBishop);
+            BitBoard moves = m_Position.BishopAttack(pos, m_Position.m_Board) & moveable & bishopPin;
+            if constexpr (T == QUIESCENCE) {
+                BitBoard qmove = moves & Enemy<white>(m_Position);
+                while (qmove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(qmove);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << toPos);
+                    pushMove({ BuildMove(pos, toPos, bishoptype, capture), ScoreCapture(bishoptype, capture) });
+                }
+            }
+            if constexpr (T == SILENT) {
+                BitBoard smove = moves & ~Enemy<white>(m_Position);
+                while (smove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(smove);
+                    pushMove({ BuildMove(pos, toPos, bishoptype), 0 });
+                }
+            }
+        }
+
+        while (notPinnedBishop > 0) {
+            int pos = PopPos(notPinnedBishop);
+            BitBoard moves = m_Position.BishopAttack(pos, m_Position.m_Board) & moveable;
+            BitBoard qmove = moves & Enemy<white>(m_Position);
+            BitBoard smove = moves & ~Enemy<white>(m_Position);
+            if constexpr (T == QUIESCENCE) {
+                while (qmove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(qmove);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << toPos);
+                    pushMove({ BuildMove(pos, toPos, bishoptype, capture), ScoreCapture(bishoptype, capture) });
+                }
+            }
+
+            if constexpr (T == SILENT) {
+                while (smove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(smove);
+                    pushMove({ BuildMove(pos, toPos, bishoptype), 0 });
+                }
+            }
+        }
+
+        // Rooks
+        BitBoard rooks = Rook<white>(m_Position) & ~bishopPin; // A bishop pinned rook can not move
+
+        // Castles
+        const BoardPos kingpos = GET_SQUARE(King<white>(m_Position));
+
+        if constexpr (T == SILENT) {
+            BitBoard CK = CastleKing<white>(m_Position.m_States[m_Position.m_Ply].m_CastleRights, danger, m_Position.m_Board, rooks);
+            BitBoard CQ = CastleQueen<white>(m_Position.m_States[m_Position.m_Ply].m_CastleRights, danger, m_Position.m_Board, rooks);
+            if (CK) {
+                pushMove({ BuildMove(kingpos, GET_SQUARE(CK), kingtype, NOPIECE, 0b000010), 50 }); // Little bonus for castles
+            }
+            if (CQ) {
+                pushMove({ BuildMove(kingpos, GET_SQUARE(CQ), kingtype, NOPIECE, 0b000010), 49 }); // Little bonus for castles
+            }
+        }
+
+        BitBoard pinnedRook = rookPin & (rooks);
+        BitBoard notPinnedRook = rooks ^ pinnedRook;
+
+        while (pinnedRook > 0) {
+            int pos = PopPos(pinnedRook);
+            BitBoard moves = m_Position.RookAttack(pos, m_Position.m_Board) & moveable & rookPin;
+            if constexpr (T == QUIESCENCE) {
+                BitBoard qmove = moves & Enemy<white>(m_Position);
+                while (qmove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(qmove);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << toPos);
+                    pushMove({ BuildMove(pos, toPos, rooktype, capture), ScoreCapture(rooktype, capture) });
+                }
+            }
+
+            if constexpr (T == SILENT) {
+                BitBoard smove = moves & ~Enemy<white>(m_Position);
+                while (smove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(smove);
+                    pushMove({ BuildMove(pos, toPos, rooktype), 0 });
+                }
+            }
+        }
+
+        while (notPinnedRook > 0) {
+            int pos = PopPos(notPinnedRook);
+            BitBoard moves = m_Position.RookAttack(pos, m_Position.m_Board) & moveable;
+            if constexpr (T == QUIESCENCE) {
+                BitBoard qmove = moves & Enemy<white>(m_Position);
+                while (qmove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(qmove);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << toPos);
+                    pushMove({ BuildMove(pos, toPos, rooktype, capture), ScoreCapture(rooktype, capture) });
+                }
+            }
+
+            if constexpr (T == SILENT) {
+                BitBoard smove = moves & ~Enemy<white>(m_Position);
+                while (smove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(smove);
+                    pushMove({ BuildMove(pos, toPos, rooktype), 0 });
+                }
+            }
+        }
+
+        // Queens
+        BitBoard queens = Queen<white>(m_Position);
+
+        BitBoard pinnedStraightQueen = rookPin & queens;
+        BitBoard pinnedDiagonalQueen = bishopPin & queens;
+
+        BitBoard notPinnedQueen = queens ^ (pinnedStraightQueen | pinnedDiagonalQueen);
+
+
+        while (pinnedStraightQueen > 0) {
+            int pos = PopPos(pinnedStraightQueen);
+            BitBoard moves = m_Position.RookAttack(pos, m_Position.m_Board) & moveable & rookPin;
+            if constexpr (T == QUIESCENCE) {
+                BitBoard qmove = moves & Enemy<white>(m_Position);
+                while (qmove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(qmove);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << toPos);
+                    pushMove({ BuildMove(pos, toPos, queentype, capture), ScoreCapture(queentype, capture) });
+                }
+            }
+
+            if constexpr (T == SILENT) {
+                BitBoard smove = moves & ~Enemy<white>(m_Position);
+                while (smove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(smove);
+                    pushMove({ BuildMove(pos, toPos, queentype), 0 });
+                }
+            }
+        }
+
+        while (pinnedDiagonalQueen > 0) {
+            int pos = PopPos(pinnedDiagonalQueen);
+            BitBoard moves = m_Position.BishopAttack(pos, m_Position.m_Board) & moveable & bishopPin;
+            if constexpr (T == QUIESCENCE) {
+                BitBoard qmove = moves & Enemy<white>(m_Position);
+                while (qmove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(qmove);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << toPos);
+                    pushMove({ BuildMove(pos, toPos, queentype, capture), ScoreCapture(queentype, capture) });
+                }
+            }
+
+            if constexpr (T == SILENT) {
+                BitBoard smove = moves & ~Enemy<white>(m_Position);
+                while (smove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(smove);
+                    pushMove({ BuildMove(pos, toPos, queentype), 0 });
+                }
+            }
+        }
+
+        while (notPinnedQueen > 0) {
+            int pos = PopPos(notPinnedQueen);
+            BitBoard moves = m_Position.QueenAttack(pos, m_Position.m_Board) & moveable;
+
+            if constexpr (T == QUIESCENCE) {
+                BitBoard qmove = moves & Enemy<white>(m_Position);
+                while (qmove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(qmove);
+                    const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << toPos);
+                    pushMove({ BuildMove(pos, toPos, queentype, capture), ScoreCapture(queentype, capture) });
+                }
+            }
+
+            if constexpr (T == SILENT) {
+                BitBoard smove = moves & ~Enemy<white>(m_Position);
+                while (smove > 0) { // Loop each bit
+                    const BoardPos toPos = PopPos(smove);
+                    pushMove({ BuildMove(pos, toPos, queentype), 0 });
+                }
+            }
+        }
+
+        // King
+
+        BitBoard kmoves = Lookup::king_attacks[kingpos] & ~Player<white>(m_Position);
+        kmoves &= ~danger;
+
+        if constexpr (T == QUIESCENCE) {
+            BitBoard qkmove = kmoves & Enemy<white>(m_Position);
+            while (qkmove > 0) { // Loop each bit
+                const BoardPos toPos = PopPos(qkmove);
+                const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << toPos);
+                pushMove({ BuildMove(kingpos, toPos, kingtype, capture), ScoreCapture(kingtype, capture) });
+            }
+        }
+
+        if constexpr (T == SILENT) {
+            BitBoard skmove = kmoves & ~Enemy<white>(m_Position);
+            while (skmove > 0) { // Loop each bit
+                const BoardPos toPos = PopPos(skmove);
+                pushMove({ BuildMove(kingpos, toPos, kingtype), 0 });
+            }
+        }
+    }
 };

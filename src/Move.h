@@ -11,14 +11,24 @@ enum ColoredPieceType : uint8 {
 };
 
 
+static inline constexpr ushort OrderingPieceValue(ColoredPieceType piece) {
+    constexpr ushort piece_values[13] = {
+        0, 100, 300, 350, 500, 1100, 10000,
+           100, 300, 350, 500, 1100, 10000,
+    };
+    return piece_values[piece];
+}
+
 template<Color c>
-static inline constexpr ColoredPieceType GetColoredPiece(PieceType T) {
+static inline constexpr ColoredPieceType GetColoredPiece(PieceType type) {
     constexpr ColoredPieceType pieceMap[2][7] = {
         { NOPIECE, BPAWN, BKNIGHT, BBISHOP, BROOK, BQUEEN, BKING },
         { NOPIECE, WPAWN, WKNIGHT, WBISHOP, WROOK, WQUEEN, WKING }
     };
-    return pieceMap[c][T];
+    return pieceMap[c][type];
 }
+
+//static inline constexpr GetPieceType(ColoredPieceType )
 
 // Move:
 // from: 6 bits
