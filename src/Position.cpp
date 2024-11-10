@@ -1,7 +1,5 @@
 #include "Position.h"
 
-#include "LookupTables.h"
-
 void Position::SetPosition(const std::string& FEN) {
     m_WhitePawn = FenToMap(FEN, 'P');
     m_WhiteKnight = FenToMap(FEN, 'N');
@@ -22,6 +20,7 @@ void Position::SetPosition(const std::string& FEN) {
     m_Hash = Zobrist_Hash(*this);
     m_PawnHash = Zobrist_PawnHash(*this);
     m_States[m_Ply].m_Hash = m_Hash;
+    m_InCheck = m_WhiteMove ? UpdateChecks<WHITE>() : UpdateChecks<BLACK>();
 }
 
 void Position::SetState(const std::string& FEN) {
@@ -408,6 +407,8 @@ void Position::MovePiece(Move move) {
 
     m_WhiteMove = !m_WhiteMove;
     m_States[m_Ply].m_Hash = m_Hash;
+
+    m_InCheck = m_WhiteMove ? UpdateChecks<WHITE>() : UpdateChecks<BLACK>();
 }
 
 void Position::UndoMove(Move move) {
@@ -599,6 +600,7 @@ void Position::UndoMove(Move move) {
     m_Board = (m_White | m_Black);
 
     m_WhiteMove = !m_WhiteMove;
+    m_InCheck = m_WhiteMove ? UpdateChecks<WHITE>() : UpdateChecks<BLACK>();
 }
 
 uint64 Zobrist_Hash(const Position& position) {

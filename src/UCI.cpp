@@ -75,6 +75,8 @@ void UCI::Start() {
             } else if (token == "movetime") {
                 GetToken(istream, token);
                 time = std::atoi(token.c_str());
+            } else if (token == "infinite") {
+                time = -1;
             }
             while (!istream.eof()) {
                 if (token == "wtime") {
@@ -97,7 +99,7 @@ void UCI::Start() {
                 continue;
             }
             else {
-                auto a = std::async(std::launch::async, &Search::UCIMove, &m_Search, time);
+                m_Search.UCIMove(time);
                 continue;
             }
         }

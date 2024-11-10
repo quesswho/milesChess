@@ -140,11 +140,6 @@ public:
             hashMove = entry->m_BestMove;
         }
 
-        uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = board.m_States[ply].m_EnPassant;
-        Check(board.m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
-        bool inCheck = false;
-        if (active != 0xFFFFFFFFFFFFFFFFull) inCheck = true;
-
 
         Move bestMove = 0;
         int movecnt = 0;
@@ -172,7 +167,7 @@ public:
 
         // Check for mate or stalemate
         if (!movecnt) {
-            if (inCheck) {
+            if (board.m_InCheck) {
                 std::vector<Move> mate = GenerateMoves<ALL>(board); // TODO: Generate evasions in Quiescense which will give mate or draw if movecnt == 0
                 if(mate.size() == 0) bestScore = -MATE_SCORE + ply;
             } else { // Commented out because it yields better performance without it even though it may not be correct
@@ -232,11 +227,6 @@ public:
             }
         }
 
-        uint64 danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = board.m_States[ply].m_EnPassant;
-        Check(board.m_WhiteMove, board, danger, active, rookPin, bishopPin, enPassant);
-        bool inCheck = false;
-        if (active != 0xFFFFFFFFFFFFFFFFull) inCheck = true;
-
         
 		int64 bestScore = -MATE_SCORE;
         int64 old_alpha = alpha;
@@ -251,9 +241,11 @@ public:
             int newdepth = depth - 1;
             int extension = 0;
             int delta = beta - alpha;
-            if (inCheck && ply < MAX_DEPTH) extension++;
 
-            if (ply >= 4 && CaptureType(move) == ColoredPieceType::NOPIECE && !inCheck) {
+            
+            board.MovePiece(move);
+
+            if (ply >= 4 && CaptureType(move) == ColoredPieceType::NOPIECE && !board.m_InCheck) {
                 int reduction = (1500 - delta * 800 / m_RootDelta) / 1024 * std::log(ply);
                 // If we are on pv node then decrease reduction
                 if (*stack->m_PV != Move()) reduction -= 1;
@@ -266,7 +258,8 @@ public:
             }
 
             newdepth += extension;
-            board.MovePiece(move); // Need to fix eventually
+            if (board.m_InCheck && ply < MAX_DEPTH) extension++;
+
 			int64 score = -AlphaBeta(board, stack+1, -beta, -alpha, ply + 1, newdepth);
             board.UndoMove(move);
 			if (score > bestScore) {
@@ -284,7 +277,7 @@ public:
 
         // Check for mate or stalemate
         if (!movecnt) {
-            if (inCheck) {
+            if (board.m_InCheck) {
                 bestScore = -MATE_SCORE + ply;
             } else {
                 bestScore = 0;
@@ -308,8 +301,12 @@ public:
 
         bool moreTime = m_Position.m_WhiteMove ? wtime > btime : wtime < btime;
         int64 timeleft = m_Position.m_WhiteMove ? wtime : btime;
-        int64 timeic = m_Position.m_WhiteMove ? winc : binc;
-        int64 target = (timeleft + (moreTime ? timediff : 0)) / 40 + 200 + timeic;
+        int64 timeinc = m_Position.m_WhiteMove ? winc : binc;
+
+        int64 est_movesleft = std::max(60 - m_Position.m_FullMoves, 20ull);
+        int64 est_timeleft = timeleft + est_movesleft * timeinc;
+
+        int64 target = est_timeleft / est_movesleft - 20; // - overhead
         float x = (m_Position.m_FullMoves - 20.0f)/30.0f;
         float factor = exp(-x*x);   // Bell curve
         sync_printf("info movetime %lli\n", (int64)(target * factor));
@@ -481,6 +478,7 @@ public:
         const BitBoard from = 1ull << fromPos;
         const BoardPos toPos = ('h' - str[2] + (str[3] - '1') * 8);
         const BitBoard to = 1ull << toPos;
+        ColoredPieceType capture = GetCaptureType<!white>(m_Position, 1ull << toPos);
 
         uint8 flags = 0;
 
@@ -505,6 +503,7 @@ public:
             type = GetColoredPiece<white>(PAWN);
             if (m_Position.m_States[m_Position.m_Ply].m_EnPassant & to) {
                 flags |= 0b1;
+                capture = GetColoredPiece<!white>(PAWN);
             }
         }
         else if (Knight<white>(m_Position) & from) {
@@ -530,7 +529,6 @@ public:
             } 
         }
 
-        const ColoredPieceType capture = GetCaptureType<!white>(m_Position, 1ull << toPos);
         
 
         assert("Could not read move", type == MoveType::NONE);

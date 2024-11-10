@@ -9,7 +9,7 @@ using uint8 = uint8_t;
 using int8 = int8_t;
 
 
-#define _COMPILETIME static inline constexpr
+#define _COMPILETIME inline constexpr
 
 /*
     Boards start from bottom right and go right to left

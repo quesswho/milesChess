@@ -23,7 +23,7 @@ int main() {
 	// Game against me & erik, we won
 	// 1. e4 e5 2. d3 Nf6 3. Nc3 Bb4 4. Ne2 d5 5. a3 Bxc3+ 6. Nxc3 dxe4 7. dxe4 Qxd1+ 8. Kxd1 O-O 9. h3 Rd8+ 10. Bd3 b6 11. g3 Ba6 12. f4 Bxd3 13. cxd3 Rxd3+ 14. Ke2 Rxg3 15. fxe5 Nfd7 16. Nd5 Na6 17. b4 c6 18. Ne7+ Kf8 19. Nxc6 Nc7 20. h4 Nb5 21. a4 Nc3+ 22. Ke1 Nxe4 23. Rf1 Rc8 24. e6 Ndf6 25. e7+ Ke8 26. b5 Rc3 27. Ba3 Rc7 28. Rd1 Re3#
 
-	if (false) {
+	if (true) {
 		UCI uci;
 		uci.Start();
 	} else {
@@ -39,6 +39,7 @@ int main() {
 		//search->LoadPosition("3r4/8/1p1r2k1/1R2KRP1/p7/8/8/8 b - - 0 1"); // TODO: Wrong move here
 		//search->LoadPosition("2r2k2/pp3p1R/5p2/3Pp3/3qP1Q1/7P/P5PK/2r5 w - - 0 1");
 		//search->LoadPosition("7k/8/8/8/8/5p2/6P1/7K w - - 0 1");
+		search->LoadPosition("5b1r/1kp5/p1pr4/2K1Pp1p/PPP5/6P1/1Bp1R2P/R7 b - - 0 33");
 		Timer time;
 		time.Start();
 		search->m_MaxTime = 10000;
