@@ -30,6 +30,12 @@ struct RootMove {
     }
 };
 
+enum NodeType {
+    ROOT,
+    PV,
+    NON_PV
+};
+
 class Search {
 public:
     int64 m_MaxTime;
@@ -120,8 +126,18 @@ public:
         *pv = Move();
     }
 
-    int64 Quiesce(Position& board, int64 alpha, int64 beta, int ply, int depth) {
+    template<NodeType node>
+    int64 Quiesce(Position& board, MoveStack* stack, int64 alpha, int64 beta, int depth) {
+        constexpr bool PVNode = node != NON_PV;
         m_NodeCnt++;
+
+        // Check for repetition
+        for (int i = 4; i < board.m_States[board.m_Ply].m_HalfMoves && i < board.m_Ply; i += 2) {
+            if (board.m_States[board.m_Ply - i].m_Hash == board.m_Hash) {
+                return 0;
+            }
+        }
+
         int64 bestScore = Evaluate(board, m_PawnTable);
         if (bestScore >= beta) { // Return if we fail soft
             return bestScore;
@@ -134,7 +150,7 @@ public:
         Move hashMove = Move();
         TTEntry* entry = m_Table->Probe(board.m_Hash);
         if (entry != nullptr) {
-            if (entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
+            if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
                 return entry->m_Value;
             }
             hashMove = entry->m_BestMove;
@@ -151,7 +167,7 @@ public:
             if (CaptureType(move) == ColoredPieceType::NOPIECE) continue; // Only analyze capturing moves
 
             board.MovePiece(move);
-            int64 score = -Quiesce(board, -beta, -alpha, ply + 1, depth - 1);
+            int64 score = -Quiesce<node>(board, stack + 1, -beta, -alpha, depth - 1);
             board.UndoMove(move);
             if (score > bestScore) {
                 bestScore = score;
@@ -169,7 +185,7 @@ public:
         if (!movecnt) {
             if (board.m_InCheck) {
                 std::vector<Move> mate = GenerateMoves<ALL>(board); // TODO: Generate evasions in Quiescense which will give mate or draw if movecnt == 0
-                if(mate.size() == 0) bestScore = -MATE_SCORE + ply;
+                if(mate.size() == 0) bestScore = -MATE_SCORE + stack->m_Ply;
             } else { // Commented out because it yields better performance without it even though it may not be correct
                 //std::vector<Move> mate = GenerateMoves<ALL>(board);
                 //if (mate.size() == 0) bestScore = 0;
@@ -178,21 +194,26 @@ public:
 
         if (bestMove != 0) {
             if (bestScore >= beta) {
-                m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, ply, depth, board.m_FullMoves));
+                m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
             } else {
-                m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, UPPER_BOUND, ply, depth, board.m_FullMoves));
+                m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, UPPER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
             }
         }
 
         return bestScore;
     }
 
-	int64 AlphaBeta(Position& board, MoveStack* stack, int64 alpha, int64 beta, int ply, int depth) {
+    template<NodeType node>
+	int64 AlphaBeta(Position& board, MoveStack* stack, int64 alpha, int64 beta, int depth, bool cutNode) {
+
+        constexpr bool PVNode = node != NON_PV;
+        constexpr bool rootNode = node == ROOT;
+
         m_NodeCnt++;
         if (!m_Running || m_Timer.EndMs() >= m_MaxTime) return 0;
 
         // Prevent explosions
-        assert("Ply is more than MAX_DEPTH!\n", ply >= MAX_DEPTH);
+        assert("Ply is more than MAX_DEPTH!\n", stack->m_Ply >= MAX_DEPTH);
         depth = std::min(depth, MAX_DEPTH - 1);
 
 
@@ -200,37 +221,44 @@ public:
         Move hashMove = Move();
         TTEntry* entry = m_Table->Probe(board.m_Hash);
         if (entry != nullptr) {
-            if (entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
+            // Check for TT cutoff
+            if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
                 return entry->m_Value;
             }
             hashMove = entry->m_BestMove;
         }
 
         // Probe the tablebase
-        int success;
-        int v = TableBase::Probe_DTZ(board, &success);
-        if (success) {
-            return Signum(v) * (MATE_SCORE-v);
+        if (!rootNode) {
+            int success;
+            //printf("%s\n", board.ToFen().c_str());
+            int v = TableBase::Probe_DTZ(board, &success);
+            if (success) {
+                int value = Signum(v) * (MATE_SCORE - v);
+                // TODO: Store value in hashtable
+                return value;
+            }
+
+            // We count any repetion as draw
+            // TODO: Maybe employ hashing to make this O(1) instead of O(n)
+            for (int i = 4; i < board.m_States[board.m_Ply].m_HalfMoves && i < board.m_Ply; i += 2) {
+                if (board.m_States[board.m_Ply - i].m_Hash == board.m_Hash) {
+                    return 0;
+                }
+            }
         }
 
 
         // Quiesce search if we reached the bottom
-        if (depth <= 1) {
-			return Quiesce(board, alpha, beta, ply, depth);
+        if (depth <= 0) {
+			return Quiesce<node>(board, stack, alpha, beta, depth);
 		}
-
-        // We count any repetion as draw
-        // TODO: Maybe employ hashing to make this O(1) instead of O(n)
-        for (int i = 0; i < board.m_States[ply].m_HalfMoves && i < board.m_Ply; i++) {
-            if (board.m_States[i].m_Hash == board.m_Hash) {
-                return 0;
-            }
-        }
-
         
 		int64 bestScore = -MATE_SCORE;
         int64 old_alpha = alpha;
         Move bestMove = 0;
+
+        int64 score = bestScore;
 
         int movecnt = 0;
 
@@ -238,35 +266,54 @@ public:
         Move move;
 		while ((move = moveGen.Next()) != 0) {
             movecnt++;
-            int newdepth = depth - 1;
-            int extension = 0;
+            int newDepth = depth - 1;
+            int reduction = 0;
             int delta = beta - alpha;
 
-            
             board.MovePiece(move);
 
-            if (ply >= 4 && CaptureType(move) == ColoredPieceType::NOPIECE && !board.m_InCheck) {
-                int reduction = (1500 - delta * 800 / m_RootDelta) / 1024 * std::log(ply);
+            // Late move reduction
+            if (depth >= 2 && movecnt > 1 && !rootNode) {
+                reduction = (500 + 500 * delta * std::log(depth) * std::log(movecnt) / m_RootDelta) / 1000;
+
+                // Extend checks
+                if (board.m_InCheck && stack->m_Ply < MAX_DEPTH) reduction -= 1;
+
                 // If we are on pv node then decrease reduction
-                if (*stack->m_PV != Move()) reduction -= 1;
+                if (PVNode) reduction -= 1;
+                //if (stack->m_PV) reduction -= 1;
 
                 // If hash move is not found then increase reduction
-                if (hashMove == Move() && depth <= ply * 2) reduction += 1;
+                if (hashMove == 0) reduction += 1;
 
-                reduction = std::max(0, reduction);
-                newdepth = std::max(1, newdepth - reduction);
+                // Reduce expected cut node
+                if (cutNode) reduction += 2;
+
+                int reducedDepth = std::min(std::max(1, newDepth - reduction), newDepth+1);
+                score = -AlphaBeta<NON_PV>(board, stack + 1, -alpha-1, -alpha, reducedDepth, true);
+                if (score > alpha && reducedDepth < newDepth) {
+                    // newdepth is different so search it again att full depth
+                    if (reducedDepth < newDepth) {
+                        score = -AlphaBeta<NON_PV>(board, stack + 1, -alpha - 1, -alpha, newDepth, !cutNode);
+                    }
+                }
+            } else if (!PVNode || movecnt > 1) {
+                score = -AlphaBeta<NON_PV>(board, stack + 1, -alpha - 1, -alpha, newDepth, !cutNode);
             }
 
-            newdepth += extension;
-            if (board.m_InCheck && ply < MAX_DEPTH) extension++;
+            if (PVNode && (movecnt == 1 || score > alpha)) {
+                score = -AlphaBeta<PV>(board, stack + 1, -beta, -alpha, newDepth, false);
+            }
 
-			int64 score = -AlphaBeta(board, stack+1, -beta, -alpha, ply + 1, newdepth);
+            
             board.UndoMove(move);
 			if (score > bestScore) {
 				bestScore = score;
                 bestMove = move;
 				if (score > alpha) {
-                    Update_PV(stack->m_PV, bestMove, (stack + 1)->m_PV);
+                    if (PVNode) {
+                        Update_PV(stack->m_PV, bestMove, (stack + 1)->m_PV);
+                    }
 					alpha = score;
 				}
 			}
@@ -278,16 +325,16 @@ public:
         // Check for mate or stalemate
         if (!movecnt) {
             if (board.m_InCheck) {
-                bestScore = -MATE_SCORE + ply;
+                bestScore = -MATE_SCORE + stack->m_Ply;
             } else {
                 bestScore = 0;
             }
         }
 
         if (bestScore >= beta) {
-            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, ply, depth, board.m_FullMoves));
+            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
         } else {
-            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, UPPER_BOUND, ply, depth, board.m_FullMoves));
+            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, UPPER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
         }
 
 		return bestScore;
@@ -303,14 +350,15 @@ public:
         int64 timeleft = m_Position.m_WhiteMove ? wtime : btime;
         int64 timeinc = m_Position.m_WhiteMove ? winc : binc;
 
-        int64 est_movesleft = std::max(60 - m_Position.m_FullMoves, 20ull);
+        int64 est_movesleft = std::max(60 - (int64)m_Position.m_FullMoves, 20ll);
         int64 est_timeleft = timeleft + est_movesleft * timeinc;
 
-        int64 target = est_timeleft / est_movesleft - 20; // - overhead
+        int64 target = std::max(std::min(est_timeleft / est_movesleft - 20, timeleft/2), 20ll); // Don't let the time run out and - overhead
         float x = (m_Position.m_FullMoves - 20.0f)/30.0f;
         float factor = exp(-x*x);   // Bell curve
-        sync_printf("info movetime %lli\n", (int64)(target * factor));
-        UCIMove(target * factor);
+        int64 result = (target * factor);
+        sync_printf("info movetime %lli\n", result);
+        UCIMove(result);
     }
 
     void UCIMove(int64 time) {
@@ -323,6 +371,8 @@ public:
 
     void UCIMove_async() {
         m_Running = true;
+        m_Timer.Start();
+
         m_Maxdepth = 0;
 
         m_NodeCnt = 1;
@@ -333,29 +383,15 @@ public:
         for (int i = 0; i < MAX_DEPTH; i++) {
             (stack + i)->m_Ply = i;
         }
-
-        // Move the moves into rootmoves
-        std::vector<Move> generatedMoves = GenerateMoves<ALL>(m_Position);
-        m_RootMoves.clear();
-        m_RootMoves.reserve(generatedMoves.size());  // Reserve space for efficiency
-
-        std::transform(std::make_move_iterator(generatedMoves.begin()),
-            std::make_move_iterator(generatedMoves.end()),
-            std::back_inserter(m_RootMoves),
-            [](Move&& move) {
-                return RootMove{ 0, std::move(move) };
-            });
-
-        if (m_RootMoves.size() == 0) return;
         
         // Start timer
-        m_Timer.Start();
-        Move bestMove = m_RootMoves[0].move;
+        Move bestMove = 0;
         Move finalMove = bestMove;
         int64 bestScore = -MATE_SCORE;
         int64 rootAlpha = MIN_ALPHA;
         int64 rootBeta = MAX_BETA;
         m_RootDelta = 10;
+        // Iterative deepening
         while (m_Running && m_Timer.EndMs() < m_MaxTime && MAX_DEPTH > m_Maxdepth) {
             bestScore = -MATE_SCORE;
 
@@ -366,7 +402,6 @@ public:
             int64 alpha, beta;
 
             m_Maxdepth++;
-            if (m_RootMoves.size() == 1) break;
 
             TTEntry* entry = m_Table->Probe(m_Position.m_Hash);
             if (entry != nullptr) {
@@ -374,29 +409,12 @@ public:
                 rootBeta = entry->m_Value + m_RootDelta;
             }
             int failHigh = 0;
+
+            // Aspiration window
             while (true) {
                 alpha = rootAlpha;
                 beta = rootBeta;
-                bestScore = -MATE_SCORE;
-                std::stable_sort(m_RootMoves.begin(), m_RootMoves.end());
-                for (RootMove& move : m_RootMoves) {
-                    m_Position.MovePiece(move.move);
-                    int64 score = -AlphaBeta(m_Position, stack+1, -beta, -alpha, 1, std::max(1, m_Maxdepth - failHigh));
-                    m_Position.UndoMove(move.move);
-                    assert("Evaluation is unreasonably big\n", score >= 72057594);
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestMove = move.move;
-                        move.score = score;
-                        if (score > alpha) {
-                            Update_PV(stack->m_PV, bestMove, (stack + 1)->m_PV);
-                            alpha = score;
-                        }
-                    }
-                    if (alpha >= beta) { // Exit out early
-                        break;
-                    }
-                }
+                bestScore = AlphaBeta<ROOT>(m_Position, stack, rootAlpha, rootBeta, std::max(1, m_Maxdepth - failHigh), false);
 
                 if (bestScore <= rootAlpha) { // Failed low
                     rootBeta = (rootAlpha + rootBeta) / 2;
@@ -407,7 +425,7 @@ public:
                     rootBeta = std::min(bestScore + m_RootDelta, MAX_BETA);
                     failHigh++;
                 } else {
-                    break;
+                    break; // We found good bounds so exit out
                 }
 
                 m_RootDelta *= 1.5;
@@ -415,14 +433,16 @@ public:
             if (!m_Running || m_Timer.EndMs() >= m_MaxTime) break;
 
             // Print pv and search info
-            sync_printf("info depth %i score cp %lli time %lli nodes %llu tps %llu\n", m_Maxdepth, (m_Position.m_WhiteMove ? 1 : -1) * bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
-            sync_printf("info pv");
+            sync_printf("info depth %i score cp %lli time %lli nodes %llu tps %llu\n", m_Maxdepth, bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
+            std::ostringstream oss;
+            oss << "info pv";
             for (int i = 0; i < MAX_DEPTH && stack->m_PV[i] != Move(); i++) {
-                sync_printf(" %s", MoveToString(stack->m_PV[i]).c_str());
+                oss << " " << MoveToString(stack->m_PV[i]);
             }
-            sync_printf("\n");
+            oss << "\n";
+            sync_printf("%s", oss.str().c_str());
 
-            finalMove = bestMove;
+            finalMove = stack->m_PV[0];
             
             if (bestScore >= beta) {
                 m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore, LOWER_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));

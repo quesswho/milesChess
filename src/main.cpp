@@ -23,6 +23,9 @@ int main() {
 	// Game against me & erik, we won
 	// 1. e4 e5 2. d3 Nf6 3. Nc3 Bb4 4. Ne2 d5 5. a3 Bxc3+ 6. Nxc3 dxe4 7. dxe4 Qxd1+ 8. Kxd1 O-O 9. h3 Rd8+ 10. Bd3 b6 11. g3 Ba6 12. f4 Bxd3 13. cxd3 Rxd3+ 14. Ke2 Rxg3 15. fxe5 Nfd7 16. Nd5 Na6 17. b4 c6 18. Ne7+ Kf8 19. Nxc6 Nc7 20. h4 Nb5 21. a4 Nc3+ 22. Ke1 Nxe4 23. Rf1 Rc8 24. e6 Ndf6 25. e7+ Ke8 26. b5 Rc3 27. Ba3 Rc7 28. Rd1 Re3#
 
+	// This should yield a draw
+	// position startpos moves e2e4 d7d5 b1c3 d5d4 c3d5 e7e6 d5f4 g7g5 f4d3 b8c6 g1f3 g8f6 f3g5 h7h6 e4e5 h6g5 e5f6 d8f6 h2h3 e6e5 g2g4 e5e4 d1e2 f6e6 f1g2 e4d3 e2e6 c8e6 c2d3 e8d7 a2a4 f7f5 h1g1 f5f4 a4a5 f8c5 e1f1 b7b5 b2b4 c5e7 c1a3 a8g8 g2c6 d7c6 f1g2 a7a6 f2f3 e7d6 g1e1 e6d5 e1h1 h8h4 h1f1 g8e8 a1e1 e8e1 f1e1 c6d7 e1h1 c7c6 h1e1 d6e7 e1h1 e7d6
+
 	if (true) {
 		UCI uci;
 		uci.Start();
@@ -39,7 +42,8 @@ int main() {
 		//search->LoadPosition("3r4/8/1p1r2k1/1R2KRP1/p7/8/8/8 b - - 0 1"); // TODO: Wrong move here
 		//search->LoadPosition("2r2k2/pp3p1R/5p2/3Pp3/3qP1Q1/7P/P5PK/2r5 w - - 0 1");
 		//search->LoadPosition("7k/8/8/8/8/5p2/6P1/7K w - - 0 1");
-		search->LoadPosition("5b1r/1kp5/p1pr4/2K1Pp1p/PPP5/6P1/1Bp1R2P/R7 b - - 0 33");
+		//search->LoadPosition("5rk1/2P2qp1/7p/5p2/3B4/7P/r4PP1/2QR2K1 b - - 0 39"); // Supposed to do the move a2a8
+		search->LoadPosition("r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2");
 		Timer time;
 		time.Start();
 		search->m_MaxTime = 10000;

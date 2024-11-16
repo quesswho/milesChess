@@ -5,6 +5,7 @@
 
 #include "TableBase.h"
 #include "LookupTables.h"
+#include "MoveGen.h"
 
 #include <windows.h>
 
@@ -95,7 +96,7 @@ namespace TableBase {
         return key;
     }
 
-    static uint64 Material_Key(const Position& board, bool mirror) {
+    static uint64 Calc_Key(const Position& board, bool mirror) {
         bool color = mirror;
         int pt;
         int i;
@@ -1187,7 +1188,7 @@ namespace TableBase {
         return *(sympat + 3 * sym);
     }
 
-    int TableBase::Probe_WDL(const Position& board, int* success) {
+    static int Probe_WDL_Table(const Position& board, int* success) {
         *success = 1;
 
         TBEntry* ptr;
@@ -1196,16 +1197,6 @@ namespace TableBase {
         int i;
         ubyte res;
         int p[TBPIECES];
-
-        int man = COUNT_BIT(board.m_Board);
-        if (man > TBPIECES) {
-            *success = 0;
-            return 0;
-        }
-
-        if (man == 2) { // Two kings is automatic draw
-            return 0;
-        }
 
         uint64 key = Material_Key(board);
 
@@ -1284,12 +1275,100 @@ namespace TableBase {
         return ((int)res) - 2;
     }
 
-    int TableBase::Probe_DTZ(const Position& board, int* success) {
-        // Probe WDL first
-        int wdl = Probe_WDL(board, success);
+    // Essentially do a quiesence search until a silent position is reached which will then be probed.
+    static int Probe_Q(Position& board, int alpha, int beta, int* success) {
+        int v;
+
+        int man = COUNT_BIT(board.m_Board);
+
+        if (man == 2) { // Two kings is automatic draw
+            return 0;
+        }
+
+        MoveGen gen(board, 0, true); // Generates all captures, or evasions if in check
+        Move move;
+        while ((move = gen.Next()) != 0) {
+            board.MovePiece(move);
+            v = -Probe_Q(board, -beta, -alpha, success);
+            board.UndoMove(move);
+            if (*success == 0) return 0;
+            if (v > alpha) {
+                if (v >= beta)
+                    return v;
+                alpha = v;
+            }
+        }
+
+        v = Probe_WDL_Table(board, success);
+
+        return alpha >= v ? alpha : v;
+    }
+
+    // -2: loss
+    // -1: loss but 50-move rule draw
+    // 0: draw
+    // 1: win but 50-move rule draw
+    // 2: win
+    int TableBase::Probe_WDL(Position& board, int* success) {
+
+        *success = 1;
+
+        int man = COUNT_BIT(board.m_Board);
+        if (man > TBPIECES) {
+            *success = 0;
+            return 0;
+        }
+
+        if (man == 2) { // Two kings is automatic draw
+            return 0;
+        }
+
+        int best_cap = -3, best_ep = -3;
+
+        MoveGen gen(board, 0, true); // Generates all captures, or evasions if in check
+        Move move;
+        while ((move = gen.Next()) != 0) {
+            board.MovePiece(move);
+            int v = -Probe_Q(board, -2, -best_cap, success);
+            board.UndoMove(move);
+            if (*success == 0) return 0;
+            if (v > best_cap) {
+                if (v == 2) {
+                    *success = 2;
+                    return 2;
+                }
+                if (!EnPassant(move))
+                    best_cap = v;
+                else if (v > best_ep)
+                    best_ep = v;
+            }
+        }
+
+        int v = Probe_WDL_Table(board, success);
         if (*success == 0) return 0;
 
-        if (wdl == 0) return 0;
+        if (best_ep > best_cap) {
+            if (best_ep > v) {
+                *success = 2;
+                return best_ep;
+            }
+            best_cap = best_ep;
+        }
+
+        if (best_cap >= v) {
+            *success = 1 + (best_cap > 0);
+            return best_cap;
+        }
+
+        return v;
+    }
+
+    static int wdl_to_dtz[] = {
+        -1, -101, 0, 101, 1
+    };
+
+    int Probe_DTZ_Table(Position& board, int wdl, int* success) {
+        *success = 1;
 
         struct TBEntry* ptr;
         uint64 idx;
@@ -1323,7 +1402,7 @@ namespace TableBase {
                     free_dtz_entry(DTZ_table[DTZ_ENTRIES - 1].entry);
                 for (i = DTZ_ENTRIES - 1; i > 0; i--)
                     DTZ_table[i] = DTZ_table[i - 1];
-                load_dtz_table(str, Material_Key(board, mirror), Material_Key(board, !mirror));
+                load_dtz_table(str, Calc_Key(board, mirror), Calc_Key(board, !mirror));
             }
         }
 
@@ -1401,6 +1480,59 @@ namespace TableBase {
         }
 
         return res;
+    }
+
+    int TableBase::Probe_DTZ(Position& board, int* success) {
+        // Probe WDL first
+        int wdl = Probe_WDL(board, success);
+        if (*success == 0) return 0;
+
+        if (wdl == 0) return 0;
+
+        // Winning capture
+        if (*success == 2)
+            return wdl_to_dtz[wdl + 2];
+
+        // Check for winning pawn move
+        if (wdl > 0) {
+            MoveGen gen(board, 0, false); // Generates all legal moves
+            Move move;
+            while ((move = gen.Next()) != 0) {
+                if (!(MovePieceType(move) == WPAWN || MovePieceType(move) == WPAWN) || (CaptureType(move) > 0)) continue;
+                board.MovePiece(move);
+                int v = -Probe_WDL(board, success);
+                board.UndoMove(move);
+                if (*success == 0) return 0;
+                if (v == wdl)
+                    return wdl_to_dtz[wdl + 2];
+            }
+        }
+
+        int dtz = Probe_DTZ_Table(board, wdl, success);
+        if (*success >= 0)
+            return wdl_to_dtz[wdl + 2] + ((wdl > 0) ? dtz : -dtz);
+
+        // if success < 0 then we need to probe DTZ for the other side to move.
+
+        int best = wdl > 0 ? INT16_MAX : wdl_to_dtz[wdl + 2];
+        MoveGen gen(board, 0, false);
+        Move move;
+        while ((move = gen.Next()) != 0) {
+            // Skip pawn moves and captures
+            if (MovePieceType(move) == WPAWN || MovePieceType(move) == WPAWN || (CaptureType(move) > 0)) continue;
+            board.MovePiece(move);
+            int v = -Probe_DTZ(board, success);
+            board.UndoMove(move);
+            if (*success == 0) return 0;
+            if (wdl > 0) {
+                if (v > 0 && v + 1 < best)
+                    best = v + 1;
+            } else {
+                if (v - 1 < best)
+                    best = v - 1;
+            }
+        }
+        return best;
     }
 
     void TableBase::Init(std::string path) {

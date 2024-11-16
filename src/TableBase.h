@@ -129,6 +129,6 @@ namespace TableBase {
 
 	void Init(std::string path);
 
-    int Probe_WDL(const Position& board, int* success);
-    int Probe_DTZ(const Position& board, int* success);
+    int Probe_WDL(Position& board, int* success);
+    int Probe_DTZ(Position& board, int* success);
 }

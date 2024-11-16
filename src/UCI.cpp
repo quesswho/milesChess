@@ -38,15 +38,60 @@ void UCI::Start() {
         } else if (token == "position") {
             GetToken(istream, token);
             if (token == "startpos") {
-                m_Search.LoadPosition(Lookup::starting_pos);
                 GetToken(istream, token);
                 if (token == "moves") {
+                    int i = 0;
+                    bool reset = false;
+
+                    // Cache moves from before
+                    std::string moves[CACHED_MOVES_LENGTH] = {};
                     while (!istream.eof()) {
                         GetToken(istream, token);
-                        Move move = m_Search.GetMove(token);
-                        m_Search.m_Position.MovePiece(move);
+                        moves[i] = token;
+                        if (i >= m_CachedLength && !reset) {
+                            m_CachedMoves[i] = token;
+                            Move move = m_Search.GetMove(token);
+                            m_Search.m_Position.MovePiece(move);
+                            m_CachedLength++;
+                        } else if (m_CachedMoves[i] != token) {
+                            m_CachedLength = 0;
+                            if (!reset) {
+                                m_Search.LoadPosition(Lookup::starting_pos);
+                                int k = 0;
+                                while (m_CachedMoves[k] != "") {
+                                    m_CachedMoves[k] = "";
+                                    k++;
+                                }
+                                reset = true;
+                            }
+                        }
+                        i++;
                     }
+                    if (i < m_CachedLength) {
+                        m_CachedLength = 0;
+                        m_Search.LoadPosition(Lookup::starting_pos);
+                        int k = 0;
+                        while (m_CachedMoves[k] != "") {
+                            m_CachedMoves[k] = "";
+                            k++;
+                        }
+                        reset = true;
+                    }
+
+                    if (reset) {
+                        for (int j = 0; j < i; j++) {
+                            token = moves[j];
+                            m_CachedMoves[j] = token;
+                            m_CachedLength++;
+                            Move move = m_Search.GetMove(token);
+                            m_Search.m_Position.MovePiece(move);
+                        }
+                    }
+
+
                     printf("info %s\n", m_Search.m_Position.ToFen().c_str());
+                } else {
+                    m_Search.LoadPosition(Lookup::starting_pos);
                 }
             } else if (token == "fen") {
                 std::string fen;

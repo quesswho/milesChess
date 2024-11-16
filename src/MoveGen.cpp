@@ -57,7 +57,11 @@ Move MoveGen::Next() {
             }
             return 0; // Finished
         case QUIESCENCE_INIT:
-            GenerateMoves<QUIESCENCE>();
+            //if (m_Position.m_InCheck) {
+              //  GenerateMoves<ALL>(); // Generates all evasions
+            //} else {
+                GenerateMoves<QUIESCENCE>();
+           // }
             // sort
             if (m_Current != m_End) std::sort(m_Current, m_End - 1, movecomp);
             m_Stage++;
