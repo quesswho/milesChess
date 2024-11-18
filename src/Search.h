@@ -13,6 +13,7 @@
 
 #define MAX_DEPTH 64 // Maximum depth that the engine will go
 #define MATE_SCORE 32767/2
+#define NONE_SCORE 32766
 #define MIN_ALPHA -32767ll
 #define MAX_BETA 32767ll
 
@@ -20,6 +21,7 @@
 struct MoveStack {
     Move m_PV[MAX_DEPTH] = {};
     int m_Ply;
+    int m_Eval = NONE_SCORE;
 };
 
 struct RootMove {
@@ -138,7 +140,18 @@ public:
             }
         }
 
+        // Probe Transposition table
+        Move hashMove = Move();
+        TTEntry* entry = m_Table->Probe(board.m_Hash);
+        if (entry != nullptr) {
+            if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Score >= beta ? LOWER_BOUND : UPPER_BOUND))) {
+                return entry->m_Score;
+            }
+            hashMove = entry->m_BestMove;
+        }
+
         int64 bestScore = Evaluate(board, m_PawnTable);
+        stack->m_Eval = bestScore;
         if (bestScore >= beta) { // Return if we fail soft
             return bestScore;
         }
@@ -146,15 +159,6 @@ public:
             alpha = bestScore;
         }
 
-        // Probe Transposition table
-        Move hashMove = Move();
-        TTEntry* entry = m_Table->Probe(board.m_Hash);
-        if (entry != nullptr) {
-            if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
-                return entry->m_Value;
-            }
-            hashMove = entry->m_BestMove;
-        }
 
 
         Move bestMove = 0;
@@ -212,6 +216,11 @@ public:
         m_NodeCnt++;
         if (!m_Running || m_Timer.EndMs() >= m_MaxTime) return 0;
 
+        // Quiesce search if we reached the bottom
+        if (depth <= 0) {
+            return Quiesce<node>(board, stack, alpha, beta, depth);
+        }
+
         // Prevent explosions
         assert("Ply is more than MAX_DEPTH!\n", stack->m_Ply >= MAX_DEPTH);
         depth = std::min(depth, MAX_DEPTH - 1);
@@ -220,12 +229,16 @@ public:
         // Probe Transposition table
         Move hashMove = Move();
         TTEntry* entry = m_Table->Probe(board.m_Hash);
+        int64 ttScore = NONE_SCORE;
+        int ttDepth;
         if (entry != nullptr) {
             // Check for TT cutoff
-            if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Value >= beta ? LOWER_BOUND : UPPER_BOUND))) {
-                return entry->m_Value;
+            if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Score >= beta ? LOWER_BOUND : UPPER_BOUND))) {
+                return entry->m_Score;
             }
             hashMove = entry->m_BestMove;
+            ttScore = entry->m_Score;
+            ttDepth = entry->m_Depth;
         }
 
         // Probe the tablebase
@@ -248,11 +261,15 @@ public:
             }
         }
 
+        int64 staticEval = Evaluate(board, m_PawnTable);
+        stack->m_Eval = staticEval;
+        bool improving = false;
 
-        // Quiesce search if we reached the bottom
-        if (depth <= 0) {
-			return Quiesce<node>(board, stack, alpha, beta, depth);
-		}
+        if (!board.m_InCheck && stack->m_Ply >= 2) {
+            improving = stack->m_Eval > (stack - 2)->m_Eval;
+        } else if (stack->m_Ply >= 4) {
+            improving = stack->m_Eval > (stack - 4)->m_Eval;
+        }
         
 		int64 bestScore = -MATE_SCORE;
         int64 old_alpha = alpha;
@@ -267,14 +284,31 @@ public:
 		while ((move = moveGen.Next()) != 0) {
             movecnt++;
             int newDepth = depth - 1;
-            int reduction = 0;
+            int reduction = 0, extension = 0;
             int delta = beta - alpha;
+
+            // Singular extension
+            if (!rootNode && stack->m_Ply < 2 * m_Maxdepth && depth >= 6 && move == hashMove && ttScore < MATE_SCORE && (entry->m_Bound & LOWER_BOUND)) {
+                int64 singularBeta = ttScore - depth;
+                int64 extScore = -AlphaBeta<NON_PV>(board, stack + 1, singularBeta - 1, singularBeta, newDepth / 2, cutNode);
+                if (extScore < singularBeta) {
+                    extension = 1;
+                } else if (singularBeta >= beta) { // Multi-cut pruning
+                    return singularBeta;
+                } else if (ttScore >= beta) { // Negative extension
+                    extension = -2 + PVNode;
+                } else if (cutNode) { // Expected cutnode is unlikely to be good
+                    extension = -2;
+                }
+            }
 
             board.MovePiece(move);
 
+            newDepth += extension;
+
             // Late move reduction
             if (depth >= 2 && movecnt > 1 && !rootNode) {
-                reduction = (500 + 500 * delta * std::log(depth) * std::log(movecnt) / m_RootDelta) / 1000;
+                //reduction = (500 + 500 * delta * std::log(depth) * std::log(movecnt) / m_RootDelta) / 1000;
 
                 // Extend checks
                 if (board.m_InCheck && stack->m_Ply < MAX_DEPTH) reduction -= 1;
@@ -285,6 +319,9 @@ public:
 
                 // If hash move is not found then increase reduction
                 if (hashMove == 0) reduction += 1;
+
+                // Reduce if we are not improving
+                if (!improving) reduction += 1;
 
                 // Reduce expected cut node
                 if (cutNode) reduction += 2;
@@ -334,7 +371,7 @@ public:
         if (bestScore >= beta) {
             m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
         } else {
-            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, UPPER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
+            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, PVNode ? EXACT_BOUND : UPPER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
         }
 
 		return bestScore;
@@ -405,8 +442,8 @@ public:
 
             TTEntry* entry = m_Table->Probe(m_Position.m_Hash);
             if (entry != nullptr) {
-                rootAlpha = entry->m_Value - m_RootDelta;
-                rootBeta = entry->m_Value + m_RootDelta;
+                rootAlpha = entry->m_Score - m_RootDelta;
+                rootBeta = entry->m_Score + m_RootDelta;
             }
             int failHigh = 0;
 
@@ -447,7 +484,7 @@ public:
             if (bestScore >= beta) {
                 m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore, LOWER_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));
             } else {
-                m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore, UPPER_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));
+                m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore, EXACT_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));
             }
 
             

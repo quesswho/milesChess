@@ -37,13 +37,12 @@ int main() {
 		//search->LoadPosition("1k2r1r1/1p3pp1/1qpb1n1p/p2p1QP1/5P2/4PB2/PPP3KP/R1B4R b - - 0 1"); // Stockfish evaluates this as -4, while milesbot rates it as 0
 		//search->LoadPosition("1k2r2r/1pb5/1qp5/p2p4/8/3Q4/PPP1p1RP/R1B4K w - - 0 11");
 		//search->LoadPosition("rnnk1b1r/p3pppB/2b5/6N1/8/2N5/1P3PPP/R1B2RK1 b - - 1 15");
-		//search->LoadPosition("5k2/8/8/8/3b4/5K2/3r4/7R w - - 72 115"); // TODO: Figure out why it's doing incorrect move h1g1
 		//printf("%llu\n", search.Perft(6));
-		//search->LoadPosition("3r4/8/1p1r2k1/1R2KRP1/p7/8/8/8 b - - 0 1"); // TODO: Wrong move here
+		search->LoadPosition("3r4/8/1p1r2k1/1R2KRP1/p7/8/8/8 b - - 0 1"); // TODO: Wrong move here
 		//search->LoadPosition("2r2k2/pp3p1R/5p2/3Pp3/3qP1Q1/7P/P5PK/2r5 w - - 0 1");
 		//search->LoadPosition("7k/8/8/8/8/5p2/6P1/7K w - - 0 1");
 		//search->LoadPosition("5rk1/2P2qp1/7p/5p2/3B4/7P/r4PP1/2QR2K1 b - - 0 39"); // Supposed to do the move a2a8
-		search->LoadPosition("r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2");
+		//search->LoadPosition("r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2");
 		Timer time;
 		time.Start();
 		search->m_MaxTime = 10000;

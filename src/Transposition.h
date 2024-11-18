@@ -3,18 +3,20 @@
 #include "Movelist.h"
 
 enum Bound {
-    UPPER_BOUND,
-    LOWER_BOUND
+    NO_BOUND = 0,
+    UPPER_BOUND = 1,
+    LOWER_BOUND = 2,
+    EXACT_BOUND = UPPER_BOUND | LOWER_BOUND
 };
 
 // Transposition table entry
 struct TTEntry {
     TTEntry()
-        : m_Hash(0), m_Moves(0), m_Ply(0), m_Value(0)
+        : m_Hash(0), m_Moves(0), m_Ply(0), m_Score(0)
     {}
 
     TTEntry(uint64 hash, Move bestmove, int64 eval, Bound bound, int ply, int depth, int moves)
-        : m_Hash(hash), m_BestMove(bestmove), m_Bound(bound), m_Ply(ply), m_Depth(depth), m_Moves(moves), m_Value(eval)
+        : m_Hash(hash), m_BestMove(bestmove), m_Bound(bound), m_Ply(ply), m_Depth(depth), m_Moves(moves), m_Score(eval)
     {}
 
     Move m_BestMove;
@@ -22,7 +24,7 @@ struct TTEntry {
     short m_Depth;
     short m_Moves;
     uint64 m_Hash;
-    int64 m_Value;
+    int64 m_Score;
     Bound m_Bound;
 };
 
