@@ -221,6 +221,16 @@ public:
             return Quiesce<node>(board, stack, alpha, beta, depth);
         }
 
+        if (!rootNode) {
+            // We count any repetion as draw
+            // TODO: Maybe employ hashing to make this O(1) instead of O(n)
+            for (int i = 4; i < board.m_States[board.m_Ply].m_HalfMoves && i < board.m_Ply; i += 2) {
+                if (board.m_States[board.m_Ply - i].m_Hash == board.m_Hash) {
+                    return 0;
+                }
+            }
+        }
+
         // Prevent explosions
         assert("Ply is more than MAX_DEPTH!\n", stack->m_Ply >= MAX_DEPTH);
         depth = std::min(depth, MAX_DEPTH - 1);
@@ -249,15 +259,16 @@ public:
             if (success) {
                 int value = Signum(v) * (MATE_SCORE - v);
                 // TODO: Store value in hashtable
+                m_Table->Enter(board.m_Hash,
+                    TTEntry(board.m_Hash,
+                        0, // No move
+                        value,
+                        EXACT_BOUND,
+                        stack->m_Ply,
+                        depth,
+                        board.m_FullMoves
+                    ));
                 return value;
-            }
-
-            // We count any repetion as draw
-            // TODO: Maybe employ hashing to make this O(1) instead of O(n)
-            for (int i = 4; i < board.m_States[board.m_Ply].m_HalfMoves && i < board.m_Ply; i += 2) {
-                if (board.m_States[board.m_Ply - i].m_Hash == board.m_Hash) {
-                    return 0;
-                }
             }
         }
 
@@ -286,7 +297,7 @@ public:
             int newDepth = depth - 1;
             int reduction = 0, extension = 0;
             int delta = beta - alpha;
-
+            bool capture = CaptureType(move) != NOPIECE;
             // Singular extension
             if (!rootNode && stack->m_Ply < 2 * m_Maxdepth && depth >= 6 && move == hashMove && ttScore < MATE_SCORE && (entry->m_Bound & LOWER_BOUND)) {
                 int64 singularBeta = ttScore - depth;
@@ -307,8 +318,8 @@ public:
             newDepth += extension;
 
             // Late move reduction
-            if (depth >= 2 && movecnt > 1 && !rootNode) {
-                //reduction = (500 + 500 * delta * std::log(depth) * std::log(movecnt) / m_RootDelta) / 1000;
+            if (depth >= 2 && movecnt > 1 + rootNode) {
+                reduction = ((375 + 220 * std::log(depth) * std::log(movecnt)) / (1 + capture)) / 1000;
 
                 // Extend checks
                 if (board.m_InCheck && stack->m_Ply < MAX_DEPTH) reduction -= 1;
@@ -368,11 +379,15 @@ public:
             }
         }
 
-        if (bestScore >= beta) {
-            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
-        } else {
-            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, PVNode ? EXACT_BOUND : UPPER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
-        }
+        m_Table->Enter(board.m_Hash, 
+            TTEntry(board.m_Hash, 
+            bestMove, 
+            bestScore, 
+            bestScore >= beta ? LOWER_BOUND : PVNode ? EXACT_BOUND : UPPER_BOUND, 
+            stack->m_Ply, 
+            depth, 
+            board.m_FullMoves
+        ));
 
 		return bestScore;
 	}

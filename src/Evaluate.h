@@ -97,7 +97,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         middlegame += knightVal + Lookup::knight_table[pos];
         endgame += knightVal + Lookup::knight_table[pos];
         if (uint64 temp = Lookup::b_king_safety[blackking] & Lookup::knight_attacks[rpos]) {
-            whiteAttack += 2 * COUNT_BIT(temp);
+            whiteAttack += 2 * COUNT_BIT(temp & ~board.m_Black);
         }
         phase -= 1;
         wkncnt++;
@@ -113,7 +113,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         middlegame -= knightVal + Lookup::knight_table[pos];
         endgame -= knightVal + Lookup::knight_table[pos];
         if (uint64 temp = Lookup::w_king_safety[whiteking] & Lookup::knight_attacks[pos]) {
-            blackAttack += 2 * COUNT_BIT(temp);
+            blackAttack += 2 * COUNT_BIT(temp & ~board.m_Black);
         }
         phase -= 1;
         bkncnt++;
@@ -134,6 +134,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         if (uint64 temp = Lookup::b_king_safety[blackking] & bish_atk) {
             whiteAttack += 2 * COUNT_BIT(temp);
         }
+
+        int bishop_mobility = COUNT_BIT(bish_atk & ~board.m_White);
+        middlegame += bishop_mobility;
+
         phase -= 1;
         wbcnt++;
     }
@@ -151,6 +155,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         if (uint64 temp = Lookup::w_king_safety[whiteking] & bish_atk) {
             blackAttack += 2 * COUNT_BIT(temp);
         }
+
+        int bishop_mobility = COUNT_BIT(bish_atk & ~board.m_Black);
+        middlegame -= bishop_mobility;
+
         phase -= 1;
         bbcnt++;
     }
@@ -170,6 +178,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         if (uint64 temp = Lookup::b_king_safety[blackking] & rook_atk) {
             whiteAttack += 3 * COUNT_BIT(temp);
         }
+
+        int rook_mobility = COUNT_BIT(rook_atk & ~board.m_White);
+        middlegame += rook_mobility;
+
         phase -= 2;
         wrcnt++;
     }
@@ -187,6 +199,9 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         if (uint64 temp = Lookup::w_king_safety[whiteking] & rook_atk) {
             blackAttack += 3 * COUNT_BIT(temp);
         }
+        int rook_mobility = COUNT_BIT(rook_atk & ~board.m_Black);
+        middlegame -= rook_mobility;
+
         phase -= 2;
         brcnt++;
     }
@@ -205,6 +220,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         if (uint64 temp = Lookup::b_king_safety[blackking] & queen_atk) {
             whiteAttack += 5 * COUNT_BIT(temp);
         }
+
+        int queen_mobility = COUNT_BIT(queen_atk & ~board.m_White);
+        middlegame += queen_mobility;
+
         // Don't develop queen on starting pos too early
         if (rpos == 4) {
             if (board.m_WhiteKnight & 0b10ull) middlegame += 4;
@@ -224,6 +243,9 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         if (uint64 temp = Lookup::king_attacks[whiteking] & queen_atk) {
             blackAttack += 5 * COUNT_BIT(temp);
         }
+        int queen_mobility = COUNT_BIT(queen_atk & ~board.m_Black);
+        middlegame -= queen_mobility;
+
         // Don't develop queen on starting pos too early
         if (pos == 60) {
             if (board.m_BlackKnight & 0b10ull << 56) middlegame -= 2;

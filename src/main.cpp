@@ -26,7 +26,7 @@ int main() {
 	// This should yield a draw
 	// position startpos moves e2e4 d7d5 b1c3 d5d4 c3d5 e7e6 d5f4 g7g5 f4d3 b8c6 g1f3 g8f6 f3g5 h7h6 e4e5 h6g5 e5f6 d8f6 h2h3 e6e5 g2g4 e5e4 d1e2 f6e6 f1g2 e4d3 e2e6 c8e6 c2d3 e8d7 a2a4 f7f5 h1g1 f5f4 a4a5 f8c5 e1f1 b7b5 b2b4 c5e7 c1a3 a8g8 g2c6 d7c6 f1g2 a7a6 f2f3 e7d6 g1e1 e6d5 e1h1 h8h4 h1f1 g8e8 a1e1 e8e1 f1e1 c6d7 e1h1 c7c6 h1e1 d6e7 e1h1 e7d6
 
-	if (true) {
+	if (false) {
 		UCI uci;
 		uci.Start();
 	} else {
@@ -38,14 +38,16 @@ int main() {
 		//search->LoadPosition("1k2r2r/1pb5/1qp5/p2p4/8/3Q4/PPP1p1RP/R1B4K w - - 0 11");
 		//search->LoadPosition("rnnk1b1r/p3pppB/2b5/6N1/8/2N5/1P3PPP/R1B2RK1 b - - 1 15");
 		//printf("%llu\n", search.Perft(6));
-		search->LoadPosition("3r4/8/1p1r2k1/1R2KRP1/p7/8/8/8 b - - 0 1"); // TODO: Wrong move here
+		//search->LoadPosition("3r4/8/1p1r2k1/1R2KRP1/p7/8/8/8 b - - 0 1"); // TODO: Wrong move here
+		//search->LoadPosition("2krR3/1p3ppr/6b1/nP3p2/5BP1/2P5/1KP5/5BR1 w - - 5 25");
 		//search->LoadPosition("2r2k2/pp3p1R/5p2/3Pp3/3qP1Q1/7P/P5PK/2r5 w - - 0 1");
 		//search->LoadPosition("7k/8/8/8/8/5p2/6P1/7K w - - 0 1");
 		//search->LoadPosition("5rk1/2P2qp1/7p/5p2/3B4/7P/r4PP1/2QR2K1 b - - 0 39"); // Supposed to do the move a2a8
-		//search->LoadPosition("r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2");
+		search->LoadPosition("r2k4/1bnp1Bpp/8/pp2B3/1r6/6K1/PP4PP/3RR3 b - - 3 23"); // Correct move: b4e4
+		//search->LoadPosition("r4rk1/1pp2ppp/p7/3Q4/4p2P/2PnP2N/PP1Pq3/RK3nR1 w - - 1 23"); // Draw trap
 		Timer time;
 		time.Start();
-		search->m_MaxTime = 10000;
+		search->m_MaxTime = 100000;
 		search->UCIMove_async(); // 3580-3770
 		//search->Perft(6); // 102-105.5
 						  // 102.3-105.3
