@@ -15,8 +15,8 @@ struct TTEntry {
         : m_Hash(0), m_Moves(0), m_Ply(0), m_Score(0)
     {}
 
-    TTEntry(uint64 hash, Move bestmove, int64 eval, Bound bound, int ply, int depth, int moves)
-        : m_Hash(hash), m_BestMove(bestmove), m_Bound(bound), m_Ply(ply), m_Depth(depth), m_Moves(moves), m_Score(eval)
+    TTEntry(uint64 hash, Move bestmove, int64 eval, Bound bound, int ply, int depth, int moves, bool pv)
+        : m_Hash(hash), m_BestMove(bestmove), m_Bound(bound), m_Ply(ply), m_Depth(depth), m_Moves(moves), m_Score(eval), m_PV(pv)
     {}
 
     Move m_BestMove;
@@ -26,6 +26,7 @@ struct TTEntry {
     uint64 m_Hash;
     int64 m_Score;
     Bound m_Bound;
+    bool m_PV;
 };
 
 

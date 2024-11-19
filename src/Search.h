@@ -142,12 +142,14 @@ public:
 
         // Probe Transposition table
         Move hashMove = Move();
+        bool ttPV = PVNode;
         TTEntry* entry = m_Table->Probe(board.m_Hash);
         if (entry != nullptr) {
             if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Score >= beta ? LOWER_BOUND : UPPER_BOUND))) {
                 return entry->m_Score;
             }
             hashMove = entry->m_BestMove;
+            ttPV |= entry->m_PV;
         }
 
         int64 bestScore = Evaluate(board, m_PawnTable);
@@ -158,8 +160,6 @@ public:
         if (alpha < bestScore) {
             alpha = bestScore;
         }
-
-
 
         Move bestMove = 0;
         int movecnt = 0;
@@ -196,13 +196,18 @@ public:
             }
         }
 
-        if (bestMove != 0) {
-            if (bestScore >= beta) {
-                m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, LOWER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
-            } else {
-                m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore, UPPER_BOUND, stack->m_Ply, depth, board.m_FullMoves));
-            }
-        }
+        
+        m_Table->Enter(board.m_Hash,
+            TTEntry(board.m_Hash,
+                bestMove,
+                bestScore,
+                bestScore >= beta ? LOWER_BOUND : PVNode ? EXACT_BOUND : UPPER_BOUND,
+                stack->m_Ply,
+                depth,
+                board.m_FullMoves,
+                ttPV
+            ));
+        
 
         return bestScore;
     }
@@ -241,14 +246,16 @@ public:
         TTEntry* entry = m_Table->Probe(board.m_Hash);
         int64 ttScore = NONE_SCORE;
         int ttDepth;
+        bool ttPV = PVNode;
         if (entry != nullptr) {
             // Check for TT cutoff
             if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Score >= beta ? LOWER_BOUND : UPPER_BOUND))) {
                 return entry->m_Score;
             }
             hashMove = entry->m_BestMove;
-            ttScore = entry->m_Score;
-            ttDepth = entry->m_Depth;
+            ttScore  = entry->m_Score;
+            ttDepth  = entry->m_Depth;
+            ttPV    |= entry->m_PV;
         }
 
         // Probe the tablebase
@@ -259,14 +266,15 @@ public:
             if (success) {
                 int value = Signum(v) * (MATE_SCORE - v);
                 // TODO: Store value in hashtable
-                m_Table->Enter(board.m_Hash,
+                if(!entry) m_Table->Enter(board.m_Hash,
                     TTEntry(board.m_Hash,
                         0, // No move
                         value,
-                        EXACT_BOUND,
+                        v > 0 ? LOWER_BOUND : v < 0 ? UPPER_BOUND : EXACT_BOUND,
                         stack->m_Ply,
                         depth,
-                        board.m_FullMoves
+                        board.m_FullMoves,
+                        ttPV
                     ));
                 return value;
             }
@@ -319,14 +327,16 @@ public:
 
             // Late move reduction
             if (depth >= 2 && movecnt > 1 + rootNode) {
-                reduction = ((375 + 220 * std::log(depth) * std::log(movecnt)) / (1 + capture)) / 1000;
-
+                //reduction = ((375 + 220 * std::log(depth) * std::log(movecnt)) / (1 + capture)) / 1000;
+                reduction = ((500 + 400 * std::log(depth) * std::log(movecnt)) / (1 + capture)) / 1000;
                 // Extend checks
                 if (board.m_InCheck && stack->m_Ply < MAX_DEPTH) reduction -= 1;
 
                 // If we are on pv node then decrease reduction
                 if (PVNode) reduction -= 1;
-                //if (stack->m_PV) reduction -= 1;
+                if (ttPV) reduction -= 1;
+
+                //if (CaptureType(hashMove) != NOPIECE) reduction += 1;
 
                 // If hash move is not found then increase reduction
                 if (hashMove == 0) reduction += 1;
@@ -335,7 +345,7 @@ public:
                 if (!improving) reduction += 1;
 
                 // Reduce expected cut node
-                if (cutNode) reduction += 2;
+                if (cutNode) reduction += 1;
 
                 int reducedDepth = std::min(std::max(1, newDepth - reduction), newDepth+1);
                 score = -AlphaBeta<NON_PV>(board, stack + 1, -alpha-1, -alpha, reducedDepth, true);
@@ -386,7 +396,8 @@ public:
             bestScore >= beta ? LOWER_BOUND : PVNode ? EXACT_BOUND : UPPER_BOUND, 
             stack->m_Ply, 
             depth, 
-            board.m_FullMoves
+            board.m_FullMoves,
+            ttPV
         ));
 
 		return bestScore;
@@ -496,12 +507,16 @@ public:
 
             finalMove = stack->m_PV[0];
             
-            if (bestScore >= beta) {
-                m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore, LOWER_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));
-            } else {
-                m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore, EXACT_BOUND, 0, m_Maxdepth, m_Position.m_FullMoves));
-            }
-
+            m_Table->Enter(m_Position.m_Hash,
+                TTEntry(m_Position.m_Hash,
+                    bestMove,
+                    bestScore,
+                    bestScore >= beta ? LOWER_BOUND : EXACT_BOUND,
+                    0,
+                    m_Maxdepth,
+                    m_Position.m_FullMoves,
+                    true
+                ));
             
             if (m_Timer.EndMs() * 2 >= m_MaxTime) break; // We won't have enough time to calculate more depth anyway
             if (bestScore >= MATE_SCORE - MAX_DEPTH || bestScore <= -MATE_SCORE + MAX_DEPTH) break; // Position is solved so exit out

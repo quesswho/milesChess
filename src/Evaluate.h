@@ -97,8 +97,11 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         middlegame += knightVal + Lookup::knight_table[pos];
         endgame += knightVal + Lookup::knight_table[pos];
         if (uint64 temp = Lookup::b_king_safety[blackking] & Lookup::knight_attacks[rpos]) {
-            whiteAttack += 2 * COUNT_BIT(temp & ~board.m_Black);
+            whiteAttack += 2 * COUNT_BIT(temp);
         }
+        BitBoard moveable = Lookup::knight_attacks[rpos] & ~board.m_White;
+        int knight_mobility = COUNT_BIT(moveable);
+        middlegame += knight_mobility;
         phase -= 1;
         wkncnt++;
     }
@@ -113,8 +116,12 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         middlegame -= knightVal + Lookup::knight_table[pos];
         endgame -= knightVal + Lookup::knight_table[pos];
         if (uint64 temp = Lookup::w_king_safety[whiteking] & Lookup::knight_attacks[pos]) {
-            blackAttack += 2 * COUNT_BIT(temp & ~board.m_Black);
+            blackAttack += 2 * COUNT_BIT(temp);
         }
+        BitBoard moveable = Lookup::knight_attacks[pos] & ~board.m_Black;
+        int knight_mobility = COUNT_BIT(moveable);
+        middlegame -= knight_mobility;
+
         phase -= 1;
         bkncnt++;
     }
