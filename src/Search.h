@@ -22,6 +22,7 @@ struct MoveStack {
     Move m_PV[MAX_DEPTH] = {};
     int m_Ply;
     int m_Eval = NONE_SCORE;
+    Move m_CurrentMove;
 };
 
 struct RootMove {
@@ -213,7 +214,7 @@ public:
     }
 
     template<NodeType node>
-	int64 AlphaBeta(Position& board, MoveStack* stack, int64 alpha, int64 beta, int depth, bool cutNode) {
+	int64 AlphaBeta(Position& board, MoveStack* stack, int alpha, int beta, int depth, bool cutNode) {
 
         constexpr bool PVNode = node != NON_PV;
         constexpr bool rootNode = node == ROOT;
@@ -289,6 +290,17 @@ public:
         } else if (stack->m_Ply >= 4) {
             improving = stack->m_Eval > (stack - 4)->m_Eval;
         }
+
+        // Null move pruning
+        if (!PVNode && stack->m_CurrentMove != 0 && stack->m_Eval >= beta && stack->m_Eval + 40 * depth - 200 >= beta) {
+            int reduction = std::min((stack->m_Eval - beta), 7) + depth / 3 + 5;
+            board.NullMove();
+            int nullscore = -AlphaBeta<NON_PV>(board, stack + 1, -beta, -beta + 1, depth - reduction, !cutNode);
+            board.UndoNullMove();
+            if (nullscore >= beta) {
+                return nullscore;
+            }
+        }
         
 		int64 bestScore = -MATE_SCORE;
         int64 old_alpha = alpha;
@@ -302,6 +314,7 @@ public:
         Move move;
 		while ((move = moveGen.Next()) != 0) {
             movecnt++;
+            stack->m_CurrentMove = move;
             int newDepth = depth - 1;
             int reduction = 0, extension = 0;
             int delta = beta - alpha;

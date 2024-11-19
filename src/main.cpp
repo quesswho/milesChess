@@ -26,7 +26,7 @@ int main() {
 	// This should yield a draw
 	// position startpos moves e2e4 d7d5 b1c3 d5d4 c3d5 e7e6 d5f4 g7g5 f4d3 b8c6 g1f3 g8f6 f3g5 h7h6 e4e5 h6g5 e5f6 d8f6 h2h3 e6e5 g2g4 e5e4 d1e2 f6e6 f1g2 e4d3 e2e6 c8e6 c2d3 e8d7 a2a4 f7f5 h1g1 f5f4 a4a5 f8c5 e1f1 b7b5 b2b4 c5e7 c1a3 a8g8 g2c6 d7c6 f1g2 a7a6 f2f3 e7d6 g1e1 e6d5 e1h1 h8h4 h1f1 g8e8 a1e1 e8e1 f1e1 c6d7 e1h1 c7c6 h1e1 d6e7 e1h1 e7d6
 
-	if (true) {
+	if (false) {
 		UCI uci;
 		uci.Start();
 	} else {
@@ -44,8 +44,8 @@ int main() {
 		//search->LoadPosition("7k/8/8/8/8/5p2/6P1/7K w - - 0 1");
 		//search->LoadPosition("5rk1/2P2qp1/7p/5p2/3B4/7P/r4PP1/2QR2K1 b - - 0 39"); // Supposed to do the move a2a8
 		//search->LoadPosition("r2k4/1bnp1Bpp/8/pp2B3/1r6/6K1/PP4PP/3RR3 b - - 3 23"); // Correct move: b4e4
-		//search->LoadPosition("r2qkbr1/7p/2p2p1p/3pp3/p1b1P3/P1N1QN2/1PP2PPP/2KR2R1 w q - 0 17"); // Should do e4e5
-		search->LoadPosition("r2qkbr1/7p/2p2p1p/4p3/p1bpP3/P1N1Q3/1PPN1PPP/2KR2R1 w q - 0 18"); // Best Move: d2c4, Likely faulty due to eval function
+		search->LoadPosition("r2qkbr1/7p/2p2p1p/3pp3/p1b1P3/P1N1QN2/1PP2PPP/2KR2R1 w q - 0 17"); // Should do e4e5
+		//search->LoadPosition("r2qkbr1/7p/2p2p1p/4p3/p1bpP3/P1N1Q3/1PPN1PPP/2KR2R1 w q - 0 18"); // Best Move: d2c4, Likely faulty due to eval function
 		//search->LoadPosition("r4rk1/1pp2ppp/p7/3Q4/4p2P/2PnP2N/PP1Pq3/RK3nR1 w - - 1 23"); // Draw trap
 		Timer time;
 		time.Start();
