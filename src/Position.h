@@ -57,7 +57,7 @@ public:
 
 
     // Hash values
-    uint64 m_Hash;
+    uint64 m_Hash; // TODO: Why do we have this when we already store it in m_States
     uint64 m_PawnHash;
 
     //
@@ -69,6 +69,9 @@ public:
 
     void MovePiece(Move move);
     void UndoMove(Move move);
+
+    void NullMove();
+    void UndoNullMove();
 
     uint64 RookAttack(int pos, BitBoard occ) const;
     uint64 BishopAttack(int pos, BitBoard occ) const;

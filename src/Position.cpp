@@ -603,6 +603,28 @@ void Position::UndoMove(Move move) {
     m_InCheck = m_WhiteMove ? UpdateChecks<WHITE>() : UpdateChecks<BLACK>();
 }
 
+void Position::NullMove() {
+    if (m_States[m_Ply].m_EnPassant) { // Remove old en passant from hash
+        m_Hash ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(m_States[m_Ply].m_EnPassant) & 0x7)];
+    }
+    m_Ply++;
+    m_States[m_Ply] = m_States[m_Ply - 1];
+    m_States[m_Ply].m_HalfMoves++;
+    if (!m_WhiteMove) m_FullMoves++;
+    m_States[m_Ply].m_EnPassant = 0;
+    m_Hash ^= Lookup::zobrist[64 * 12]; // White Move
+    m_PawnHash ^= Lookup::zobrist[64 * 12];
+    m_WhiteMove = !m_WhiteMove;
+    m_States[m_Ply].m_Hash = m_Hash;
+}
+void Position::UndoNullMove() {
+    m_Ply--;
+    m_Hash = m_States[m_Ply].m_Hash;
+    if (m_WhiteMove) m_FullMoves--;
+    m_PawnHash ^= Lookup::zobrist[64 * 12];
+    m_WhiteMove = !m_WhiteMove;
+}
+
 uint64 Zobrist_Hash(const Position& position) {
     uint64 result = 0;
 
