@@ -27,6 +27,7 @@ find_package(Threads REQUIRED)
 
 add_library(milesChess_core STATIC
     src/MoveGen.cpp
+    src/Perft.cpp
     src/Position.cpp
     src/TableBase.cpp
     src/UCI.cpp
