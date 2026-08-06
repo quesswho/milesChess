@@ -11,25 +11,33 @@ endif()
 
 option(MILESCHESS_NATIVE "Tune for the host CPU (-march=native)" ON)
 
-add_executable(engine
-    src/main.cpp
+add_library(milesChess_flags INTERFACE)
+target_compile_features(milesChess_flags INTERFACE cxx_std_20)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(milesChess_flags INTERFACE -Wall -Wno-unused-variable)
+    if(MILESCHESS_NATIVE)
+        target_compile_options(milesChess_flags INTERFACE -march=native)
+    else()
+        target_compile_options(milesChess_flags INTERFACE -mpopcnt -mbmi -mbmi2)
+    endif()
+endif()
+
+find_package(Threads REQUIRED)
+
+add_library(milesChess_core STATIC
     src/MoveGen.cpp
     src/Position.cpp
     src/TableBase.cpp
     src/UCI.cpp
 )
+target_include_directories(milesChess_core PUBLIC src)
+target_link_libraries(milesChess_core PUBLIC Threads::Threads milesChess_flags)
 
-target_include_directories(engine PRIVATE src)
+add_executable(engine src/main.cpp)
+target_link_libraries(engine PRIVATE milesChess_core)
 
-find_package(Threads REQUIRED)
-target_link_libraries(engine PRIVATE Threads::Threads)
-
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(engine PRIVATE -Wall -Wno-unused-variable)
-    if(MILESCHESS_NATIVE)
-        target_compile_options(engine PRIVATE -march=native)
-    else()
-        # Baseline the engine actually needs: popcnt (COUNT_BIT) and bmi (tzcnt).
-        target_compile_options(engine PRIVATE -mpopcnt -mbmi -mbmi2)
-    endif()
+include(CTest)
+if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+    add_subdirectory(tests)
 endif()
