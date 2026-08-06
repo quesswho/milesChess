@@ -26,7 +26,7 @@ int main() {
 	// This should yield a draw
 	// position startpos moves e2e4 d7d5 b1c3 d5d4 c3d5 e7e6 d5f4 g7g5 f4d3 b8c6 g1f3 g8f6 f3g5 h7h6 e4e5 h6g5 e5f6 d8f6 h2h3 e6e5 g2g4 e5e4 d1e2 f6e6 f1g2 e4d3 e2e6 c8e6 c2d3 e8d7 a2a4 f7f5 h1g1 f5f4 a4a5 f8c5 e1f1 b7b5 b2b4 c5e7 c1a3 a8g8 g2c6 d7c6 f1g2 a7a6 f2f3 e7d6 g1e1 e6d5 e1h1 h8h4 h1f1 g8e8 a1e1 e8e1 f1e1 c6d7 e1h1 c7c6 h1e1 d6e7 e1h1 e7d6
 
-	if (false) {
+	if (true) {
 		UCI uci;
 		uci.Start();
 	} else {
