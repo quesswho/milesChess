@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <cinttypes>
+#include <atomic>
 #include <vector>
 #include <thread>
 #include <cmath>
@@ -49,12 +50,12 @@ private:
     //uint64 m_PawnHash[MAX_DEPTH];
     //uint64 m_History[256];
     std::vector<std::unique_ptr<std::thread>> m_Threads;
-    bool m_Running;
+    std::atomic<bool> m_Running;
     Timer m_Timer;
 	int m_Maxdepth; // Maximum depth currently set
     uint64 m_NodeCnt;
-    TranspositionTable* m_Table;
-    PawnTable* m_PawnTable;
+    std::unique_ptr<TranspositionTable> m_Table;
+    std::unique_ptr<PawnTable> m_PawnTable;
     std::vector<RootMove> m_RootMoves;
     int m_RootDelta;
 public:
@@ -62,14 +63,12 @@ public:
 	Search() 
         : m_Maxdepth(0), m_Running(false), m_MaxTime(999999999999999), m_NodeCnt(0)
 	{
-        m_Table = new TranspositionTable(1024 * 1024 * 1024);
-        m_PawnTable = new PawnTable(1024 * 1024);
+        m_Table = std::make_unique<TranspositionTable>(1024ull * 1024 * 1024);
+        m_PawnTable = std::make_unique<PawnTable>(1024ull * 1024);
         LoadPosition(Lookup::starting_pos);
     }
 
-    ~Search() {
-        delete m_Table;
-    }
+    ~Search() = default;
 
     void Stop() {
         m_Running = false;
@@ -154,7 +153,7 @@ public:
             ttPV |= entry->m_PV;
         }
 
-        int64 bestScore = Evaluate(board, m_PawnTable);
+        int64 bestScore = Evaluate(board, m_PawnTable.get());
         stack->m_Eval = bestScore;
         if (bestScore >= beta) { // Return if we fail soft
             return bestScore;
@@ -282,7 +281,7 @@ public:
             }
         }
 
-        int64 staticEval = Evaluate(board, m_PawnTable);
+        int64 staticEval = Evaluate(board, m_PawnTable.get());
         stack->m_Eval = staticEval;
         bool improving = false;
 
