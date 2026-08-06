@@ -123,7 +123,7 @@ namespace TableBase {
         return key;
     }
 
-    static void set_norm_piece(TBEntry_piece* ptr, ubyte* norm, ubyte* pieces) {
+    static void set_norm_piece(TBEntry_piece* ptr, uint8* norm, uint8* pieces) {
         int i, j;
 
         for (i = 0; i < ptr->num; i++)
@@ -157,7 +157,7 @@ namespace TableBase {
         return f / l;
     }
 
-    static uint64 calc_factors_pawn(int* factor, int num, int order, int order2, ubyte* norm, int file) {
+    static uint64 calc_factors_pawn(int* factor, int num, int order, int order2, uint8* norm, int file) {
         int i, k, n;
         uint64 f;
 
@@ -184,7 +184,7 @@ namespace TableBase {
         return f;
     }
 
-    static void set_norm_pawn(struct TBEntry_pawn* ptr, ubyte* norm, ubyte* pieces) {
+    static void set_norm_pawn(struct TBEntry_pawn* ptr, uint8* norm, uint8* pieces) {
         int i, j;
 
         for (i = 0; i < ptr->num; i++)
@@ -199,7 +199,7 @@ namespace TableBase {
     }
 
 
-    static uint64 calc_factors_piece(int* factor, int num, int order, ubyte* norm, ubyte enc_type) {
+    static uint64 calc_factors_piece(int* factor, int num, int order, uint8* norm, uint8 enc_type) {
         int i, k, n;
         uint64 f;
         static int pivfac[] = { 31332, 28056, 462 };
@@ -222,7 +222,7 @@ namespace TableBase {
         return f;
     }
 
-    static void setup_pieces_piece(struct TBEntry_piece* ptr, unsigned char* data, uint64* tb_size) {
+    static void setup_pieces_piece(struct TBEntry_piece* ptr, uint8* data, uint64* tb_size) {
         int i;
         int order;
 
@@ -239,7 +239,7 @@ namespace TableBase {
         tb_size[1] = calc_factors_piece(ptr->factor[1], ptr->num, order, ptr->norm[1], ptr->enc_type);
     }
 
-    static void setup_pieces_piece_dtz(struct DTZEntry_piece* ptr, unsigned char* data, uint64* tb_size) {
+    static void setup_pieces_piece_dtz(struct DTZEntry_piece* ptr, uint8* data, uint64* tb_size) {
         int i;
         int order;
 
@@ -250,7 +250,7 @@ namespace TableBase {
         tb_size[0] = calc_factors_piece(ptr->factor, ptr->num, order, ptr->norm, ptr->enc_type);
     }
 
-    static void setup_pieces_pawn(struct TBEntry_pawn* ptr, unsigned char* data, uint64* tb_size, int f) {
+    static void setup_pieces_pawn(struct TBEntry_pawn* ptr, uint8* data, uint64* tb_size, int f) {
         int i, j;
         int order, order2;
 
@@ -270,7 +270,7 @@ namespace TableBase {
         tb_size[1] = calc_factors_pawn(ptr->file[f].factor[1], ptr->num, order, order2, ptr->file[f].norm[1], f);
     }
 
-    static void setup_pieces_pawn_dtz(struct DTZEntry_pawn* ptr, unsigned char* data, uint64* tb_size, int f) {
+    static void setup_pieces_pawn_dtz(struct DTZEntry_pawn* ptr, uint8* data, uint64* tb_size, int f) {
         int i, j;
         int order, order2;
 
@@ -299,7 +299,7 @@ namespace TableBase {
         tmp[s] = 1;
     }
 
-    static PairsData* setup_pairs(unsigned char* data, uint64 tb_size, uint64* size, unsigned char** next, ubyte* flags, int wdl) {
+    static PairsData* setup_pairs(uint8* data, uint64 tb_size, uint64* size, uint8** next, uint8* flags, int wdl) {
         PairsData* d;
         int i;
 
@@ -319,7 +319,7 @@ namespace TableBase {
         int blocksize = data[1];
         int idxbits = data[2];
         int real_num_blocks = *(uint32*)(&data[4]);
-        int num_blocks = real_num_blocks + *(ubyte*)(&data[3]);
+        int num_blocks = real_num_blocks + *(uint8*)(&data[3]);
         int max_len = data[8];
         int min_len = data[9];
         int h = max_len - min_len + 1;
@@ -328,7 +328,7 @@ namespace TableBase {
         d->blocksize = blocksize;
         d->idxbits = idxbits;
         d->offset = (ushort*)(&data[10]);
-        d->symlen = ((ubyte*)d) + sizeof(struct PairsData) + (h - 1) * sizeof(uint32);
+        d->symlen = ((uint8*)d) + sizeof(struct PairsData) + (h - 1) * sizeof(uint32);
         d->sympat = &data[12 + 2 * h];
         d->min_len = min_len;
         *next = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)];
@@ -400,11 +400,11 @@ namespace TableBase {
     }
 
     static int Load_Wdl(TBEntry* entry, char* str) {
-        ubyte* next;
+        uint8* next;
         int f, s;
         uint64 tb_size[8];
         uint64 size[8 * 3];
-        ubyte flags;
+        uint8 flags;
 
         entry->data = Map_TB(str, WDLSUFFIX, &entry->mapping);
         if (!entry->data) {
@@ -412,7 +412,7 @@ namespace TableBase {
             return 0;
         }
 
-        ubyte* data = (ubyte*)entry->data;
+        uint8* data = (uint8*)entry->data;
         if (((uint32*)data)[0] != WDL_MAGIC) {
             printf("Corrupted table.\n");
             Unmap_TB(entry->data, entry->mapping);
@@ -453,11 +453,11 @@ namespace TableBase {
                 data += size[4];
             }
 
-            data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+            data = (uint8*)((((uintptr_t)data) + 0x3f) & ~0x3f);
             ptr->precomp[0]->data = data;
             data += size[2];
             if (split) {
-                data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+                data = (uint8*)((((uintptr_t)data) + 0x3f) & ~0x3f);
                 ptr->precomp[1]->data = data;
             }
         } else {
@@ -498,11 +498,11 @@ namespace TableBase {
             }
 
             for (f = 0; f < files; f++) {
-                data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+                data = (uint8*)((((uintptr_t)data) + 0x3f) & ~0x3f);
                 ptr->file[f].precomp[0]->data = data;
                 data += size[6 * f + 2];
                 if (split) {
-                    data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+                    data = (uint8*)((((uintptr_t)data) + 0x3f) & ~0x3f);
                     ptr->file[f].precomp[1]->data = data;
                     data += size[6 * f + 5];
                 }
@@ -513,8 +513,8 @@ namespace TableBase {
     }
 
     static int Load_DTZ(struct TBEntry* entry) {
-        ubyte* data = (ubyte*)entry->data;
-        ubyte* next;
+        uint8* data = (uint8*)entry->data;
+        uint8* next;
         int f, s;
         uint64 tb_size[4];
         uint64 size[4 * 3];
@@ -556,7 +556,7 @@ namespace TableBase {
             ptr->precomp->sizetable = (ushort*)data;
             data += size[1];
 
-            data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+            data = (uint8*)((((uintptr_t)data) + 0x3f) & ~0x3f);
             ptr->precomp->data = data;
             data += size[2];
         } else {
@@ -596,7 +596,7 @@ namespace TableBase {
             }
 
             for (f = 0; f < files; f++) {
-                data = (ubyte*)((((uintptr_t)data) + 0x3f) & ~0x3f);
+                data = (uint8*)((((uintptr_t)data) + 0x3f) & ~0x3f);
                 ptr->file[f].precomp->data = data;
                 data += size[3 * f + 2];
             }
@@ -815,7 +815,7 @@ namespace TableBase {
       1, 1, 1, 1, 1, 1, 1, 0
     };
 
-    static const ubyte triangle[] = {
+    static const uint8 triangle[] = {
       6, 0, 1, 2, 2, 1, 0, 6,
       0, 7, 3, 4, 4, 3, 7, 0,
       1, 3, 8, 5, 5, 8, 3, 1,
@@ -826,16 +826,16 @@ namespace TableBase {
       6, 0, 1, 2, 2, 1, 0, 6
     };
 
-    static const ubyte invtriangle[] = {
+    static const uint8 invtriangle[] = {
       1, 2, 3, 10, 11, 19, 0, 9, 18, 27
     };
 
-    static const ubyte invdiag[] = {
+    static const uint8 invdiag[] = {
       0, 9, 18, 27, 36, 45, 54, 63,
       7, 14, 21, 28, 35, 42, 49, 56
     };
 
-    static const ubyte flipdiag[] = {
+    static const uint8 flipdiag[] = {
        0,  8, 16, 24, 32, 40, 48, 56,
        1,  9, 17, 25, 33, 41, 49, 57,
        2, 10, 18, 26, 34, 42, 50, 58,
@@ -846,7 +846,7 @@ namespace TableBase {
        7, 15, 23, 31, 39, 47, 55, 63
     };
 
-    static const ubyte lower[] = {
+    static const uint8 lower[] = {
       28,  0,  1,  2,  3,  4,  5,  6,
        0, 29,  7,  8,  9, 10, 11, 12,
        1,  7, 30, 13, 14, 15, 16, 17,
@@ -857,7 +857,7 @@ namespace TableBase {
        6, 12, 17, 21, 24, 26, 27, 35
     };
 
-    static const ubyte diag[] = {
+    static const uint8 diag[] = {
        0,  0,  0,  0,  0,  0,  0,  8,
        0,  1,  0,  0,  0,  0,  9,  0,
        0,  0,  2,  0,  0, 10,  0,  0,
@@ -868,7 +868,7 @@ namespace TableBase {
       15,  0,  0,  0,  0,  0,  0,  7
     };
 
-    static const ubyte flap[] = {
+    static const uint8 flap[] = {
       0, 0, 0, 0, 0, 0, 0, 0,
       0, 6, 12, 18, 18, 12, 6, 0,
       1, 7, 13, 19, 19, 13, 7, 1,
@@ -879,7 +879,7 @@ namespace TableBase {
       0, 0, 0, 0, 0, 0, 0, 0
     };
 
-    static const ubyte ptwist[] = {
+    static const uint8 ptwist[] = {
       0, 0, 0, 0, 0, 0, 0, 0,
       47, 35, 23, 11, 10, 22, 34, 46,
       45, 33, 21, 9, 8, 20, 32, 44,
@@ -890,21 +890,21 @@ namespace TableBase {
       0, 0, 0, 0, 0, 0, 0, 0
     };
 
-    static const ubyte invflap[] = {
+    static const uint8 invflap[] = {
       8, 16, 24, 32, 40, 48,
       9, 17, 25, 33, 41, 49,
       10, 18, 26, 34, 42, 50,
       11, 19, 27, 35, 43, 51
     };
 
-    static const ubyte invptwist[] = {
+    static const uint8 invptwist[] = {
       52, 51, 44, 43, 36, 35, 28, 27, 20, 19, 12, 11,
       53, 50, 45, 42, 37, 34, 29, 26, 21, 18, 13, 10,
       54, 49, 46, 41, 38, 33, 30, 25, 22, 17, 14, 9,
       55, 48, 47, 40, 39, 32, 31, 24, 23, 16, 15, 8
     };
 
-    static const ubyte file_to_file[] = {
+    static const uint8 file_to_file[] = {
       0, 1, 2, 3, 3, 2, 1, 0
     };
 
@@ -992,9 +992,9 @@ namespace TableBase {
     };
 
     static int wdl_to_map[5] = { 1, 3, 0, 2, 0 };
-    static ubyte pa_flags[5] = { 8, 0, 0, 0, 4 };
+    static uint8 pa_flags[5] = { 8, 0, 0, 0, 4 };
 
-    static uint64 encode_piece(struct TBEntry_piece* ptr, ubyte* norm, int* pos, int* factor) {
+    static uint64 encode_piece(struct TBEntry_piece* ptr, uint8* norm, int* pos, int* factor) {
         uint64 idx;
         int i, j, k, m, l, p;
         int n = ptr->num;
@@ -1068,7 +1068,7 @@ namespace TableBase {
         return file_to_file[pos[0] & 0x07];
     }
 
-    static uint64 encode_pawn(struct TBEntry_pawn* ptr, ubyte* norm, int* pos, int* factor) {
+    static uint64 encode_pawn(struct TBEntry_pawn* ptr, uint8* norm, int* pos, int* factor) {
         uint64 idx;
         int i, j, k, m, s, t;
         int n = ptr->num;
@@ -1125,7 +1125,7 @@ namespace TableBase {
         return idx;
     }
 
-    static ubyte decompress_pairs(struct PairsData* d, uint64 idx) {
+    static uint8 decompress_pairs(struct PairsData* d, uint64 idx) {
         if (!d->idxbits)
             return d->min_len;
 
@@ -1147,7 +1147,7 @@ namespace TableBase {
         int m = d->min_len;
         ushort* offset = d->offset;
         uint32* base = d->base - m;
-        ubyte* symlen = d->symlen;
+        uint8* symlen = d->symlen;
         int sym, bitcnt;
 
         uint32 next = 0;
@@ -1173,7 +1173,7 @@ namespace TableBase {
             bitcnt -= l;
         }
 
-        ubyte* sympat = d->sympat;
+        uint8* sympat = d->sympat;
         while (symlen[sym] != 0) {
             int w = *(int*)(sympat + 3 * sym);
             int s1 = w & 0x0fff;
@@ -1195,7 +1195,7 @@ namespace TableBase {
         TBHashEntry* ptr2;
         uint64 idx;
         int i;
-        ubyte res;
+        uint8 res;
         int p[TBPIECES];
 
         uint64 key = Material_Key(board);
@@ -1243,7 +1243,7 @@ namespace TableBase {
         // Pieces of the same type are guaranteed to be consecutive.
         if (!ptr->has_pawns) {
             TBEntry_piece* entry = (TBEntry_piece*)ptr;
-            ubyte* pc = entry->pieces[bside];
+            uint8* pc = entry->pieces[bside];
             for (i = 0; i < entry->num;) {
                 BitBoard bb = board.m_Pieces[pc[i] & 0x07][((pc[i] ^ cmirror) >> 3) & 0x1];
                 do {
@@ -1261,7 +1261,7 @@ namespace TableBase {
                 p[i++] = PopPos(bb) ^ mirror;
             } while (bb);
             int f = pawn_file(entry, p);
-            ubyte* pc = entry->file[f].pieces[bside];
+            uint8* pc = entry->file[f].pieces[bside];
             for (; i < entry->num;) {
                 bb = board.m_Pieces[pc[i] & 0x07][((pc[i] ^ cmirror) >> 3) & 0x1];
                 do {
@@ -1434,7 +1434,7 @@ namespace TableBase {
                 *success = -1;
                 return 0;
             }
-            ubyte* pc = entry->pieces;
+            uint8* pc = entry->pieces;
             for (i = 0; i < entry->num;) {
                 BitBoard bb = board.m_Pieces[(pc[i] & 0x07)][((pc[i] ^ cmirror) >> 3) & 0x1];
                 do {
@@ -1462,7 +1462,7 @@ namespace TableBase {
                 *success = -1;
                 return 0;
             }
-            ubyte* pc = entry->file[f].pieces;
+            uint8* pc = entry->file[f].pieces;
             for (; i < entry->num;) {
                 bb = board.m_Pieces[pc[i] & 0x07][((pc[i] ^ cmirror) >> 3) & 0x1];
                 do {

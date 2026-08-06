@@ -7,6 +7,7 @@
 
 #include <unordered_map>
 #include <algorithm>
+#include <cinttypes>
 #include <vector>
 #include <thread>
 #include <cmath>
@@ -14,8 +15,8 @@
 #define MAX_DEPTH 64 // Maximum depth that the engine will go
 #define MATE_SCORE 32767/2
 #define NONE_SCORE 32766
-#define MIN_ALPHA -32767ll
-#define MAX_BETA 32767ll
+#define MIN_ALPHA int64(-32767)
+#define MAX_BETA int64(32767)
 
 // Quadratic https://www.chessprogramming.org/Triangular_PV-Table
 struct MoveStack {
@@ -104,7 +105,7 @@ public:
 			int64 count = Perft_r<!white>(pos, depth + 1);
 			result += count;
 			if (depth == 0) {
-                if(m_Running) sync_printf("%s: %llu: %s\n", MoveToString(move).c_str(), count, m_Position.ToFen().c_str());
+                if(m_Running) sync_printf("%s: %" PRId64 ": %s\n", MoveToString(move).c_str(), count, m_Position.ToFen().c_str());
 			}
             pos.UndoMove(move);
 		}
@@ -118,7 +119,7 @@ public:
 		time.Start();
         uint64 result = m_Position.m_WhiteMove ? Perft_r<WHITE>(m_Position, 0) : Perft_r<BLACK>(m_Position, 0);
 		float t = time.End();
-        if(m_Running) sync_printf("%llu\n%.3fMNodes/s\n", result, (result / 1000000.0f) / t);
+        if(m_Running) sync_printf("%" PRIu64 "\n%.3fMNodes/s\n", result, (result / 1000000.0f) / t);
         m_Running = false;
 		return result;
 	}
@@ -302,7 +303,7 @@ public:
             }
         }
         
-		int64 bestScore = -MATE_SCORE;
+		    int64 bestScore = -MATE_SCORE;
         int64 old_alpha = alpha;
         Move bestMove = 0;
 
@@ -426,14 +427,14 @@ public:
         int64 timeleft = m_Position.m_WhiteMove ? wtime : btime;
         int64 timeinc = m_Position.m_WhiteMove ? winc : binc;
 
-        int64 est_movesleft = std::max(60 - (int64)m_Position.m_FullMoves, 20ll);
+        int64 est_movesleft = std::max(60 - (int64)m_Position.m_FullMoves, int64(20));
         int64 est_timeleft = timeleft + est_movesleft * timeinc;
 
-        int64 target = std::max(std::min(est_timeleft / est_movesleft - 20, timeleft/2), 20ll); // Don't let the time run out and - overhead
+        int64 target = std::max(std::min(est_timeleft / est_movesleft - 20, timeleft/2), int64(20)); // Don't let the time run out and - overhead
         float x = (m_Position.m_FullMoves - 20.0f)/30.0f;
         float factor = exp(-x*x);   // Bell curve
         int64 result = (target * factor);
-        sync_printf("info movetime %lli\n", result);
+        sync_printf("info movetime %" PRId64 "\n", result);
         UCIMove(result);
     }
 
@@ -509,7 +510,7 @@ public:
             if (!m_Running || m_Timer.EndMs() >= m_MaxTime) break;
 
             // Print pv and search info
-            sync_printf("info depth %i score cp %lli time %lli nodes %llu tps %llu\n", m_Maxdepth, bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
+            sync_printf("info depth %i score cp %" PRId64 " time %" PRId64 " nodes %" PRIu64 " tps %" PRIu64 "\n", m_Maxdepth, bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
             std::ostringstream oss;
             oss << "info pv";
             for (int i = 0; i < MAX_DEPTH && stack->m_PV[i] != Move(); i++) {

@@ -1,11 +1,10 @@
 #pragma once
 #include <cstdint>
 
-using uint64 = unsigned long long;
-using int64 = long long;
-using uint32 = unsigned int;
-using ushort = unsigned short;
-using ubyte = unsigned char;
+using uint64 = uint64_t;
+using int64 = int64_t;
+using uint32 = uint32_t;
+using ushort = uint16_t;
 using uint8 = uint8_t;
 using int8 = int8_t;
 

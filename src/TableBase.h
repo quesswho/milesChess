@@ -26,10 +26,10 @@ namespace TableBase {
     struct PairsData {
         char* indextable;
         ushort* sizetable;
-        ubyte* data;
+        uint8* data;
         ushort* offset;
-        ubyte* symlen;
-        ubyte* sympat;
+        uint8* symlen;
+        uint8* sympat;
         int blocksize;
         int idxbits;
         int min_len;
@@ -40,41 +40,41 @@ namespace TableBase {
         char* data;
         uint64 key;
         uint64 mapping;
-        ubyte ready;
-        ubyte num;
-        ubyte symmetric;
-        ubyte has_pawns;
+        uint8 ready;
+        uint8 num;
+        uint8 symmetric;
+        uint8 has_pawns;
     };
 
     struct TBEntry_piece {
         char* data;
         uint64 key;
         uint64 mapping;
-        ubyte ready;
-        ubyte num;
-        ubyte symmetric;
-        ubyte has_pawns;
-        ubyte enc_type;
+        uint8 ready;
+        uint8 num;
+        uint8 symmetric;
+        uint8 has_pawns;
+        uint8 enc_type;
         struct PairsData* precomp[2];
         int factor[2][TBPIECES];
-        ubyte pieces[2][TBPIECES];
-        ubyte norm[2][TBPIECES];
+        uint8 pieces[2][TBPIECES];
+        uint8 norm[2][TBPIECES];
     };
 
     struct TBEntry_pawn {
         char* data;
         uint64 key;
         uint64 mapping;
-        ubyte ready;
-        ubyte num;
-        ubyte symmetric;
-        ubyte has_pawns;
-        ubyte pawns[2];
+        uint8 ready;
+        uint8 num;
+        uint8 symmetric;
+        uint8 has_pawns;
+        uint8 pawns[2];
         struct {
             struct PairsData* precomp[2];
             int factor[2][TBPIECES];
-            ubyte pieces[2][TBPIECES];
-            ubyte norm[2][TBPIECES];
+            uint8 pieces[2][TBPIECES];
+            uint8 norm[2][TBPIECES];
         } file[4];
     };
 
@@ -87,38 +87,38 @@ namespace TableBase {
         char* data;
         uint64 key;
         uint64 mapping;
-        ubyte ready;
-        ubyte num;
-        ubyte symmetric;
-        ubyte has_pawns;
-        ubyte enc_type;
+        uint8 ready;
+        uint8 num;
+        uint8 symmetric;
+        uint8 has_pawns;
+        uint8 enc_type;
         PairsData* precomp;
         int factor[TBPIECES];
-        ubyte pieces[TBPIECES];
-        ubyte norm[TBPIECES];
-        ubyte flags; // accurate, mapped, side
+        uint8 pieces[TBPIECES];
+        uint8 norm[TBPIECES];
+        uint8 flags; // accurate, mapped, side
         ushort map_idx[4];
-        ubyte* map;
+        uint8* map;
     };
 
     struct DTZEntry_pawn {
         char* data;
         uint64 key;
         uint64 mapping;
-        ubyte ready;
-        ubyte num;
-        ubyte symmetric;
-        ubyte has_pawns;
-        ubyte pawns[2];
+        uint8 ready;
+        uint8 num;
+        uint8 symmetric;
+        uint8 has_pawns;
+        uint8 pawns[2];
         struct {
             PairsData* precomp;
             int factor[TBPIECES];
-            ubyte pieces[TBPIECES];
-            ubyte norm[TBPIECES];
+            uint8 pieces[TBPIECES];
+            uint8 norm[TBPIECES];
         } file[4];
-        ubyte flags[4];
+        uint8 flags[4];
         ushort map_idx[4][4];
-        ubyte* map;
+        uint8* map;
     };
 
     struct DTZTableEntry {

@@ -1,5 +1,6 @@
 #pragma once
 #include <immintrin.h>
+#include <cinttypes>
 #include <random>
 #include <array>
 
@@ -105,7 +106,7 @@ namespace Lookup {
 
         int i = 0;
         for (uint64 e : result) {
-            printf("%#018llx, ", e);
+            printf("%#018" PRIx64 ", ", e);
             i++;
             if (i % 4 == 0) printf("\n");
         }
@@ -130,7 +131,7 @@ namespace Lookup {
     static void PrintLineTable() {
         int i = 0;
         for (uint64 e : Lookup::InitSlider()) {
-            printf("%#018llx, ", e);
+            printf("%#018" PRIx64 ", ", e);
             i++;
             if (i % 4 == 0) printf("\n");
         }
@@ -141,7 +142,7 @@ namespace Lookup {
     static void PrintKnightTable() {
         int i = 0;
         for (uint64 e : Lookup::InitKnight()) {
-            printf("%#018llx, ", e);
+            printf("%#018" PRIx64 ", ", e);
             i++;
             if (i % 4 == 0) printf("\n");
         }
@@ -150,7 +151,7 @@ namespace Lookup {
     static void PrintKingTable() {
         int i = 0;
         for (uint64 e : Lookup::InitKing()) {
-            printf("%#018llx, ", e);
+            printf("%#018" PRIx64 ", ", e);
             i++;
             if (i % 4 == 0) printf("\n");
         }
@@ -159,7 +160,7 @@ namespace Lookup {
     static void PrintTable(std::array<uint64, 64> table) {
         int i = 0;
         for (uint64 e : table) {
-            printf("%#018llx, ", e);
+            printf("%#018" PRIx64 ", ", e);
             i++;
             if (i % 4 == 0) printf("\n");
         }
@@ -587,7 +588,7 @@ namespace Lookup {
     static void PrintActiveMoves() {
         int i = 0;
         for (uint64 e : InitActiveMoves()) {
-            printf("%#018llx, ", e);
+            printf("%#018" PRIx64 ", ", e);
             i++;
             if (i % 4 == 0) printf("\n");
         }
@@ -596,7 +597,7 @@ namespace Lookup {
     static void PrintCheckMoves() {
         int i = 0;
         for (uint64 e : InitCheckMoves()) {
-            printf("%#018llx, ", e);
+            printf("%#018" PRIx64 ", ", e);
             i++;
             if (i % 4 == 0) printf("\n");
         }
@@ -612,7 +613,7 @@ namespace Lookup {
             if (i % 8 != 7) {
                 for (int j = i + 9; j < 64; j += 8) map |= 1ull << j;
             }
-            printf("%#018llx, ", map);
+            printf("%#018" PRIx64 ", ", map);
             if ((i+1) % 4 == 0) printf("\n");
 
         }
@@ -628,7 +629,7 @@ namespace Lookup {
             if (i % 8 != 7) {
                 for (int j = i - 7; j > 0; j -= 8) map |= 1ull << j;
             }
-            printf("%#018llx, ", map);
+            printf("%#018" PRIx64 ", ", map);
             if ((i+1) % 4 == 0) printf("\n");
 
         }
@@ -638,7 +639,7 @@ namespace Lookup {
         for (int i = 0; i < 64; i++) {
             uint64 map = 0;
             for (int j = i + 8; j < 64; j += 8) map |= 1ull << j;
-            printf("%#018llx, ", map);
+            printf("%#018" PRIx64 ", ", map);
             if ((i + 1) % 4 == 0) printf("\n");
         }
     }
@@ -647,7 +648,7 @@ namespace Lookup {
         for (int i = 0; i < 64; i++) {
             uint64 map = 0;
             for (int j = i - 8; j > 0; j -= 8) map |= 1ull << j;
-            printf("%#018llx, ", map);
+            printf("%#018" PRIx64 ", ", map);
             if ((i + 1) % 4 == 0) printf("\n");
 
         }
@@ -658,7 +659,7 @@ namespace Lookup {
             uint64 map = 0;
             if((i%8) != 0) for (int j = (i - 1) % 8; j < 64; j += 8) map |= 1ull << j;
             if ((i % 8) != 7) for (int j = (i + 1) % 8; j < 64; j += 8) map |= 1ull << j;
-            printf("%#018llx, ", map);
+            printf("%#018" PRIx64 ", ", map);
             if ((i + 1) % 4 == 0) printf("\n");
         }
     }
@@ -3828,7 +3829,7 @@ namespace Lookup {
         std::mt19937_64 mt(seed);
 
         for (int i = 1; i <= 781; i++) {
-            printf("%#018llx, ", mt());
+            printf("%#018" PRIx64 ", ", mt());
             if (i % 4 == 0) printf("\n");
         }
     }
