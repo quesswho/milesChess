@@ -120,47 +120,13 @@ public:
         return TimeExpired();
     }
 
-	void LoadPosition(std::string fen) {
+    void ClearTables() {
         m_Table->Clear();
+        m_PawnTable->Clear();
+    }
+
+	void LoadPosition(std::string fen) {
         m_Position.SetPosition(fen);
-	}
-
-    template<Color white>
-	uint64 Perft_r(Position& pos, int depth) {
-        if (!m_Running) return 0;
-        assert(Zobrist_Hash(pos) == pos.m_Hash && "Hash is not matched!");
-		//const std::vector<Move> moves = TGenerateMoves<ALL, white>(pos);
-        MoveGen moveGen(pos, 0, false);
-        if (depth == m_Maxdepth - 1) {
-            uint64 count = 0;
-            while ((moveGen.Next()) != 0) count++;
-            return count;
-        }
-		int64 result = 0;
-		//for (const Move& move : moves) {
-        Move move;
-        while ((move = moveGen.Next()) != 0) {
-            pos.MovePiece(move);
-			int64 count = Perft_r<!white>(pos, depth + 1);
-			result += count;
-			if (depth == 0) {
-                if(m_Running) sync_printf("%s: %" PRId64 ": %s\n", MoveToString(move).c_str(), count, m_Position.ToFen().c_str());
-			}
-            pos.UndoMove(move);
-		}
-		return result;
-	}
-
-	uint64 Perft(int maxdepth) {
-        m_Running = true;
-        m_Maxdepth = maxdepth;
-		Timer time;
-		time.Start();
-        uint64 result = m_Position.m_WhiteMove ? Perft_r<WHITE>(m_Position, 0) : Perft_r<BLACK>(m_Position, 0);
-		float t = time.End();
-        if(m_Running) sync_printf("%" PRIu64 "\n%.3fMNodes/s\n", result, (result / 1000000.0f) / t);
-        m_Running = false;
-		return result;
 	}
 
     static void Update_PV(Move* pv, Move move, Move* target) {

@@ -1625,6 +1625,6 @@ namespace TableBase {
             }
         }
 
-        printf("Found %d tablebases.\n", TBnum_piece + TBnum_pawn);
+        printf("info string found %d tablebases\n", TBnum_piece + TBnum_pawn);
     }
 }

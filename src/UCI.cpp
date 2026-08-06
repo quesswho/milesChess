@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "UCI.h"
+#include "Perft.h"
 
 static void GetToken(std::istringstream& uip, std::string& token) {
     token.clear();
@@ -21,8 +22,36 @@ static std::string BuildFen(const std::vector<std::string>& fields) {
     return fen;
 }
 
+// setoption name <Name> value <Value>, either may contain spaces
+void UCI::SetOption(std::istringstream& istream) {
+    std::string token, name, value;
+    if (!(istream >> token) || token != "name") return;
+
+    bool inValue = false;
+    while (istream >> token) {
+        if (!inValue && token == "value") {
+            inValue = true;
+            continue;
+        }
+        std::string& target = inValue ? value : name;
+        if (!target.empty()) target += " ";
+        target += token;
+    }
+
+    if (name == "Hash") {
+        int mb = std::atoi(value.c_str());
+        if (mb >= 1) m_Search.SetHashSize(mb);
+        else sync_printf("info string bad Hash value %s\n", value.c_str());
+    } else if (name == "SyzygyPath") {
+        if (!value.empty() && value != "<empty>") TableBase::Init(value);
+    } else {
+        sync_printf("info string unknown option %s\n", name.c_str());
+    }
+}
+
 void UCI::NewGame() {
     m_Search.Stop();
+    m_Search.ClearTables();
     m_Search.LoadPosition(Lookup::starting_pos);
     m_CachedFen = Lookup::starting_pos;
     m_CachedMoves.clear();
@@ -76,9 +105,13 @@ void UCI::Start() {
         } else if (token == "uci") {
             printf("id name MilesBot 1.0\n");
             printf("id author Miles\n");
+            printf("option name Hash type spin default %llu min 1 max 4096\n", DEFAULT_HASH_MB);
+            printf("option name SyzygyPath type string default <empty>\n");
             printf("uciok\n");
         } else if (token == "isready") {
             printf("readyok\n");
+        } else if (token == "setoption") {
+            SetOption(istream);
         } else if (token == "ucinewgame") {
             NewGame();
         } else if (token == "position") {
@@ -110,7 +143,7 @@ void UCI::Start() {
         } else if (token == "perft") {
             GetToken(istream, token);
             int depth = std::atoi(token.c_str());
-            if (depth > 0) m_Search.Perft(depth);
+            if (depth > 0) PerftDivide(m_Search.m_Position, depth, true);
         } else if (token == "go") {
             int64 time = 1000;
             int64 wtime = -1;
@@ -151,7 +184,7 @@ void UCI::Start() {
             }
 
             if (perft > 0) {
-                m_Search.Perft(perft);
+                PerftDivide(m_Search.m_Position, perft, true);
             } else if (!movetime && wtime > 0 && btime > 0) {
                 m_Search.MoveTimed(wtime, btime, winc, binc, depth);
             } else {
