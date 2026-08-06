@@ -18,6 +18,8 @@
 #define NONE_SCORE 32766
 #define MIN_ALPHA int64(-32767)
 #define MAX_BETA int64(32767)
+#define DEFAULT_HASH_MB 16ull
+#define PAWN_TABLE_MB 1ull
 
 // Quadratic https://www.chessprogramming.org/Triangular_PV-Table
 struct MoveStack {
@@ -60,15 +62,19 @@ private:
     int m_RootDelta;
 public:
 
-	Search() 
+	Search(uint64 hashMB = DEFAULT_HASH_MB)
         : m_Maxdepth(0), m_Running(false), m_MaxTime(999999999999999), m_NodeCnt(0)
 	{
-        m_Table = std::make_unique<TranspositionTable>(1024ull * 1024 * 1024);
-        m_PawnTable = std::make_unique<PawnTable>(1024ull * 1024);
+        m_Table = std::make_unique<TranspositionTable>(hashMB * 1024 * 1024);
+        m_PawnTable = std::make_unique<PawnTable>(PAWN_TABLE_MB * 1024 * 1024);
         LoadPosition(Lookup::starting_pos);
     }
 
     ~Search() = default;
+
+    void SetHashSize(uint64 hashMB) {
+        m_Table->Resize(hashMB * 1024 * 1024);
+    }
 
     void Stop() {
         m_Running = false;
