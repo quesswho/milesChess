@@ -46,8 +46,6 @@ public:
 
     BitBoard m_Board;
 
-    ColoredPieceType m_Squares[64];
-
     Color m_WhiteMove;
     uint64 m_FullMoves;
 
@@ -175,7 +173,5 @@ private:
     }
 };
 
-static uint64 Zobrist_Hash(const Position& position);
-static uint64 Zobrist_PawnHash(const Position& position);
-
-static Move GetMove(const Position& position, std::string str);
+uint64 Zobrist_Hash(const Position& position);
+uint64 Zobrist_PawnHash(const Position& position);

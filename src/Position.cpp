@@ -147,7 +147,7 @@ void Position::MovePiece(Move move) {
 
     const ColoredPieceType type = MovePieceType(move);
 
-    assert(!(move.m_To & m_White) && "Cant move to same color piece");
+    assert(!(to & (type <= WKING ? m_White : m_Black)) && "Cant move to same color piece");
     switch (type) {
     case WPAWN:
         if (tPos - fPos == 16) {
@@ -429,7 +429,7 @@ void Position::UndoMove(Move move) {
 
     const ColoredPieceType type = MovePieceType(move);
 
-    assert(!(move.m_To & m_White) && "Cant move to same color piece");
+    assert((to & (type <= WKING ? m_White : m_Black)) && "Undo: destination must hold the moved piece");
     switch (type) {
     case WPAWN:
         if (promotion) {
@@ -831,7 +831,7 @@ std::string Position::ToFen() const {
     return FEN;
 }
 
-static uint64 Zobrist_PawnHash(const Position& position) {
+uint64 Zobrist_PawnHash(const Position& position) {
     uint64 result = 0;
 
     BitBoard wp = position.m_WhitePawn, bp = position.m_BlackPawn;
@@ -849,41 +849,3 @@ static uint64 Zobrist_PawnHash(const Position& position) {
     return result;
 }
 
-static Move GetMove(const Position& position, std::string str) {
-
-    const uint32 from = ('h' - str[0] + (str[1] - '1') * 8);
-    const uint32 to = ('h' - str[2] + (str[3] - '1') * 8);
-    Move result = from | (to << 6);
-
-    uint32 moveFlag = 0;
-    if (str.size() > 4) {
-        switch (str[4]) {
-        case 'k':
-            result |= 0x200000;
-            break;
-        case 'b':
-            result |= 0x400000;
-            break;
-        case 'r':
-            result |= 0x800000;
-            break;
-        case 'q':
-            result |= 0x1000000;
-            break;
-        }
-    }
-    ColoredPieceType move = position.m_Squares[from];
-    result |= move << 12;
-    ColoredPieceType capture = position.m_Squares[to];
-    result |= capture << 16;
-    if((move == WPAWN || move == BPAWN) && position.m_States[position.m_Ply].m_EnPassant & (1ull << to)) {
-        result |= 0x100000;
-    }
-    if (move == WKING || move == BKING) {
-        if ((from & 0x7) + (to & 0x7) > 1) { // If piece moved two squares horizontally
-            result |= 0x200000;
-        }
-    }
-
-    return result;
-}

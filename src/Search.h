@@ -632,7 +632,7 @@ public:
 
         
 
-        assert(type != MoveType::NONE && "Could not read move");
+        assert(type != NOPIECE && "Could not read move");
         return fromPos | toPos << 6 | type << 12 | capture << 16 | flags << 20;
     }
 

@@ -184,13 +184,15 @@ static int sync_printf(const char* format, ...) {
 
 // Remove double whitespaces and \t characters from command
 static std::string trim_str(std::string str) {
-    for (int i = 0; i < str.length() - 1; i++) {
-        if ((str.at(i) == ' ' && str.at(i + 1) == ' ') || str.at(i) == '\t') {
-            str.erase(str.begin() + i);
-            i--;
-        }
+    std::string result;
+    result.reserve(str.size());
+    for (size_t i = 0; i < str.size(); i++) {
+        const char c = str[i];
+        if (c == '\t') continue;
+        if (c == ' ' && !result.empty() && result.back() == ' ') continue;
+        result += c;
     }
-    return str;
+    return result;
 }
 
 class Timer {
