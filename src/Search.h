@@ -43,9 +43,22 @@ enum NodeType {
     NON_PV
 };
 
+struct SearchLimits {
+    int maxDepth = MAX_DEPTH;
+    uint64 maxNodes = 0;   // 0 = unlimited
+    int64 maxTimeMs = -1;  // -1 = unlimited
+    bool useTablebase = true;
+};
+
+struct SearchResult {
+    Move best = 0;
+    int64 score = 0;
+    uint64 nodes = 0;
+    int depth = 0;
+};
+
 class Search {
 public:
-    int64 m_MaxTime;
     Position m_Position;
 private:
 	//uint64 m_Hash[MAX_DEPTH];
@@ -60,10 +73,11 @@ private:
     std::unique_ptr<PawnTable> m_PawnTable;
     std::vector<RootMove> m_RootMoves;
     int m_RootDelta;
+    SearchLimits m_Limits;
 public:
 
 	Search(uint64 hashMB = DEFAULT_HASH_MB)
-        : m_Maxdepth(0), m_Running(false), m_MaxTime(999999999999999), m_NodeCnt(0)
+        : m_Maxdepth(0), m_Running(false), m_NodeCnt(0)
 	{
         m_Table = std::make_unique<TranspositionTable>(hashMB * 1024 * 1024);
         m_PawnTable = std::make_unique<PawnTable>(PAWN_TABLE_MB * 1024 * 1024);
@@ -91,6 +105,16 @@ public:
     void Stop() {
         m_Running = false;
         JoinThreads();
+    }
+
+    bool TimeExpired() {
+        return m_Limits.maxTimeMs >= 0 && m_Timer.EndMs() >= m_Limits.maxTimeMs;
+    }
+
+    bool ShouldStop() {
+        if (!m_Running) return true;
+        if (m_Limits.maxNodes && m_NodeCnt >= m_Limits.maxNodes) return true;
+        return TimeExpired();
     }
 
 	void LoadPosition(std::string fen) {
@@ -233,7 +257,7 @@ public:
         constexpr bool rootNode = node == ROOT;
 
         m_NodeCnt++;
-        if (!m_Running || m_Timer.EndMs() >= m_MaxTime) return 0;
+        if (ShouldStop()) return 0;
 
         // Quiesce search if we reached the bottom
         if (depth <= 0) {
@@ -273,7 +297,7 @@ public:
         }
 
         // Probe the tablebase
-        if (!rootNode) {
+        if (!rootNode && m_Limits.useTablebase) {
             int success;
             //printf("%s\n", board.ToFen().c_str());
             int v = TableBase::Probe_DTZ(board, &success);
@@ -451,15 +475,24 @@ public:
     }
 
     void UCIMove(int64 time) {
+        SearchLimits limits;
+        limits.maxTimeMs = time;
+        StartAsync(limits);
+    }
+
+    void StartAsync(const SearchLimits& limits) {
         JoinThreads();
-        m_MaxTime = time;
-        if (m_MaxTime == -1) {
-            m_MaxTime = 999999999999999;
-        }
+        m_Limits = limits;
         m_Threads.push_back(std::make_unique<std::thread>(&Search::UCIMove_async, &*this));
     }
 
     void UCIMove_async() {
+        SearchResult result = Go(m_Limits);
+        sync_printf("bestmove %s\n", MoveToString(result.best).c_str());
+    }
+
+    SearchResult Go(const SearchLimits& limits) {
+        m_Limits = limits;
         m_Running = true;
         m_Timer.Start();
 
@@ -473,7 +506,9 @@ public:
         for (int i = 0; i < MAX_DEPTH; i++) {
             (stack + i)->m_Ply = i;
         }
-        
+
+        const int depthCap = std::min(m_Limits.maxDepth, (int)MAX_DEPTH);
+
         // Start timer
         Move bestMove = 0;
         Move finalMove = bestMove;
@@ -482,7 +517,7 @@ public:
         int64 rootBeta = MAX_BETA;
         m_RootDelta = 10;
         // Iterative deepening
-        while (m_Running && m_Timer.EndMs() < m_MaxTime && MAX_DEPTH > m_Maxdepth) {
+        while (m_Running && !TimeExpired() && depthCap > m_Maxdepth) {
             bestScore = -MATE_SCORE;
 
             m_RootDelta = 10;
@@ -520,7 +555,7 @@ public:
 
                 m_RootDelta *= 1.5;
             }
-            if (!m_Running || m_Timer.EndMs() >= m_MaxTime) break;
+            if (ShouldStop()) break;
 
             // Print pv and search info
             sync_printf("info depth %i score cp %" PRId64 " time %" PRId64 " nodes %" PRIu64 " tps %" PRIu64 "\n", m_Maxdepth, bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
@@ -545,11 +580,19 @@ public:
                     true
                 ));
             
-            if (m_Timer.EndMs() * 2 >= m_MaxTime) break; // We won't have enough time to calculate more depth anyway
+            if (m_Limits.maxTimeMs >= 0 && m_Timer.EndMs() * 2 >= m_Limits.maxTimeMs) break; // We won't have enough time to calculate more depth anyway
             if (bestScore >= MATE_SCORE - MAX_DEPTH || bestScore <= -MATE_SCORE + MAX_DEPTH) break; // Position is solved so exit out
         }
-        sync_printf("bestmove %s\n", MoveToString(finalMove).c_str());
         delete[] stack;
+
+        m_Running = false;
+
+        SearchResult result;
+        result.best = finalMove;
+        result.score = bestScore;
+        result.nodes = m_NodeCnt;
+        result.depth = m_Maxdepth;
+        return result;
     }
 
     template<Color white>

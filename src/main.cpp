@@ -49,8 +49,9 @@ int main() {
 		//search->LoadPosition("r4rk1/1pp2ppp/p7/3Q4/4p2P/2PnP2N/PP1Pq3/RK3nR1 w - - 1 23"); // Draw trap
 		Timer time;
 		time.Start();
-		search->m_MaxTime = 100000;
-		search->UCIMove_async(); // 3580-3770
+		SearchLimits limits;
+		limits.maxTimeMs = 100000;
+		search->Go(limits); // 3580-3770
 		//search->Perft(6); // 102-105.5
 						  // 102.3-105.3
 		printf("%.3fs\n", time.End());
