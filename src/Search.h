@@ -586,7 +586,7 @@ public:
         ColoredPieceType type = NOPIECE;
         if (str.size() > 4) {
             switch (str[4]) {
-            case 'k':
+            case 'n':
                 flags |= 0b100;
                 break;
             case 'b':

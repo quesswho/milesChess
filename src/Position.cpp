@@ -541,8 +541,6 @@ void Position::UndoMove(Move move) {
 
     const ColoredPieceType capture = CaptureType(move);
 
-    if (capture != NOPIECE) m_States[m_Ply].m_HalfMoves = 0;
-
     switch (capture) {
         // White pieces
     case BPAWN:
