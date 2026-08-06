@@ -66,6 +66,7 @@ private:
     //uint64 m_History[256];
     std::vector<std::unique_ptr<std::thread>> m_Threads;
     std::atomic<bool> m_Running;
+    std::atomic<bool> m_Stopping;
     Timer m_Timer;
 	int m_Maxdepth; // Maximum depth currently set
     uint64 m_NodeCnt;
@@ -77,7 +78,7 @@ private:
 public:
 
 	Search(uint64 hashMB = DEFAULT_HASH_MB)
-        : m_Maxdepth(0), m_Running(false), m_NodeCnt(0)
+        : m_Maxdepth(0), m_Running(false), m_Stopping(false), m_NodeCnt(0)
 	{
         m_Table = std::make_unique<TranspositionTable>(hashMB * 1024 * 1024);
         m_PawnTable = std::make_unique<PawnTable>(PAWN_TABLE_MB * 1024 * 1024);
@@ -103,8 +104,10 @@ public:
     }
 
     void Stop() {
+        m_Stopping = true; // A search that has not entered Go() yet would miss m_Running
         m_Running = false;
         JoinThreads();
+        m_Stopping = false;
     }
 
     bool TimeExpired() {
@@ -112,7 +115,7 @@ public:
     }
 
     bool ShouldStop() {
-        if (!m_Running) return true;
+        if (!m_Running || m_Stopping) return true;
         if (m_Limits.maxNodes && m_NodeCnt >= m_Limits.maxNodes) return true;
         return TimeExpired();
     }
@@ -456,7 +459,7 @@ public:
     
 
     // Calculate time to allocate for a move
-    void MoveTimed(int64 wtime, int64 btime, int64 winc, int64 binc) {
+    void MoveTimed(int64 wtime, int64 btime, int64 winc, int64 binc, int depth = MAX_DEPTH) {
         int64 timediff = llabs(wtime - btime);
 
         bool moreTime = m_Position.m_WhiteMove ? wtime > btime : wtime < btime;
@@ -471,12 +474,13 @@ public:
         float factor = exp(-x*x);   // Bell curve
         int64 result = (target * factor);
         sync_printf("info movetime %" PRId64 "\n", result);
-        UCIMove(result);
+        UCIMove(result, depth);
     }
 
-    void UCIMove(int64 time) {
+    void UCIMove(int64 time, int depth = MAX_DEPTH) {
         SearchLimits limits;
         limits.maxTimeMs = time;
+        limits.maxDepth = std::clamp(depth, 1, (int)MAX_DEPTH);
         StartAsync(limits);
     }
 
@@ -488,7 +492,7 @@ public:
 
     void UCIMove_async() {
         SearchResult result = Go(m_Limits);
-        sync_printf("bestmove %s\n", MoveToString(result.best).c_str());
+        sync_printf("bestmove %s\n", result.best != Move() ? MoveToString(result.best).c_str() : "0000");
     }
 
     SearchResult Go(const SearchLimits& limits) {
@@ -517,7 +521,7 @@ public:
         int64 rootBeta = MAX_BETA;
         m_RootDelta = 10;
         // Iterative deepening
-        while (m_Running && !TimeExpired() && depthCap > m_Maxdepth) {
+        while (!ShouldStop() && depthCap > m_Maxdepth) {
             bestScore = -MATE_SCORE;
 
             m_RootDelta = 10;
@@ -586,6 +590,11 @@ public:
         delete[] stack;
 
         m_Running = false;
+
+        if (finalMove == Move()) { // Stopped before a single depth finished, any legal move beats none
+            std::vector<Move> moves = GenerateMoves<ALL>(m_Position);
+            if (!moves.empty()) finalMove = moves[0];
+        }
 
         SearchResult result;
         result.best = finalMove;
