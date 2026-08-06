@@ -70,20 +70,27 @@ public:
         LoadPosition(Lookup::starting_pos);
     }
 
-    ~Search() = default;
+    ~Search() {
+        Stop();
+    }
 
     void SetHashSize(uint64 hashMB) {
+        Stop();
         m_Table->Resize(hashMB * 1024 * 1024);
     }
 
-    void Stop() {
-        m_Running = false;
+    void JoinThreads() {
         for (std::unique_ptr<std::thread>& t : m_Threads) {
             if (t->joinable()) {
                 t->join();
             }
         }
         m_Threads.clear();
+    }
+
+    void Stop() {
+        m_Running = false;
+        JoinThreads();
     }
 
 	void LoadPosition(std::string fen) {
@@ -444,6 +451,7 @@ public:
     }
 
     void UCIMove(int64 time) {
+        JoinThreads();
         m_MaxTime = time;
         if (m_MaxTime == -1) {
             m_MaxTime = 999999999999999;
