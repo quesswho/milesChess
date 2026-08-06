@@ -12,7 +12,7 @@ template<Color white>
 static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) {
     constexpr Color enemy = !white;
 
-    int kingsq = GET_SQUARE(King<white>(board));
+    int kingsq = GetSquare(King<white>(board));
 
     BitBoard knightPawnCheck = Lookup::knight_attacks[kingsq] & Knight<enemy>(board);
 
@@ -31,8 +31,8 @@ static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active
     active = 0xFFFFFFFFFFFFFFFFull; // No checks
     BitBoard rookcheck = board.RookAttack(kingsq, board.m_Board) & (Rook<enemy>(board) | Queen<enemy>(board));
     if (rookcheck > 0) { // If a rook piece is attacking the king
-        active = Lookup::active_moves[kingsq * 64 + GET_SQUARE(rookcheck)];
-        danger |= Lookup::check_mask[kingsq * 64 + GET_SQUARE(rookcheck)] & ~rookcheck;
+        active = Lookup::active_moves[kingsq * 64 + GetSquare(rookcheck)];
+        danger |= Lookup::check_mask[kingsq * 64 + GetSquare(rookcheck)] & ~rookcheck;
     }
     rookPin = 0;
     BitBoard rookpinner = board.RookXray(kingsq, board.m_Board) & (Rook<enemy>(board) | Queen<enemy>(board));
@@ -47,9 +47,9 @@ static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active
         if (active != 0xFFFFFFFFFFFFFFFFull) { // case where rook and bishop checks king
             active = 0;
         } else {
-            active = Lookup::active_moves[kingsq * 64 + GET_SQUARE(bishopcheck)];
+            active = Lookup::active_moves[kingsq * 64 + GetSquare(bishopcheck)];
         }
-        danger |= Lookup::check_mask[kingsq * 64 + GET_SQUARE(bishopcheck)] & ~bishopcheck;
+        danger |= Lookup::check_mask[kingsq * 64 + GetSquare(bishopcheck)] & ~bishopcheck;
     }
 
     bishopPin = 0;
@@ -103,7 +103,7 @@ static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active
         danger |= (board.RookAttack(pos, board.m_Board) & ~(1ull << pos));
     }
 
-    danger |= Lookup::king_attacks[GET_SQUARE(King<enemy>(board))];
+    danger |= Lookup::king_attacks[GetSquare(King<enemy>(board))];
 
     return enPassantCheck;
 }
@@ -345,14 +345,14 @@ static std::vector<Move> TGenerateMoves(const Position& board) {
     BitBoard rooks = Rook<white>(board) & ~bishopPin; // A bishop pinned rook can not move
 
     // Castles
-    const BoardPos kingpos = GET_SQUARE(King<white>(board));
+    const BoardPos kingpos = GetSquare(King<white>(board));
     BitBoard CK = CastleKing<white>(board.m_States[board.m_Ply].m_CastleRights, danger, board.m_Board, rooks);
     BitBoard CQ = CastleQueen<white>(board.m_States[board.m_Ply].m_CastleRights, danger, board.m_Board, rooks);
     if (CK) {
-        result.push_back(BuildMove(kingpos, GET_SQUARE(CK), kingtype, NOPIECE, 0b000010));
+        result.push_back(BuildMove(kingpos, GetSquare(CK), kingtype, NOPIECE, 0b000010));
     }
     if (CQ) {
-        result.push_back(BuildMove(kingpos, GET_SQUARE(CQ), kingtype, NOPIECE, 0b000010));
+        result.push_back(BuildMove(kingpos, GetSquare(CQ), kingtype, NOPIECE, 0b000010));
     }
 
     BitBoard pinnedRook = rookPin & (rooks);
@@ -747,16 +747,16 @@ private:
         BitBoard rooks = Rook<white>(m_Position) & ~bishopPin; // A bishop pinned rook can not move
 
         // Castles
-        const BoardPos kingpos = GET_SQUARE(King<white>(m_Position));
+        const BoardPos kingpos = GetSquare(King<white>(m_Position));
 
         if constexpr (T == SILENT) {
             BitBoard CK = CastleKing<white>(m_Position.m_States[m_Position.m_Ply].m_CastleRights, danger, m_Position.m_Board, rooks);
             BitBoard CQ = CastleQueen<white>(m_Position.m_States[m_Position.m_Ply].m_CastleRights, danger, m_Position.m_Board, rooks);
             if (CK) {
-                pushMove({ BuildMove(kingpos, GET_SQUARE(CK), kingtype, NOPIECE, 0b000010), 50 }); // Little bonus for castles
+                pushMove({ BuildMove(kingpos, GetSquare(CK), kingtype, NOPIECE, 0b000010), 50 }); // Little bonus for castles
             }
             if (CQ) {
-                pushMove({ BuildMove(kingpos, GET_SQUARE(CQ), kingtype, NOPIECE, 0b000010), 49 }); // Little bonus for castles
+                pushMove({ BuildMove(kingpos, GetSquare(CQ), kingtype, NOPIECE, 0b000010), 49 }); // Little bonus for castles
             }
         }
 

@@ -7,11 +7,17 @@
 #include "LookupTables.h"
 #include "MoveGen.h"
 
-#include <windows.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <algorithm>
+#include <cerrno>
+#include <cstring>
 
 namespace TableBase {
 
-#define Swap(a,b) {int tmp=a;a=b;b=tmp;}
 
     static std::string s_Path;
 
@@ -39,14 +45,14 @@ namespace TableBase {
         int i;
 
         for (pt = (int)PieceType::KING; pt >= (int)PieceType::PAWN; pt--) {
-            for (i = COUNT_BIT(board.m_Pieces[pt][color]); i > 0; i--) {
+            for (i = CountBits(board.m_Pieces[pt][color]); i > 0; i--) {
                 *str++ = pchr[6 - pt];
             }
         }
         *str++ = 'v';
         color = !color;
         for (pt = (int)PieceType::KING; pt >= (int)PieceType::PAWN; pt--) {
-            for (i = COUNT_BIT(board.m_Pieces[pt][color]); i > 0; i--) {
+            for (i = CountBits(board.m_Pieces[pt][color]); i > 0; i--) {
                 *str++ = pchr[6 - pt];
             }
         }
@@ -54,8 +60,8 @@ namespace TableBase {
     }
 
     static uint64 Material_Key(const Position& board) {
-        const uint8_t wp = COUNT_BIT(board.m_WhitePawn), wkn = COUNT_BIT(board.m_WhiteKnight), wb = COUNT_BIT(board.m_WhiteBishop), wr = COUNT_BIT(board.m_WhiteRook), wq = COUNT_BIT(board.m_WhiteQueen), wk = COUNT_BIT(board.m_WhiteKing),
-            bp = COUNT_BIT(board.m_BlackPawn), bkn = COUNT_BIT(board.m_BlackKnight), bb = COUNT_BIT(board.m_BlackBishop), br = COUNT_BIT(board.m_BlackRook), bq = COUNT_BIT(board.m_BlackQueen), bk = COUNT_BIT(board.m_BlackKing);
+        const uint8_t wp = CountBits(board.m_WhitePawn), wkn = CountBits(board.m_WhiteKnight), wb = CountBits(board.m_WhiteBishop), wr = CountBits(board.m_WhiteRook), wq = CountBits(board.m_WhiteQueen), wk = CountBits(board.m_WhiteKing),
+            bp = CountBits(board.m_BlackPawn), bkn = CountBits(board.m_BlackKnight), bb = CountBits(board.m_BlackBishop), br = CountBits(board.m_BlackRook), bq = CountBits(board.m_BlackQueen), bk = CountBits(board.m_BlackKing);
         
         uint64 key = 0;
         if (wp) {
@@ -103,13 +109,13 @@ namespace TableBase {
         uint64 key = 0;
 
         for (pt = (int)PieceType::KING; pt >= (int)PieceType::PAWN; pt--) {
-            if((i = COUNT_BIT(board.m_Pieces[pt][color])) > 0) {
+            if((i = CountBits(board.m_Pieces[pt][color])) > 0) {
                 key ^= Lookup::zobrist[color*64 + (pt-1)*128 + i - 1];
             }
         }
         color = !color;
         for (pt = (int)PieceType::KING; pt >= (int)PieceType::PAWN; pt--) {
-            if ((i = COUNT_BIT(board.m_Pieces[pt][color])) > 0) {
+            if ((i = CountBits(board.m_Pieces[pt][color])) > 0) {
                 key ^= Lookup::zobrist[color * 64 + (pt - 1) * 128 + i - 1];
             }
         }
@@ -359,33 +365,28 @@ namespace TableBase {
         strcat(file, "/");
         strcat(file, str);
         strcat(file, suffix);
-        HANDLE fd = CreateFile(file, GENERIC_READ, FILE_SHARE_READ, NULL,
-            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (fd != FD_ERR) return fd;
-
-        return FD_ERR;
+        return open(file, O_RDONLY);
     }
 
     static void Close_TB(FD fd) {
-        CloseHandle(fd);
+        close(fd);
     }
 
+    // *mapping receives the mapped length, which munmap needs back.
     static char* Map_TB(const char* name, const char* suffix, uint64* mapping) {
         FD fd = Open_TB(name, suffix);
         if (fd == FD_ERR)
             return NULL;
-        DWORD size_low, size_high;
-        size_low = GetFileSize(fd, &size_high);
-        HANDLE map = CreateFileMapping(fd, NULL, PAGE_READONLY, size_high, size_low,
-            NULL);
-        if (map == NULL) {
-            printf("CreateFileMapping() failed.\n");
+
+        struct stat statbuf;
+        if (fstat(fd, &statbuf) != 0) {
+            printf("fstat() failed, name = %s%s, error = %s.\n", name, suffix, strerror(errno));
             exit(1);
         }
-        *mapping = (uint64)map;
-        char* data = (char*)MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
-        if (data == NULL) {
-            printf("MapViewOfFile() failed, name = %s%s, error = %lu.\n", name, suffix, GetLastError());
+        *mapping = (uint64)statbuf.st_size;
+        char* data = (char*)mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        if (data == MAP_FAILED) {
+            printf("mmap() failed, name = %s%s, error = %s.\n", name, suffix, strerror(errno));
             exit(1);
         }
 
@@ -395,8 +396,7 @@ namespace TableBase {
 
     static void Unmap_TB(char* data, uint64 mapping) {
         if (!data) return;
-        UnmapViewOfFile(data);
-        CloseHandle((HANDLE)mapping);
+        munmap(data, (size_t)mapping);
     }
 
     static int Load_Wdl(TBEntry* entry, char* str) {
@@ -1042,7 +1042,7 @@ namespace TableBase {
             int t = norm[i];
             for (j = i; j < i + t; j++)
                 for (k = j + 1; k < i + t; k++)
-                    if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+                    if (pos[j] > pos[k]) std::swap(pos[j], pos[k]);
             int s = 0;
             for (m = i; m < i + t; m++) {
                 p = pos[m];
@@ -1063,7 +1063,7 @@ namespace TableBase {
 
         for (i = 1; i < ptr->pawns[0]; i++)
             if (flap[pos[0]] > flap[pos[i]])
-                Swap(pos[0], pos[i]);
+                std::swap(pos[0], pos[i]);
 
         return file_to_file[pos[0] & 0x07];
     }
@@ -1080,7 +1080,7 @@ namespace TableBase {
         for (i = 1; i < ptr->pawns[0]; i++)
             for (j = i + 1; j < ptr->pawns[0]; j++)
                 if (ptwist[pos[i]] < ptwist[pos[j]])
-                    Swap(pos[i], pos[j]);
+                    std::swap(pos[i], pos[j]);
 
         t = ptr->pawns[0] - 1;
         idx = pawnidx[t][flap[pos[0]]];
@@ -1094,7 +1094,7 @@ namespace TableBase {
         if (t > i) {
             for (j = i; j < t; j++)
                 for (k = j + 1; k < t; k++)
-                    if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+                    if (pos[j] > pos[k]) std::swap(pos[j], pos[k]);
             s = 0;
             for (m = i; m < t; m++) {
                 int p = pos[m];
@@ -1110,7 +1110,7 @@ namespace TableBase {
             t = norm[i];
             for (j = i; j < i + t; j++)
                 for (k = j + 1; k < i + t; k++)
-                    if (pos[j] > pos[k]) Swap(pos[j], pos[k]);
+                    if (pos[j] > pos[k]) std::swap(pos[j], pos[k]);
             s = 0;
             for (m = i; m < i + t; m++) {
                 int p = pos[m];
@@ -1151,7 +1151,7 @@ namespace TableBase {
         int sym, bitcnt;
 
         uint32 next = 0;
-        uint32 code = _byteswap_ulong(*ptr++);
+        uint32 code = __builtin_bswap32(*ptr++);
         bitcnt = 0; // number of bits in next
         for (;;) {
             int l = m;
@@ -1165,7 +1165,7 @@ namespace TableBase {
                     code |= (next >> (32 - l));
                     l -= bitcnt;
                 }
-                next = _byteswap_ulong(*ptr++);
+                next = __builtin_bswap32(*ptr++);
                 bitcnt = 32;
             }
             code |= (next >> (32 - l));
@@ -1279,7 +1279,7 @@ namespace TableBase {
     static int Probe_Q(Position& board, int alpha, int beta, int* success) {
         int v;
 
-        int man = COUNT_BIT(board.m_Board);
+        int man = CountBits(board.m_Board);
 
         if (man == 2) { // Two kings is automatic draw
             return 0;
@@ -1309,11 +1309,11 @@ namespace TableBase {
     // 0: draw
     // 1: win but 50-move rule draw
     // 2: win
-    int TableBase::Probe_WDL(Position& board, int* success) {
+    int Probe_WDL(Position& board, int* success) {
 
         *success = 1;
 
-        int man = COUNT_BIT(board.m_Board);
+        int man = CountBits(board.m_Board);
         if (man > TBPIECES) {
             *success = 0;
             return 0;
@@ -1482,7 +1482,7 @@ namespace TableBase {
         return res;
     }
 
-    int TableBase::Probe_DTZ(Position& board, int* success) {
+    int Probe_DTZ(Position& board, int* success) {
         // Probe WDL first
         int wdl = Probe_WDL(board, success);
         if (*success == 0) return 0;
@@ -1535,7 +1535,7 @@ namespace TableBase {
         return best;
     }
 
-    void TableBase::Init(std::string path) {
+    void Init(std::string path) {
         s_Path = path;
         char str[16];
         int i, j, k,l;

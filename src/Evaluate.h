@@ -61,7 +61,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
 
     int64 phase = 4 + 4 + 8 + 8;
 
-    int whiteking = GET_SQUARE(wk), blackking = GET_SQUARE(bk);
+    int whiteking = GetSquare(wk), blackking = GetSquare(bk);
 
     int whiteAttack = 0, blackAttack = 0;
 
@@ -71,10 +71,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
     for (int i = PieceType::PAWN; i < PieceType::QUEEN; i++) {
         for (int j = PieceType::PAWN; j < i; j++) {
             // TODO: separate imbalance factor for mg and eg
-            middlegame += Lookup::imbalance_factor[i-1][j-1]*(COUNT_BIT(board.m_Pieces[i][0]) * COUNT_BIT(board.m_Pieces[j][0])
-                - COUNT_BIT(board.m_Pieces[i][1])* COUNT_BIT(board.m_Pieces[j][1]));
-            endgame += Lookup::imbalance_factor[i][j] * (COUNT_BIT(board.m_Pieces[i][0]) * COUNT_BIT(board.m_Pieces[j][0])
-                - COUNT_BIT(board.m_Pieces[i][1]) * COUNT_BIT(board.m_Pieces[j][1]));
+            middlegame += Lookup::imbalance_factor[i-1][j-1]*(CountBits(board.m_Pieces[i][0]) * CountBits(board.m_Pieces[j][0])
+                - CountBits(board.m_Pieces[i][1])* CountBits(board.m_Pieces[j][1]));
+            endgame += Lookup::imbalance_factor[i][j] * (CountBits(board.m_Pieces[i][0]) * CountBits(board.m_Pieces[j][0])
+                - CountBits(board.m_Pieces[i][1]) * CountBits(board.m_Pieces[j][1]));
         }
     }
 
@@ -97,10 +97,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         middlegame += knightVal + Lookup::knight_table[pos];
         endgame += knightVal + Lookup::knight_table[pos];
         if (uint64 temp = Lookup::b_king_safety[blackking] & Lookup::knight_attacks[rpos]) {
-            whiteAttack += 2 * COUNT_BIT(temp);
+            whiteAttack += 2 * CountBits(temp);
         }
         BitBoard moveable = Lookup::knight_attacks[rpos] & ~board.m_White;
-        int knight_mobility = COUNT_BIT(moveable);
+        int knight_mobility = CountBits(moveable);
         middlegame += knight_mobility;
         phase -= 1;
         wkncnt++;
@@ -116,10 +116,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         middlegame -= knightVal + Lookup::knight_table[pos];
         endgame -= knightVal + Lookup::knight_table[pos];
         if (uint64 temp = Lookup::w_king_safety[whiteking] & Lookup::knight_attacks[pos]) {
-            blackAttack += 2 * COUNT_BIT(temp);
+            blackAttack += 2 * CountBits(temp);
         }
         BitBoard moveable = Lookup::knight_attacks[pos] & ~board.m_Black;
-        int knight_mobility = COUNT_BIT(moveable);
+        int knight_mobility = CountBits(moveable);
         middlegame -= knight_mobility;
 
         phase -= 1;
@@ -139,10 +139,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         endgame += bishopVal + Lookup::bishop_table[pos];
         BitBoard bish_atk = board.BishopAttack(rpos, board.m_Board);
         if (uint64 temp = Lookup::b_king_safety[blackking] & bish_atk) {
-            whiteAttack += 2 * COUNT_BIT(temp);
+            whiteAttack += 2 * CountBits(temp);
         }
 
-        int bishop_mobility = COUNT_BIT(bish_atk & ~board.m_White);
+        int bishop_mobility = CountBits(bish_atk & ~board.m_White);
         middlegame += bishop_mobility;
 
         phase -= 1;
@@ -160,10 +160,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         endgame -= bishopVal + Lookup::bishop_table[pos];
         BitBoard bish_atk = board.BishopAttack(pos, board.m_Board);
         if (uint64 temp = Lookup::w_king_safety[whiteking] & bish_atk) {
-            blackAttack += 2 * COUNT_BIT(temp);
+            blackAttack += 2 * CountBits(temp);
         }
 
-        int bishop_mobility = COUNT_BIT(bish_atk & ~board.m_Black);
+        int bishop_mobility = CountBits(bish_atk & ~board.m_Black);
         middlegame -= bishop_mobility;
 
         phase -= 1;
@@ -183,10 +183,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         endgame += rookVal + Lookup::eg_rook_table[pos];
         BitBoard rook_atk = board.RookAttack(rpos, board.m_Board);
         if (uint64 temp = Lookup::b_king_safety[blackking] & rook_atk) {
-            whiteAttack += 3 * COUNT_BIT(temp);
+            whiteAttack += 3 * CountBits(temp);
         }
 
-        int rook_mobility = COUNT_BIT(rook_atk & ~board.m_White);
+        int rook_mobility = CountBits(rook_atk & ~board.m_White);
         middlegame += rook_mobility;
 
         phase -= 2;
@@ -204,9 +204,9 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         endgame -= rookVal + Lookup::eg_rook_table[pos];
         BitBoard rook_atk = board.RookAttack(pos, board.m_Board);
         if (uint64 temp = Lookup::w_king_safety[whiteking] & rook_atk) {
-            blackAttack += 3 * COUNT_BIT(temp);
+            blackAttack += 3 * CountBits(temp);
         }
-        int rook_mobility = COUNT_BIT(rook_atk & ~board.m_Black);
+        int rook_mobility = CountBits(rook_atk & ~board.m_Black);
         middlegame -= rook_mobility;
 
         phase -= 2;
@@ -225,10 +225,10 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         endgame += queenVal + Lookup::eg_queen_table[pos];
         BitBoard queen_atk = board.QueenAttack(rpos, board.m_Board);
         if (uint64 temp = Lookup::b_king_safety[blackking] & queen_atk) {
-            whiteAttack += 5 * COUNT_BIT(temp);
+            whiteAttack += 5 * CountBits(temp);
         }
 
-        int queen_mobility = COUNT_BIT(queen_atk & ~board.m_White);
+        int queen_mobility = CountBits(queen_atk & ~board.m_White);
         middlegame += queen_mobility;
 
         // Don't develop queen on starting pos too early
@@ -248,9 +248,9 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         phase -= 4;
         BitBoard queen_atk = board.QueenAttack(pos, board.m_Board);
         if (uint64 temp = Lookup::king_attacks[whiteking] & queen_atk) {
-            blackAttack += 5 * COUNT_BIT(temp);
+            blackAttack += 5 * CountBits(temp);
         }
-        int queen_mobility = COUNT_BIT(queen_atk & ~board.m_Black);
+        int queen_mobility = CountBits(queen_atk & ~board.m_Black);
         middlegame -= queen_mobility;
 
         // Don't develop queen on starting pos too early

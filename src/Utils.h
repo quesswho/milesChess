@@ -2,15 +2,23 @@
 #include <bit>
 #include <cassert>
 #include <chrono>
-#include <stdarg.h>
-
-#define NOMINMAX
-#include <Windows.h> // _mm_popcnt_u64(...)
+#include <cstdarg>
+#include <cstdio>
+#include <mutex>
+#include <string>
 
 #include "Types.h"
 
-#define GET_SQUARE(X) _tzcnt_u64(X)
-#define COUNT_BIT(X) _mm_popcnt_u64(X)
+// Index of the least significant set bit; 64 when the board is empty.
+// Compiles to tzcnt under -mbmi.
+static inline constexpr int GetSquare(BitBoard val) {
+    return std::countr_zero(val);
+}
+
+// Compiles to popcnt under -mpopcnt.
+static inline constexpr int CountBits(BitBoard val) {
+    return std::popcount(val);
+}
 
 struct Score {
     Score()
@@ -43,15 +51,9 @@ static inline uint64 PopBit(uint64& val) {
     return result;
 }
 
-static inline int LSB(uint64& val) {
-    unsigned long r;
-    _BitScanForward64(&r, val);
-    return r;
-}
-
+// Pops the least significant set bit and returns its index.
 static inline int PopPos(BitBoard& val) {
-    int index = int(LSB(val)); // 0 returns 0
-    //int index = int(_tzcnt_u64(val));
+    int index = GetSquare(val);
     val &= val - 1;
     return index;
 }
@@ -206,8 +208,9 @@ public:
     float EndMs() { return std::chrono::duration_cast<std::chrono::milliseconds > (std::chrono::high_resolution_clock::now() - m_Start).count(); }
 };
 
-#define GetLower(S) ((1ull << S) - 1)
-#define GetUpper(S) (0xFFFFFFFFFFFFFFFF << (S))
+// All squares below / above sq.
+static inline constexpr BitBoard GetLower(int sq) { return (1ull << sq) - 1; }
+static inline constexpr BitBoard GetUpper(int sq) { return 0xFFFFFFFFFFFFFFFFull << sq; }
 
 struct lineEx {
     BitBoard lower;
@@ -231,6 +234,3 @@ struct lineEx {
     constexpr lineEx(int sq, BitBoard line) : lower(init_low(sq, line)), upper(init_up(sq, line)), uni(init_low(sq, line) | init_up(sq, line))
     {}
 };
-
-#undef GetLower
-#undef GetUpper

@@ -3,7 +3,7 @@
 #include "Position.h"
 
 template<Color white>
-static _COMPILETIME BitBoard FirstRank() {
+static inline constexpr BitBoard FirstRank() {
     if constexpr (white) {
         return Lookup::lines[1];
     } else {
@@ -12,7 +12,7 @@ static _COMPILETIME BitBoard FirstRank() {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard PawnForward(BitBoard pawns) {
+static inline constexpr BitBoard PawnForward(BitBoard pawns) {
     if constexpr (white) {
         return pawns << 8;
     } else {
@@ -21,7 +21,7 @@ static _COMPILETIME BitBoard PawnForward(BitBoard pawns) {
 }
 
 template<Color white>
-static _COMPILETIME BoardPos PawnPosForward(BoardPos pawns) {
+static inline constexpr BoardPos PawnPosForward(BoardPos pawns) {
     if constexpr (white) {
         return pawns + 8;
     }
@@ -32,7 +32,7 @@ static _COMPILETIME BoardPos PawnPosForward(BoardPos pawns) {
 
 
 template<Color white>
-static _COMPILETIME BitBoard Pawn2Forward(BitBoard pawns) {
+static inline constexpr BitBoard Pawn2Forward(BitBoard pawns) {
     if constexpr (white) {
         return pawns << 16;
     } else {
@@ -41,7 +41,7 @@ static _COMPILETIME BitBoard Pawn2Forward(BitBoard pawns) {
 }
 
 template<Color white>
-static _COMPILETIME BoardPos PawnPos2Forward(BoardPos pawns) {
+static inline constexpr BoardPos PawnPos2Forward(BoardPos pawns) {
     if constexpr (white) {
         return pawns + 16;
     }
@@ -51,7 +51,7 @@ static _COMPILETIME BoardPos PawnPos2Forward(BoardPos pawns) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard PawnRight(const Position& board) {
+static inline constexpr BitBoard PawnRight(const Position& board) {
     if constexpr (white) {
         return (board.m_WhitePawn & (~Lookup::lines[0])) << 7; // Remove pawns at rank 8;
     } else {
@@ -60,7 +60,7 @@ static _COMPILETIME BitBoard PawnRight(const Position& board) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard PawnLeft(const Position& board) {
+static inline constexpr BitBoard PawnLeft(const Position& board) {
     if constexpr (white) {
         return (board.m_WhitePawn & (~Lookup::lines[7 * 4])) << 9; // Remove pawns at rank 8;
     } else {
@@ -71,12 +71,12 @@ static _COMPILETIME BitBoard PawnLeft(const Position& board) {
 
 
 template<Color white>
-static _COMPILETIME BitBoard PawnAttack(const Position& board) {
+static inline constexpr BitBoard PawnAttack(const Position& board) {
     return PawnLeft<white>(board) | PawnRight<white>(board);
 }
 
 template<Color white>
-static _COMPILETIME BitBoard PawnAttackRight(BitBoard pawns) {
+static inline constexpr BitBoard PawnAttackRight(BitBoard pawns) {
     if constexpr (white) {
         return (pawns & (~Lookup::lines[0])) << 7; // Remove pawns at rank 8
     } else {
@@ -85,7 +85,7 @@ static _COMPILETIME BitBoard PawnAttackRight(BitBoard pawns) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard PawnAttackLeft(BitBoard pawns) {
+static inline constexpr BitBoard PawnAttackLeft(BitBoard pawns) {
     if constexpr (white) {
         return (pawns & (~Lookup::lines[7 * 4])) << 9; // Remove pawns at rank 8
     } else {
@@ -95,7 +95,7 @@ static _COMPILETIME BitBoard PawnAttackLeft(BitBoard pawns) {
 
 // Does not remove cases near the border of the board
 template<Color white>
-static _COMPILETIME BoardPos PawnPosRight(BoardPos pawns) {
+static inline constexpr BoardPos PawnPosRight(BoardPos pawns) {
     if constexpr (white) {
         return pawns + 7;
     }
@@ -106,7 +106,7 @@ static _COMPILETIME BoardPos PawnPosRight(BoardPos pawns) {
 
 // Does not remove cases near the border of the board
 template<Color white>
-static _COMPILETIME BoardPos PawnPosLeft(BoardPos pawns) {
+static inline constexpr BoardPos PawnPosLeft(BoardPos pawns) {
     if constexpr (white) {
         return pawns + 9;
     }
@@ -117,7 +117,7 @@ static _COMPILETIME BoardPos PawnPosLeft(BoardPos pawns) {
 
 
 template<Color white>
-static _COMPILETIME BitBoard Player(const Position& board) {
+static inline constexpr BitBoard Player(const Position& board) {
     if constexpr (white) {
         return board.m_White;
     } else {
@@ -126,7 +126,7 @@ static _COMPILETIME BitBoard Player(const Position& board) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard Enemy(const Position& board) {
+static inline constexpr BitBoard Enemy(const Position& board) {
     if constexpr (white) {
         return board.m_Black;
     } else {
@@ -135,7 +135,7 @@ static _COMPILETIME BitBoard Enemy(const Position& board) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard Pawn(const Position& board) {
+static inline constexpr BitBoard Pawn(const Position& board) {
     if constexpr (white) {
         return board.m_WhitePawn;
     } else {
@@ -144,7 +144,7 @@ static _COMPILETIME BitBoard Pawn(const Position& board) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard Knight(const Position& board) {
+static inline constexpr BitBoard Knight(const Position& board) {
     if constexpr (white) {
         return board.m_WhiteKnight;
     } else {
@@ -153,7 +153,7 @@ static _COMPILETIME BitBoard Knight(const Position& board) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard Bishop(const Position& board) {
+static inline constexpr BitBoard Bishop(const Position& board) {
     if constexpr (white) {
         return board.m_WhiteBishop;
     } else {
@@ -162,7 +162,7 @@ static _COMPILETIME BitBoard Bishop(const Position& board) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard Rook(const Position& board) {
+static inline constexpr BitBoard Rook(const Position& board) {
     if constexpr (white) {
         return board.m_WhiteRook;
     } else {
@@ -171,7 +171,7 @@ static _COMPILETIME BitBoard Rook(const Position& board) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard Queen(const Position& board) {
+static inline constexpr BitBoard Queen(const Position& board) {
     if constexpr (white) {
         return board.m_WhiteQueen;
     } else {
@@ -180,7 +180,7 @@ static _COMPILETIME BitBoard Queen(const Position& board) {
 }
 
 template<Color white>
-static _COMPILETIME BitBoard King(const Position& board) {
+static inline constexpr BitBoard King(const Position& board) {
     if constexpr (white) {
         return board.m_WhiteKing;
     } else {

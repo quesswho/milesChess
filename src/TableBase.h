@@ -20,8 +20,8 @@ namespace TableBase {
 #define WDLSUFFIX ".rtbw"
 #define DTZSUFFIX ".rtbz"
 
-#define FD HANDLE
-#define FD_ERR INVALID_HANDLE_VALUE
+    using FD = int;
+    inline constexpr FD FD_ERR = -1;
 
     struct PairsData {
         char* indextable;

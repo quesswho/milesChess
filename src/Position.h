@@ -77,8 +77,8 @@ public:
     uint64 BishopAttack(int pos, BitBoard occ) const;
     uint64 QueenAttack(int pos, BitBoard occ) const;
 
-    uint64_t RookXray(int pos, BitBoard occ) const;
-    uint64_t BishopXray(int pos, BitBoard occ) const;
+    BitBoard RookXray(int pos, BitBoard occ) const;
+    BitBoard BishopXray(int pos, BitBoard occ) const;
 
     std::string ToFen() const;
 private:
@@ -87,7 +87,7 @@ private:
     template<Color white>
     bool UpdateChecks() const {
         constexpr Color enemy = !white;
-        BoardPos kingsq = GET_SQUARE(King<white>());
+        BoardPos kingsq = GetSquare(King<white>());
 
         if (
             (Lookup::knight_attacks[kingsq] & Knight<enemy>())                                         // Knight check
@@ -103,7 +103,7 @@ private:
     }
 
     template<Color white>
-    _COMPILETIME BitBoard PawnRight() const {
+    inline constexpr BitBoard PawnRight() const {
         if constexpr (white) {
             return (m_WhitePawn & (~Lookup::lines[0])) << 7; // Remove pawns at rank 8;
         } else {
@@ -112,7 +112,7 @@ private:
     }
 
     template<Color white>
-    _COMPILETIME BitBoard PawnLeft() const {
+    inline constexpr BitBoard PawnLeft() const {
         if constexpr (white) {
             return (m_WhitePawn & (~Lookup::lines[7 * 4])) << 9; // Remove pawns at rank 8;
         } else {
@@ -121,7 +121,7 @@ private:
     }
 
     template<Color white>
-    _COMPILETIME BitBoard Pawn() const {
+    inline constexpr BitBoard Pawn() const {
         if constexpr (white) {
             return m_WhitePawn;
         } else {
@@ -130,7 +130,7 @@ private:
     }
 
     template<Color white>
-    _COMPILETIME BitBoard Knight() const {
+    inline constexpr BitBoard Knight() const {
         if constexpr (white) {
             return m_WhiteKnight;
         } else {
@@ -139,7 +139,7 @@ private:
     }
 
     template<Color white>
-    _COMPILETIME BitBoard Bishop() const {
+    inline constexpr BitBoard Bishop() const {
         if constexpr (white) {
             return m_WhiteBishop;
         } else {
@@ -148,7 +148,7 @@ private:
     }
 
     template<Color white>
-    _COMPILETIME BitBoard Rook() const {
+    inline constexpr BitBoard Rook() const {
         if constexpr (white) {
             return m_WhiteRook;
         } else {
@@ -157,7 +157,7 @@ private:
     }
 
     template<Color white>
-    _COMPILETIME BitBoard Queen() const {
+    inline constexpr BitBoard Queen() const {
         if constexpr (white) {
             return m_WhiteQueen;
         } else {
@@ -166,7 +166,7 @@ private:
     }
 
     template<Color white>
-    _COMPILETIME BitBoard King() const {
+    inline constexpr BitBoard King() const {
         if constexpr (white) {
             return m_WhiteKing;
         } else {

@@ -129,7 +129,7 @@ void Position::MovePiece(Move move) {
 
 
     if (m_States[m_Ply].m_EnPassant) { // Remove old en passant from hash
-        m_Hash ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(m_States[m_Ply].m_EnPassant) & 0x7)];
+        m_Hash ^= Lookup::zobrist[64 * 12 + 5 + (GetSquare(m_States[m_Ply].m_EnPassant) & 0x7)];
     }
 
     m_Ply++;
@@ -147,7 +147,7 @@ void Position::MovePiece(Move move) {
 
     const ColoredPieceType type = MovePieceType(move);
 
-    assert("Cant move to same color piece", move.m_To & m_White);
+    assert(!(move.m_To & m_White) && "Cant move to same color piece");
     switch (type) {
     case WPAWN:
         if (tPos - fPos == 16) {
@@ -429,7 +429,7 @@ void Position::UndoMove(Move move) {
 
     const ColoredPieceType type = MovePieceType(move);
 
-    assert("Cant move to same color piece", move.m_To & m_White);
+    assert(!(move.m_To & m_White) && "Cant move to same color piece");
     switch (type) {
     case WPAWN:
         if (promotion) {
@@ -605,7 +605,7 @@ void Position::UndoMove(Move move) {
 
 void Position::NullMove() {
     if (m_States[m_Ply].m_EnPassant) { // Remove old en passant from hash
-        m_Hash ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(m_States[m_Ply].m_EnPassant) & 0x7)];
+        m_Hash ^= Lookup::zobrist[64 * 12 + 5 + (GetSquare(m_States[m_Ply].m_EnPassant) & 0x7)];
     }
     m_Ply++;
     m_States[m_Ply] = m_States[m_Ply - 1];
@@ -699,7 +699,7 @@ uint64 Zobrist_Hash(const Position& position) {
     if (position.m_States[position.m_Ply].m_CastleRights & CASTLE_WHITEQUEEN) result ^= Lookup::zobrist[64 * 12 + 2];
     if (position.m_States[position.m_Ply].m_CastleRights & CASTLE_BLACKKING) result ^= Lookup::zobrist[64 * 12 + 3];
     if (position.m_States[position.m_Ply].m_CastleRights & CASTLE_BLACKQUEEN) result ^= Lookup::zobrist[64 * 12 + 4];
-    if (position.m_States[position.m_Ply].m_EnPassant) result ^= Lookup::zobrist[64 * 12 + 5 + (GET_SQUARE(position.m_States[position.m_Ply].m_EnPassant) % 8)];
+    if (position.m_States[position.m_Ply].m_EnPassant) result ^= Lookup::zobrist[64 * 12 + 5 + (GetSquare(position.m_States[position.m_Ply].m_EnPassant) % 8)];
 
     return result;
 }

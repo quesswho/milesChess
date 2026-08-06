@@ -88,7 +88,7 @@ public:
     template<Color white>
 	uint64 Perft_r(Position& pos, int depth) {
         if (!m_Running) return 0;
-        assert("Hash is not matched!", Zobrist_Hash(pos) != pos.m_Hash);
+        assert(Zobrist_Hash(pos) == pos.m_Hash && "Hash is not matched!");
 		//const std::vector<Move> moves = TGenerateMoves<ALL, white>(pos);
         MoveGen moveGen(pos, 0, false);
         if (depth == m_Maxdepth - 1) {
@@ -238,7 +238,7 @@ public:
         }
 
         // Prevent explosions
-        assert("Ply is more than MAX_DEPTH!\n", stack->m_Ply >= MAX_DEPTH);
+        assert(stack->m_Ply < MAX_DEPTH && "Ply is more than MAX_DEPTH!");
         depth = std::min(depth, MAX_DEPTH - 1);
 
 
@@ -562,7 +562,7 @@ public:
             danger |= (board.RookAttack(pos, board.m_Board) & ~(1ull << pos));
         }
 
-        danger |= Lookup::king_attacks[GET_SQUARE(King<enemy>(board))];
+        danger |= Lookup::king_attacks[GetSquare(King<enemy>(board))];
 
         return danger;
     }
@@ -631,7 +631,7 @@ public:
 
         
 
-        assert("Could not read move", type == MoveType::NONE);
+        assert(type != MoveType::NONE && "Could not read move");
         return fromPos | toPos << 6 | type << 12 | capture << 16 | flags << 20;
     }
 
