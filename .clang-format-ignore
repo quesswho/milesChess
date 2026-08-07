@@ -1,0 +1,4 @@
+# Generated / hand-aligned lookup data. The piece-square tables carry meaning in
+# their line breaks and the 88507 entry black magic attack table would reflow
+# into ~90k lines, so this header is left alone.
+src/LookupTables.h
