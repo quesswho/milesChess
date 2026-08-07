@@ -7,9 +7,9 @@ void Position::SetPosition(const std::string& FEN) {
     m_WhiteRook = FenToMap(FEN, 'R');
     m_WhiteQueen = FenToMap(FEN, 'Q');
     m_WhiteKing = FenToMap(FEN, 'K');
-    m_BlackPawn = FenToMap(FEN, 'p'); 
-    m_BlackKnight = FenToMap(FEN, 'n'); 
-    m_BlackBishop = FenToMap(FEN, 'b'); 
+    m_BlackPawn = FenToMap(FEN, 'p');
+    m_BlackKnight = FenToMap(FEN, 'n');
+    m_BlackBishop = FenToMap(FEN, 'b');
     m_BlackRook = FenToMap(FEN, 'r');
     m_BlackQueen = FenToMap(FEN, 'q');
     m_BlackKing = FenToMap(FEN, 'k');
@@ -32,15 +32,9 @@ void Position::SetState(const std::string& FEN) {
 
     char ac = FEN[i++]; // Active color
     switch (ac) {
-    case 'w':
-        m_WhiteMove = WHITE;
-        break;
-    case 'b':
-        m_WhiteMove = BLACK;
-        break;
-    default:
-        printf("Invalid FEN for active color\n");
-        return;
+    case 'w': m_WhiteMove = WHITE; break;
+    case 'b': m_WhiteMove = BLACK; break;
+    default: printf("Invalid FEN for active color\n"); return;
     }
 
     i++;
@@ -52,18 +46,10 @@ void Position::SetState(const std::string& FEN) {
         }
 
         switch (c) {
-        case 'K':
-            m_States[m_Ply].m_CastleRights |= CASTLE_WHITEKING;
-            break;
-        case 'Q':
-            m_States[m_Ply].m_CastleRights |= CASTLE_WHITEQUEEN;
-            break;
-        case 'k':
-            m_States[m_Ply].m_CastleRights |= CASTLE_BLACKKING;
-            break;
-        case 'q':
-            m_States[m_Ply].m_CastleRights |= CASTLE_BLACKQUEEN;
-            break;
+        case 'K': m_States[m_Ply].m_CastleRights |= CASTLE_WHITEKING; break;
+        case 'Q': m_States[m_Ply].m_CastleRights |= CASTLE_WHITEQUEEN; break;
+        case 'k': m_States[m_Ply].m_CastleRights |= CASTLE_BLACKKING; break;
+        case 'q': m_States[m_Ply].m_CastleRights |= CASTLE_BLACKQUEEN; break;
         }
     }
 
@@ -73,12 +59,10 @@ void Position::SetState(const std::string& FEN) {
     if (a != '-') {
         if (m_WhiteMove) {
             m_States[m_Ply].m_EnPassant = 1ull << (40 + ('h' - a)); // TODO: need to be tested
-        }
-        else {
+        } else {
             m_States[m_Ply].m_EnPassant = 1ull << (16 + ('h' - a)); // TODO: need to be tested
         }
-    }
-    else {
+    } else {
         m_States[m_Ply].m_EnPassant = 0;
     }
 
@@ -187,7 +171,7 @@ void Position::MovePiece(Move move) {
             m_PawnHash ^= Lookup::zobrist[tPos] ^ Lookup::zobrist[fPos];
             m_WhitePawn ^= swp;
         }
-        
+
         m_States[m_Ply].m_HalfMoves = 0;
         break;
     case WKNIGHT:
@@ -201,7 +185,7 @@ void Position::MovePiece(Move move) {
     case WROOK:
         if (from == 0b1ull) {
             m_States[m_Ply].m_CastleRights &= ~(CASTLE_WHITEKING);
-            if ((m_States[m_Ply-1].m_CastleRights & CASTLE_WHITEKING)) {
+            if ((m_States[m_Ply - 1].m_CastleRights & CASTLE_WHITEKING)) {
                 m_Hash ^= Lookup::zobrist[64 * 12 + 1];
             }
         } else if (from == 0b10000000ull) {
@@ -228,26 +212,26 @@ void Position::MovePiece(Move move) {
         m_WhiteKing ^= swp;
         if (Castle(move)) {
             if (to == 0b10) { // King side castle
-                m_Hash ^= Lookup::zobrist[64 * 10 + 1] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6] ^ Lookup::zobrist[64 * 6 + 2];
+                m_Hash ^= Lookup::zobrist[64 * 10 + 1] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6]
+                          ^ Lookup::zobrist[64 * 6 + 2];
                 m_WhiteRook ^= 0b101ull;
-            }
-            else {
-                m_Hash ^= Lookup::zobrist[64 * 10 + 5] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6 + 7] ^ Lookup::zobrist[64 * 6 + 4];
+            } else {
+                m_Hash ^= Lookup::zobrist[64 * 10 + 5] ^ Lookup::zobrist[64 * 10 + 3] ^ Lookup::zobrist[64 * 6 + 7]
+                          ^ Lookup::zobrist[64 * 6 + 4];
                 m_WhiteRook ^= 0b10010000ull;
             }
-        }
-        else {
+        } else {
             m_Hash ^= Lookup::zobrist[64 * 10 + tPos] ^ Lookup::zobrist[64 * 10 + fPos];
         }
         break;
     case BPAWN:
         if (fPos - tPos == 16) {
             m_States[m_Ply].m_EnPassant = to << 8;
-            m_Hash ^= Lookup::zobrist[64 + tPos] ^ Lookup::zobrist[64 + fPos] ^ Lookup::zobrist[64 * 12 + 5 + (tPos % 8)];
+            m_Hash ^=
+                Lookup::zobrist[64 + tPos] ^ Lookup::zobrist[64 + fPos] ^ Lookup::zobrist[64 * 12 + 5 + (tPos % 8)];
             m_PawnHash ^= Lookup::zobrist[64 + tPos] ^ Lookup::zobrist[64 + fPos];
             m_BlackPawn ^= swp;
-        }
-        else if (promotion) {
+        } else if (promotion) {
             switch (promotion) {
             case 0x400000:
                 m_Hash ^= Lookup::zobrist[64 + fPos] ^ Lookup::zobrist[64 * 3 + tPos];
@@ -274,8 +258,7 @@ void Position::MovePiece(Move move) {
                 m_BlackQueen ^= to;
                 break;
             }
-        }
-        else {
+        } else {
             m_Hash ^= Lookup::zobrist[64 + tPos] ^ Lookup::zobrist[64 + fPos];
             m_PawnHash ^= Lookup::zobrist[64 + tPos] ^ Lookup::zobrist[64 + fPos];
             m_BlackPawn ^= swp;
@@ -297,8 +280,7 @@ void Position::MovePiece(Move move) {
             if ((m_States[m_Ply - 1].m_CastleRights & CASTLE_BLACKKING)) {
                 m_Hash ^= Lookup::zobrist[64 * 12 + 3];
             }
-        }
-        else if (from == (0b10000000ull << 56)) {
+        } else if (from == (0b10000000ull << 56)) {
             m_States[m_Ply].m_CastleRights &= ~(CASTLE_BLACKQUEEN); // Remove WhiteQueen
             if ((m_States[m_Ply - 1].m_CastleRights & CASTLE_BLACKQUEEN)) {
                 m_Hash ^= Lookup::zobrist[64 * 12 + 4];
@@ -322,15 +304,15 @@ void Position::MovePiece(Move move) {
         m_BlackKing ^= swp;
         if (Castle(move)) {
             if (to == 0b10ull << 56) { // King side castle
-                m_Hash ^= Lookup::zobrist[64 * 11 + 57] ^ Lookup::zobrist[64 * 11 + 59] ^ Lookup::zobrist[64 * 7 + 56] ^ Lookup::zobrist[64 * 7 + 58];
+                m_Hash ^= Lookup::zobrist[64 * 11 + 57] ^ Lookup::zobrist[64 * 11 + 59] ^ Lookup::zobrist[64 * 7 + 56]
+                          ^ Lookup::zobrist[64 * 7 + 58];
                 m_BlackRook ^= (0b101ull << 56);
-            }
-            else {
-                m_Hash ^= Lookup::zobrist[64 * 11 + 61] ^ Lookup::zobrist[64 * 11 + 59] ^ Lookup::zobrist[64 * 7 + 60] ^ Lookup::zobrist[64 * 7 + 63];
+            } else {
+                m_Hash ^= Lookup::zobrist[64 * 11 + 61] ^ Lookup::zobrist[64 * 11 + 59] ^ Lookup::zobrist[64 * 7 + 60]
+                          ^ Lookup::zobrist[64 * 7 + 63];
                 m_BlackRook ^= (0b10010000ull << 56);
             }
-        }
-        else {
+        } else {
             m_Hash ^= Lookup::zobrist[64 * 11 + tPos] ^ Lookup::zobrist[64 * 11 + fPos];
         }
         break;
@@ -455,31 +437,21 @@ void Position::UndoMove(Move move) {
                 m_WhiteQueen ^= to;
                 break;
             }
-        }
-        else {
+        } else {
             m_PawnHash ^= Lookup::zobrist[tPos] ^ Lookup::zobrist[fPos];
             m_WhitePawn ^= swp;
         }
         break;
-    case WKNIGHT:
-        m_WhiteKnight ^= swp;
-        break;
-    case WBISHOP:
-        m_WhiteBishop ^= swp;
-        break;
-    case WROOK:
-        m_WhiteRook ^= swp;
-        break;
-    case WQUEEN:
-        m_WhiteQueen ^= swp;
-        break;
+    case WKNIGHT: m_WhiteKnight ^= swp; break;
+    case WBISHOP: m_WhiteBishop ^= swp; break;
+    case WROOK: m_WhiteRook ^= swp; break;
+    case WQUEEN: m_WhiteQueen ^= swp; break;
     case WKING:
         m_WhiteKing ^= swp;
         if (Castle(move)) {
             if (to == 0b10) { // King side castle
                 m_WhiteRook ^= 0b101ull;
-            }
-            else {
+            } else {
                 m_WhiteRook ^= 0b10010000ull;
             }
         }
@@ -508,31 +480,21 @@ void Position::UndoMove(Move move) {
                 m_BlackQueen ^= to;
                 break;
             }
-        }
-        else {
+        } else {
             m_PawnHash ^= Lookup::zobrist[64 + tPos] ^ Lookup::zobrist[64 + fPos];
             m_BlackPawn ^= swp;
         }
         break;
-    case BKNIGHT:
-        m_BlackKnight ^= swp;
-        break;
-    case BBISHOP:
-        m_BlackBishop ^= swp;
-        break;
-    case BROOK:
-        m_BlackRook ^= swp;
-        break;
-    case BQUEEN:
-        m_BlackQueen ^= swp;
-        break;
+    case BKNIGHT: m_BlackKnight ^= swp; break;
+    case BBISHOP: m_BlackBishop ^= swp; break;
+    case BROOK: m_BlackRook ^= swp; break;
+    case BQUEEN: m_BlackQueen ^= swp; break;
     case BKING:
         m_BlackKing ^= swp;
         if (Castle(move)) {
             if (to == 0b10ull << 56) { // King side castle
                 m_BlackRook ^= (0b101ull << 56);
-            }
-            else {
+            } else {
                 m_BlackRook ^= (0b10010000ull << 56);
             }
         }
@@ -547,21 +509,14 @@ void Position::UndoMove(Move move) {
         if (EnPassant(move)) {
             m_PawnHash ^= Lookup::zobrist[56 + tPos];
             m_BlackPawn ^= (to >> 8);
-        }
-        else {
+        } else {
             m_PawnHash ^= Lookup::zobrist[64 + tPos];
             m_BlackPawn ^= to;
         }
         break;
-    case BKNIGHT:
-        m_BlackKnight ^= to;
-        break;
-    case BBISHOP:
-        m_BlackBishop ^= to;
-        break;
-    case BROOK:
-        m_BlackRook ^= to;
-        break;
+    case BKNIGHT: m_BlackKnight ^= to; break;
+    case BBISHOP: m_BlackBishop ^= to; break;
+    case BROOK: m_BlackRook ^= to; break;
     case BQUEEN:
         m_BlackQueen ^= to;
         break;
@@ -570,24 +525,15 @@ void Position::UndoMove(Move move) {
         if (EnPassant(move)) {
             m_PawnHash ^= Lookup::zobrist[8 + tPos];
             m_WhitePawn ^= (to << 8);
-        }
-        else {
+        } else {
             m_PawnHash ^= Lookup::zobrist[tPos];
             m_WhitePawn ^= to;
         }
         break;
-    case WKNIGHT:
-        m_WhiteKnight ^= to;
-        break;
-    case WBISHOP:
-        m_WhiteBishop ^= to;
-        break;
-    case WROOK:
-        m_WhiteRook ^= to;
-        break;
-    case WQUEEN:
-        m_WhiteQueen ^= to;
-        break;
+    case WKNIGHT: m_WhiteKnight ^= to; break;
+    case WBISHOP: m_WhiteBishop ^= to; break;
+    case WROOK: m_WhiteRook ^= to; break;
+    case WQUEEN: m_WhiteQueen ^= to; break;
     case NOPIECE:
         // No capture
         break;
@@ -626,8 +572,10 @@ void Position::UndoNullMove() {
 uint64 Zobrist_Hash(const Position& position) {
     uint64 result = 0;
 
-    BitBoard wp = position.m_WhitePawn, wkn = position.m_WhiteKnight, wb = position.m_WhiteBishop, wr = position.m_WhiteRook, wq = position.m_WhiteQueen, wk = position.m_WhiteKing,
-        bp = position.m_BlackPawn, bkn = position.m_BlackKnight, bb = position.m_BlackBishop, br = position.m_BlackRook, bq = position.m_BlackQueen, bk = position.m_BlackKing;
+    BitBoard wp = position.m_WhitePawn, wkn = position.m_WhiteKnight, wb = position.m_WhiteBishop,
+             wr = position.m_WhiteRook, wq = position.m_WhiteQueen, wk = position.m_WhiteKing,
+             bp = position.m_BlackPawn, bkn = position.m_BlackKnight, bb = position.m_BlackBishop,
+             br = position.m_BlackRook, bq = position.m_BlackQueen, bk = position.m_BlackKing;
 
     while (wp > 0) {
         int pos = PopPos(wp);
@@ -697,7 +645,8 @@ uint64 Zobrist_Hash(const Position& position) {
     if (position.m_States[position.m_Ply].m_CastleRights & CASTLE_WHITEQUEEN) result ^= Lookup::zobrist[64 * 12 + 2];
     if (position.m_States[position.m_Ply].m_CastleRights & CASTLE_BLACKKING) result ^= Lookup::zobrist[64 * 12 + 3];
     if (position.m_States[position.m_Ply].m_CastleRights & CASTLE_BLACKQUEEN) result ^= Lookup::zobrist[64 * 12 + 4];
-    if (position.m_States[position.m_Ply].m_EnPassant) result ^= Lookup::zobrist[64 * 12 + 5 + (GetSquare(position.m_States[position.m_Ply].m_EnPassant) % 8)];
+    if (position.m_States[position.m_Ply].m_EnPassant)
+        result ^= Lookup::zobrist[64 * 12 + 5 + (GetSquare(position.m_States[position.m_Ply].m_EnPassant) % 8)];
 
     return result;
 }
@@ -722,8 +671,7 @@ std::string Position::ToFen() const {
         if (!(m_Board & pos)) {
             skip++;
             continue;
-        }
-        else if (skip > 0) {
+        } else if (skip > 0) {
             FEN += (char)('0' + skip);
             skip = 0;
         }
@@ -782,12 +730,11 @@ std::string Position::ToFen() const {
         FEN += (char)('0' + skip);
         skip = 0;
     }
-    
+
 
     if (m_WhiteMove) {
         FEN += " w ";
-    }
-    else {
+    } else {
         FEN += " b ";
     }
 
@@ -814,12 +761,10 @@ std::string Position::ToFen() const {
         char pos = 'h' - ((int)(log2(m_States[m_Ply].m_EnPassant)) % 8);
         if (m_WhiteMove) {
             FEN += pos + std::to_string(6);
-        }
-        else {
+        } else {
             FEN += pos + std::to_string(3);
         }
-    }
-    else {
+    } else {
         FEN += '-';
     }
 
@@ -846,4 +791,3 @@ uint64 Zobrist_PawnHash(const Position& position) {
 
     return result;
 }
-

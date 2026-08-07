@@ -7,16 +7,17 @@
 
 class UCI {
 public:
-	Search m_Search;
+    Search m_Search;
 
-	UCI() = default;
+    UCI() = default;
 
-	void Start();
+    void Start();
+
 private:
-	void SetPosition(const std::string& fen, const std::vector<std::string>& moves);
-	void SetOption(std::istringstream& istream);
-	void NewGame();
+    void SetPosition(const std::string& fen, const std::vector<std::string>& moves);
+    void SetOption(std::istringstream& istream);
+    void NewGame();
 
-	std::string m_CachedFen;
-	std::vector<std::string> m_CachedMoves;
+    std::string m_CachedFen;
+    std::vector<std::string> m_CachedMoves;
 };

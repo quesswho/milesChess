@@ -21,23 +21,18 @@ using int8 = int8_t;
 using BitBoard = uint64;
 using BoardPos = uint8;
 
-enum Color : bool {
-    WHITE = true,
-    BLACK = false
-};
+enum Color : bool { WHITE = true, BLACK = false };
 
 constexpr Color operator!(Color color) {
     return color == WHITE ? BLACK : WHITE;
 }
 
-enum PieceType : int {
-    NONE = 0, PAWN = 1, KNIGHT = 2, BISHOP = 3, ROOK = 4, QUEEN = 5, KING = 6
-};
+enum PieceType : int { NONE = 0, PAWN = 1, KNIGHT = 2, BISHOP = 3, ROOK = 4, QUEEN = 5, KING = 6 };
 
 struct BoardInfo {
     BoardInfo()
-        : m_WhiteMove(WHITE), m_EnPassant(0), m_WhiteCastleKing(true), m_WhiteCastleQueen(true), m_BlackCastleKing(true), m_BlackCastleQueen(true), m_HalfMoves(0), m_FullMoves(0)
-    {}
+        : m_WhiteMove(WHITE), m_EnPassant(0), m_WhiteCastleKing(true), m_WhiteCastleQueen(true),
+          m_BlackCastleKing(true), m_BlackCastleQueen(true), m_HalfMoves(0), m_FullMoves(0) {}
 
     Color m_WhiteMove;
     BitBoard m_EnPassant;

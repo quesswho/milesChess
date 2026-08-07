@@ -24,8 +24,7 @@ template<Color white>
 static inline constexpr BoardPos PawnPosForward(BoardPos pawns) {
     if constexpr (white) {
         return pawns + 8;
-    }
-    else {
+    } else {
         return pawns - 8;
     }
 }
@@ -44,8 +43,7 @@ template<Color white>
 static inline constexpr BoardPos PawnPos2Forward(BoardPos pawns) {
     if constexpr (white) {
         return pawns + 16;
-    }
-    else {
+    } else {
         return pawns - 16;
     }
 }
@@ -67,7 +65,6 @@ static inline constexpr BitBoard PawnLeft(const Position& board) {
         return (board.m_BlackPawn & (~Lookup::lines[7 * 4])) >> 7;
     }
 }
-
 
 
 template<Color white>
@@ -98,8 +95,7 @@ template<Color white>
 static inline constexpr BoardPos PawnPosRight(BoardPos pawns) {
     if constexpr (white) {
         return pawns + 7;
-    }
-    else {
+    } else {
         return pawns - 9;
     }
 }
@@ -109,8 +105,7 @@ template<Color white>
 static inline constexpr BoardPos PawnPosLeft(BoardPos pawns) {
     if constexpr (white) {
         return pawns + 9;
-    }
-    else {
+    } else {
         return pawns - 7;
     }
 }

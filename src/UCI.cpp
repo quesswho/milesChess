@@ -74,7 +74,8 @@ void UCI::SetPosition(const std::string& fen, const std::vector<std::string>& mo
         const std::string& str = moves[i];
         Move move = str.size() >= 4 ? m_Search.GetMove(str) : Move();
         if (MovePieceType(move) == NOPIECE) {
-            sync_printf("info string illegal move %s in position %s\n", str.c_str(), m_Search.m_Position.ToFen().c_str());
+            sync_printf("info string illegal move %s in position %s\n", str.c_str(),
+                        m_Search.m_Position.ToFen().c_str());
             m_CachedFen.clear();
             return;
         }

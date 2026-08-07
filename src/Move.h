@@ -5,26 +5,32 @@
 #include "Utils.h"
 
 
+// clang-format off
 enum ColoredPieceType : uint8 {
     NOPIECE = 0, WPAWN = 1, WKNIGHT = 2, WBISHOP = 3, WROOK = 4, WQUEEN = 5, WKING = 6,
     BPAWN = 7, BKNIGHT = 8, BBISHOP = 9, BROOK = 10, BQUEEN = 11, BKING = 12
 };
+// clang-format on
 
 
 static inline constexpr ushort OrderingPieceValue(ColoredPieceType piece) {
+    // clang-format off
     constexpr ushort piece_values[13] = {
         0, 100, 300, 350, 500, 1100, 10000,
            100, 300, 350, 500, 1100, 10000,
     };
+    // clang-format on
     return piece_values[piece];
 }
 
 template<Color c>
 static inline constexpr ColoredPieceType GetColoredPiece(PieceType type) {
+    // clang-format off
     constexpr ColoredPieceType pieceMap[2][7] = {
         { NOPIECE, BPAWN, BKNIGHT, BBISHOP, BROOK, BQUEEN, BKING },
         { NOPIECE, WPAWN, WKNIGHT, WBISHOP, WROOK, WQUEEN, WKING }
     };
+    // clang-format on
     return pieceMap[c][type];
 }
 
@@ -36,7 +42,7 @@ static inline constexpr ColoredPieceType GetColoredPiece(PieceType type) {
 // PieceType: 4 bits
 // CaptureType: 4 bits
 // MoveFlag: EP, Castle, PN, PB, PR, PQ, 6 bits
-// 
+//
 // Total is 26 bits
 
 using Move = uint32;
@@ -54,7 +60,7 @@ static inline Move BuildMove(uint8 from, uint8 to, ColoredPieceType type, Colore
 }
 
 static inline int From(Move move) {
-    return (int) (move & 0x3F);
+    return (int)(move & 0x3F);
 }
 
 static inline int To(Move move) {
@@ -108,18 +114,10 @@ static inline std::string MoveToString(Move move) {
     result += '1' + (t / 8);
     int promotion = Promotion(move);
     switch (promotion) {
-    case 0x400000:
-        result += 'n';
-        break;
-    case 0x800000:
-        result += 'b';
-        break;
-    case 0x1000000:
-        result += 'r';
-        break;
-    case 0x2000000:
-        result += 'q';
-        break;
+    case 0x400000: result += 'n'; break;
+    case 0x800000: result += 'b'; break;
+    case 0x1000000: result += 'r'; break;
+    case 0x2000000: result += 'q'; break;
     case 0: // No promotion
         break;
     }

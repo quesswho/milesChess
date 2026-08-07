@@ -2,14 +2,11 @@
 #include "Position.h"
 #include "Movelist.h"
 
-enum MoveGenType {
-	ALL,
-    QUIESCENCE,
-    SILENT
-};
+enum MoveGenType { ALL, QUIESCENCE, SILENT };
 
 template<Color white>
-static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) {
+static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin,
+                       BitBoard& bishopPin, BitBoard& enPassant) {
     constexpr Color enemy = !white;
 
     int kingsq = GetSquare(King<white>(board));
@@ -43,7 +40,7 @@ static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active
     }
 
     BitBoard bishopcheck = board.BishopAttack(kingsq, board.m_Board) & (Bishop<enemy>(board) | Queen<enemy>(board));
-    if (bishopcheck > 0) { // If a bishop piece is attacking the king
+    if (bishopcheck > 0) {                     // If a bishop piece is attacking the king
         if (active != 0xFFFFFFFFFFFFFFFFull) { // case where rook and bishop checks king
             active = 0;
         } else {
@@ -63,16 +60,24 @@ static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active
     }
 
     if (enPassant) {
-        if ((King<white>(board) & Lookup::EnPassantRank<white>()) && (Pawn<white>(board) & Lookup::EnPassantRank<white>()) && ((Rook<enemy>(board) | Queen<enemy>(board)) & Lookup::EnPassantRank<white>())) {
+        if ((King<white>(board) & Lookup::EnPassantRank<white>())
+            && (Pawn<white>(board) & Lookup::EnPassantRank<white>())
+            && ((Rook<enemy>(board) | Queen<enemy>(board)) & Lookup::EnPassantRank<white>())) {
             BitBoard REPawn = PawnRight<white>(board) & enPassant;
             BitBoard LEPawn = PawnLeft<white>(board) & enPassant;
             if (REPawn) {
-                BitBoard noEPPawn = board.m_Board & ~(PawnForward<enemy>(enPassant) | PawnAttackLeft<enemy>(REPawn)); // Remove en passanter and en passant target
-                if (board.RookAttack(kingsq, noEPPawn) & (Rook<enemy>(board) | Queen<enemy>(board))) enPassant = 0; // If there is a rook or queen attacking king after removing pawns
+                BitBoard noEPPawn = board.m_Board
+                                    & ~(PawnForward<enemy>(enPassant)
+                                        | PawnAttackLeft<enemy>(REPawn)); // Remove en passanter and en passant target
+                if (board.RookAttack(kingsq, noEPPawn) & (Rook<enemy>(board) | Queen<enemy>(board)))
+                    enPassant = 0; // If there is a rook or queen attacking king after removing pawns
             }
             if (LEPawn) {
-                BitBoard noEPPawn = board.m_Board & ~(PawnForward<enemy>(enPassant) | PawnAttackRight<enemy>(LEPawn)); // Remove en passanter and en passant target
-                if (board.RookAttack(kingsq, noEPPawn) & (Rook<enemy>(board) | Queen<enemy>(board))) enPassant = 0; // If there is a rook or queen attacking king after removing pawns
+                BitBoard noEPPawn = board.m_Board
+                                    & ~(PawnForward<enemy>(enPassant)
+                                        | PawnAttackRight<enemy>(LEPawn)); // Remove en passanter and en passant target
+                if (board.RookAttack(kingsq, noEPPawn) & (Rook<enemy>(board) | Queen<enemy>(board)))
+                    enPassant = 0; // If there is a rook or queen attacking king after removing pawns
             }
         }
     }
@@ -82,7 +87,6 @@ static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active
     } else if (knightPawnCheck && active == 0xFFFFFFFFFFFFFFFFull) {
         active = knightPawnCheck;
     }
-
 
 
     BitBoard knights = Knight<enemy>(board);
@@ -108,8 +112,10 @@ static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active
     return enPassantCheck;
 }
 
-static BitBoard Check(Color white, const Position& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin, BitBoard& bishopPin, BitBoard& enPassant) {
-    return white ? TCheck<WHITE>(board, danger, active, rookPin, bishopPin, enPassant) : TCheck<BLACK>(board, danger, active, rookPin, bishopPin, enPassant);
+static BitBoard Check(Color white, const Position& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin,
+                      BitBoard& bishopPin, BitBoard& enPassant) {
+    return white ? TCheck<WHITE>(board, danger, active, rookPin, bishopPin, enPassant)
+                 : TCheck<BLACK>(board, danger, active, rookPin, bishopPin, enPassant);
 }
 
 template<Color enemy>
@@ -134,16 +140,22 @@ static inline int64 CastleKing(uint8 castle, uint64 danger, uint64 board, uint64
     if constexpr (white) {
         return (((castle & 1) && (board & 0b110) == 0 && (danger & 0b1110) == 0) && (rooks & 0b1) > 0) * (1ull << 1);
     } else {
-        return ((castle & 0b100) && ((board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0) && (rooks & 0b1ull << 56) > 0) * (1ull << 57);
+        return ((castle & 0b100) && ((board & (0b110ull << 56)) == 0) && ((danger & (0b1110ull << 56)) == 0)
+                && (rooks & 0b1ull << 56) > 0)
+               * (1ull << 57);
     }
 }
 
 template<Color white>
 static inline int64 CastleQueen(uint8 castle, uint64 danger, uint64 board, uint64 rooks) {
     if constexpr (white) {
-        return (((castle & 0b10) && (board & 0b01110000) == 0 && (danger & 0b00111000) == 0) && (rooks & 0b10000000) > 0) * (1ull << 5);
+        return (((castle & 0b10) && (board & 0b01110000) == 0 && (danger & 0b00111000) == 0)
+                && (rooks & 0b10000000) > 0)
+               * (1ull << 5);
     } else {
-        return ((castle & 0b1000) && ((board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0) && (rooks & (0b10000000ull << 56)) > 0) * (1ull << 61);
+        return ((castle & 0b1000) && ((board & (0b01110000ull << 56)) == 0) && ((danger & (0b00111000ull << 56)) == 0)
+                && (rooks & (0b10000000ull << 56)) > 0)
+               * (1ull << 61);
     }
 }
 
@@ -169,7 +181,8 @@ static std::vector<Move> TGenerateMoves(const Position& board) {
     BitBoard pawns = Pawn<white>(board);
     BitBoard nonBishopPawn = pawns & ~bishopPin;
 
-    BitBoard FPawns = PawnForward<white>(nonBishopPawn) & (~board.m_Board) & active; // No diagonally pinned pawn can move forward
+    BitBoard FPawns =
+        PawnForward<white>(nonBishopPawn) & (~board.m_Board) & active; // No diagonally pinned pawn can move forward
 
     if constexpr (T != QUIESCENCE) {
         BitBoard F2Pawns = PawnForward<white>(nonBishopPawn & Lookup::StartingPawnRank<white>()) & ~board.m_Board;
@@ -505,21 +518,24 @@ enum MoveGenStage {
 };
 
 constexpr MoveGenStage operator++(MoveGenStage& cur, int) {
-    cur = (MoveGenStage)((int)(cur)+1);
+    cur = (MoveGenStage)((int)(cur) + 1);
     return cur;
 }
 
 // https://www.chessprogramming.org/Move_List#Search_Lists
 class MoveGen {
 private:
-	Position& m_Position;
-	Move m_HashMove;
-    ScoreMove m_Moves[256] = { 0 }; // Will likely cause a crash on ludicrous positions with more than 256 moves QQQQQQQQ/Q6Q/Q6Q/Q6Q/Q6Q/K6Q/BR5Q/kBQQQQQQ w - - 0 1
+    Position& m_Position;
+    Move m_HashMove;
+    ScoreMove m_Moves[256] = {
+        0
+    }; // Will likely cause a crash on ludicrous positions with more than 256 moves QQQQQQQQ/Q6Q/Q6Q/Q6Q/Q6Q/K6Q/BR5Q/kBQQQQQQ w - - 0 1
     ScoreMove* m_Current;
     ScoreMove* m_End;
     MoveGenStage m_Stage;
     ScoreMove* m_CapturesEnd;
     ScoreMove* m_BadCapture;
+
 public:
     MoveGen(Position& position, Move hashmove, bool quiescence);
 
@@ -529,10 +545,8 @@ private:
     inline int ScoreCapture(ColoredPieceType aggressor, ColoredPieceType victim) {
         return OrderingPieceValue(victim) - OrderingPieceValue(aggressor);
     }
-    
-    inline void pushMove(const ScoreMove& move) {
-        *(m_End++) = move;
-    }
+
+    inline void pushMove(const ScoreMove& move) { *(m_End++) = move; }
 
     template<MoveGenType T>
     inline void GenerateMoves() {
@@ -542,7 +556,8 @@ private:
     template<Color white, MoveGenType T>
     void TGenerateMoves() {
         constexpr Color enemy = !white;
-        BitBoard danger = 0, active = 0, rookPin = 0, bishopPin = 0, enPassant = m_Position.m_States[m_Position.m_Ply].m_EnPassant;
+        BitBoard danger = 0, active = 0, rookPin = 0, bishopPin = 0,
+                 enPassant = m_Position.m_States[m_Position.m_Ply].m_EnPassant;
         BitBoard enPassantCheck = TCheck<white>(m_Position, danger, active, rookPin, bishopPin, enPassant);
         BitBoard moveable = ~Player<white>(m_Position) & active;
 
@@ -558,11 +573,14 @@ private:
         BitBoard pawns = Pawn<white>(m_Position);
         BitBoard nonBishopPawn = pawns & ~bishopPin;
 
-        BitBoard FPawns = PawnForward<white>(nonBishopPawn) & (~m_Position.m_Board) & active; // No diagonally pinned pawn can move forward
+        BitBoard FPawns = PawnForward<white>(nonBishopPawn) & (~m_Position.m_Board)
+                          & active; // No diagonally pinned pawn can move forward
 
         if constexpr (T == SILENT) {
-            BitBoard F2Pawns = PawnForward<white>(nonBishopPawn & Lookup::StartingPawnRank<white>()) & ~m_Position.m_Board;
-            F2Pawns = PawnForward<white>(F2Pawns) & (~m_Position.m_Board) & active; // TODO: Use Fpawns to save calculation
+            BitBoard F2Pawns =
+                PawnForward<white>(nonBishopPawn & Lookup::StartingPawnRank<white>()) & ~m_Position.m_Board;
+            F2Pawns =
+                PawnForward<white>(F2Pawns) & (~m_Position.m_Board) & active; // TODO: Use Fpawns to save calculation
 
             BitBoard pinnedF2Pawns = F2Pawns & Pawn2Forward<white>(rookPin);
             BitBoard movePinF2Pawns = F2Pawns & rookPin;
@@ -602,28 +620,40 @@ private:
                 // Add Forward pawns
                 while (FPromote > 0) {
                     const BoardPos pos = PopPos(FPromote);
-                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b000100), ScoreCapture(pawntype, WBISHOP) });
-                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b001000), ScoreCapture(pawntype, WKNIGHT) });
-                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b010000), ScoreCapture(pawntype, WROOK) });
-                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b100000), ScoreCapture(pawntype, WQUEEN) });
+                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b000100),
+                               ScoreCapture(pawntype, WBISHOP) });
+                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b001000),
+                               ScoreCapture(pawntype, WKNIGHT) });
+                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b010000),
+                               ScoreCapture(pawntype, WROOK) });
+                    pushMove({ BuildMove(PawnPosForward<enemy>(pos), pos, pawntype, NOPIECE, 0b100000),
+                               ScoreCapture(pawntype, WQUEEN) });
                 }
 
                 while (RPromote > 0) { // Loop each bit
                     const BoardPos pos = PopPos(RPromote);
                     const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << pos);
-                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b000100), ScoreCapture(pawntype, WBISHOP) });
-                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b001000), ScoreCapture(pawntype, WKNIGHT) });
-                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b010000), ScoreCapture(pawntype, WROOK) });
-                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b100000), ScoreCapture(pawntype, WQUEEN) });
+                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b000100),
+                               ScoreCapture(pawntype, WBISHOP) });
+                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b001000),
+                               ScoreCapture(pawntype, WKNIGHT) });
+                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b010000),
+                               ScoreCapture(pawntype, WROOK) });
+                    pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture, 0b100000),
+                               ScoreCapture(pawntype, WQUEEN) });
                 }
 
                 while (LPromote > 0) {
                     const BoardPos pos = PopPos(LPromote);
                     const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << pos);
-                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b000100), ScoreCapture(pawntype, WBISHOP) });
-                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b001000), ScoreCapture(pawntype, WKNIGHT) });
-                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b010000), ScoreCapture(pawntype, WROOK) });
-                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b100000), ScoreCapture(pawntype, WQUEEN) });
+                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b000100),
+                               ScoreCapture(pawntype, WBISHOP) });
+                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b001000),
+                               ScoreCapture(pawntype, WKNIGHT) });
+                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b010000),
+                               ScoreCapture(pawntype, WROOK) });
+                    pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture, 0b100000),
+                               ScoreCapture(pawntype, WQUEEN) });
                 }
             }
         }
@@ -640,13 +670,15 @@ private:
             while (RPawns > 0) { // Loop each bit
                 const BoardPos pos = PopPos(RPawns);
                 const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << pos);
-                pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture), ScoreCapture(pawntype, capture) });
+                pushMove(
+                    { BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, capture), ScoreCapture(pawntype, capture) });
             }
 
             while (LPawns > 0) {
                 const BoardPos pos = PopPos(LPawns);
                 const ColoredPieceType capture = GetCaptureType<enemy>(m_Position, 1ull << pos);
-                pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture), ScoreCapture(pawntype, capture) });
+                pushMove(
+                    { BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, capture), ScoreCapture(pawntype, capture) });
             }
 
             // En passant
@@ -658,7 +690,8 @@ private:
             REPawns = REPawns & (~pinnedREPawns | stillPinREPawns);
             if (REPawns > 0) {
                 const BoardPos pos = PopPos(REPawns);
-                pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, GetColoredPiece<enemy>(PAWN), 0b000001), OrderingPieceValue(WPAWN) }); // En passant is usually a good move so we give it a bonus
+                pushMove({ BuildMove(PawnPosLeft<enemy>(pos), pos, pawntype, GetColoredPiece<enemy>(PAWN), 0b000001),
+                           OrderingPieceValue(WPAWN) }); // En passant is usually a good move so we give it a bonus
             }
 
             BitBoard pinnedLEPawns = LEPawns & PawnAttackLeft<white>(bishopPin);
@@ -666,7 +699,8 @@ private:
             LEPawns = LEPawns & (~pinnedLEPawns | stillPinLEPawns);
             if (LEPawns > 0) {
                 const BoardPos pos = PopPos(LEPawns);
-                pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, GetColoredPiece<enemy>(PAWN), 0b000001), OrderingPieceValue(WPAWN) }); // En passant is usually a good move so we give it a bonus
+                pushMove({ BuildMove(PawnPosRight<enemy>(pos), pos, pawntype, GetColoredPiece<enemy>(PAWN), 0b000001),
+                           OrderingPieceValue(WPAWN) }); // En passant is usually a good move so we give it a bonus
             }
         }
 
@@ -750,13 +784,17 @@ private:
         const BoardPos kingpos = GetSquare(King<white>(m_Position));
 
         if constexpr (T == SILENT) {
-            BitBoard CK = CastleKing<white>(m_Position.m_States[m_Position.m_Ply].m_CastleRights, danger, m_Position.m_Board, rooks);
-            BitBoard CQ = CastleQueen<white>(m_Position.m_States[m_Position.m_Ply].m_CastleRights, danger, m_Position.m_Board, rooks);
+            BitBoard CK = CastleKing<white>(m_Position.m_States[m_Position.m_Ply].m_CastleRights, danger,
+                                            m_Position.m_Board, rooks);
+            BitBoard CQ = CastleQueen<white>(m_Position.m_States[m_Position.m_Ply].m_CastleRights, danger,
+                                             m_Position.m_Board, rooks);
             if (CK) {
-                pushMove({ BuildMove(kingpos, GetSquare(CK), kingtype, NOPIECE, 0b000010), 50 }); // Little bonus for castles
+                pushMove(
+                    { BuildMove(kingpos, GetSquare(CK), kingtype, NOPIECE, 0b000010), 50 }); // Little bonus for castles
             }
             if (CQ) {
-                pushMove({ BuildMove(kingpos, GetSquare(CQ), kingtype, NOPIECE, 0b000010), 49 }); // Little bonus for castles
+                pushMove(
+                    { BuildMove(kingpos, GetSquare(CQ), kingtype, NOPIECE, 0b000010), 49 }); // Little bonus for castles
             }
         }
 

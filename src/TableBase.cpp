@@ -60,27 +60,31 @@ namespace TableBase {
     }
 
     static uint64 Material_Key(const Position& board) {
-        const uint8_t wp = CountBits(board.m_WhitePawn), wkn = CountBits(board.m_WhiteKnight), wb = CountBits(board.m_WhiteBishop), wr = CountBits(board.m_WhiteRook), wq = CountBits(board.m_WhiteQueen), wk = CountBits(board.m_WhiteKing),
-            bp = CountBits(board.m_BlackPawn), bkn = CountBits(board.m_BlackKnight), bb = CountBits(board.m_BlackBishop), br = CountBits(board.m_BlackRook), bq = CountBits(board.m_BlackQueen), bk = CountBits(board.m_BlackKing);
-        
+        const uint8_t wp = CountBits(board.m_WhitePawn), wkn = CountBits(board.m_WhiteKnight),
+                      wb = CountBits(board.m_WhiteBishop), wr = CountBits(board.m_WhiteRook),
+                      wq = CountBits(board.m_WhiteQueen), wk = CountBits(board.m_WhiteKing),
+                      bp = CountBits(board.m_BlackPawn), bkn = CountBits(board.m_BlackKnight),
+                      bb = CountBits(board.m_BlackBishop), br = CountBits(board.m_BlackRook),
+                      bq = CountBits(board.m_BlackQueen), bk = CountBits(board.m_BlackKing);
+
         uint64 key = 0;
         if (wp) {
-            key ^= Lookup::zobrist[wp-1];
+            key ^= Lookup::zobrist[wp - 1];
         }
         if (bp) {
-            key ^= Lookup::zobrist[64+bp-1];
+            key ^= Lookup::zobrist[64 + bp - 1];
         }
         if (wkn) {
             key ^= Lookup::zobrist[128 + wkn - 1];
         }
         if (bkn) {
-            key ^= Lookup::zobrist[64+128 + wkn - 1];
+            key ^= Lookup::zobrist[64 + 128 + wkn - 1];
         }
         if (wb) {
-            key ^= Lookup::zobrist[128*2 + wb - 1];
+            key ^= Lookup::zobrist[128 * 2 + wb - 1];
         }
         if (bb) {
-            key ^= Lookup::zobrist[64+128 * 2 + bb - 1];
+            key ^= Lookup::zobrist[64 + 128 * 2 + bb - 1];
         }
         if (wr) {
             key ^= Lookup::zobrist[128 * 3 + wr - 1];
@@ -109,8 +113,8 @@ namespace TableBase {
         uint64 key = 0;
 
         for (pt = (int)PieceType::KING; pt >= (int)PieceType::PAWN; pt--) {
-            if((i = CountBits(board.m_Pieces[pt][color])) > 0) {
-                key ^= Lookup::zobrist[color*64 + (pt-1)*128 + i - 1];
+            if ((i = CountBits(board.m_Pieces[pt][color])) > 0) {
+                key ^= Lookup::zobrist[color * 64 + (pt - 1) * 128 + i - 1];
             }
         }
         color = !color;
@@ -126,21 +130,15 @@ namespace TableBase {
     static void set_norm_piece(TBEntry_piece* ptr, uint8* norm, uint8* pieces) {
         int i, j;
 
-        for (i = 0; i < ptr->num; i++)
-            norm[i] = 0;
+        for (i = 0; i < ptr->num; i++) norm[i] = 0;
 
         switch (ptr->enc_type) {
-        case 0:
-            norm[0] = 3;
-            break;
-        default:
-            norm[0] = 2;
-            break;
+        case 0: norm[0] = 3; break;
+        default: norm[0] = 2; break;
         }
 
         for (i = norm[0]; i < ptr->num; i += norm[i])
-            for (j = i; j < ptr->num && pieces[j] == pieces[i]; j++)
-                norm[i]++;
+            for (j = i; j < ptr->num && pieces[j] == pieces[i]; j++) norm[i]++;
     }
 
     // place k like pieces on n squares
@@ -187,15 +185,13 @@ namespace TableBase {
     static void set_norm_pawn(struct TBEntry_pawn* ptr, uint8* norm, uint8* pieces) {
         int i, j;
 
-        for (i = 0; i < ptr->num; i++)
-            norm[i] = 0;
+        for (i = 0; i < ptr->num; i++) norm[i] = 0;
 
         norm[0] = ptr->pawns[0];
         if (ptr->pawns[1]) norm[ptr->pawns[0]] = ptr->pawns[1];
 
         for (i = ptr->pawns[0] + ptr->pawns[1]; i < ptr->num; i += norm[i])
-            for (j = i; j < ptr->num && pieces[j] == pieces[i]; j++)
-                norm[i]++;
+            for (j = i; j < ptr->num && pieces[j] == pieces[i]; j++) norm[i]++;
     }
 
 
@@ -226,14 +222,12 @@ namespace TableBase {
         int i;
         int order;
 
-        for (i = 0; i < ptr->num; i++)
-            ptr->pieces[0][i] = data[i + 1] & 0x0f;
+        for (i = 0; i < ptr->num; i++) ptr->pieces[0][i] = data[i + 1] & 0x0f;
         order = data[0] & 0x0f;
         set_norm_piece(ptr, ptr->norm[0], ptr->pieces[0]);
         tb_size[0] = calc_factors_piece(ptr->factor[0], ptr->num, order, ptr->norm[0], ptr->enc_type);
 
-        for (i = 0; i < ptr->num; i++)
-            ptr->pieces[1][i] = data[i + 1] >> 4;
+        for (i = 0; i < ptr->num; i++) ptr->pieces[1][i] = data[i + 1] >> 4;
         order = data[0] >> 4;
         set_norm_piece(ptr, ptr->norm[1], ptr->pieces[1]);
         tb_size[1] = calc_factors_piece(ptr->factor[1], ptr->num, order, ptr->norm[1], ptr->enc_type);
@@ -243,8 +237,7 @@ namespace TableBase {
         int i;
         int order;
 
-        for (i = 0; i < ptr->num; i++)
-            ptr->pieces[i] = data[i + 1] & 0x0f;
+        for (i = 0; i < ptr->num; i++) ptr->pieces[i] = data[i + 1] & 0x0f;
         order = data[0] & 0x0f;
         set_norm_piece((struct TBEntry_piece*)ptr, ptr->norm, ptr->pieces);
         tb_size[0] = calc_factors_piece(ptr->factor, ptr->num, order, ptr->norm, ptr->enc_type);
@@ -257,15 +250,13 @@ namespace TableBase {
         j = 1 + (ptr->pawns[1] > 0);
         order = data[0] & 0x0f;
         order2 = ptr->pawns[1] ? (data[1] & 0x0f) : 0x0f;
-        for (i = 0; i < ptr->num; i++)
-            ptr->file[f].pieces[0][i] = data[i + j] & 0x0f;
+        for (i = 0; i < ptr->num; i++) ptr->file[f].pieces[0][i] = data[i + j] & 0x0f;
         set_norm_pawn(ptr, ptr->file[f].norm[0], ptr->file[f].pieces[0]);
         tb_size[0] = calc_factors_pawn(ptr->file[f].factor[0], ptr->num, order, order2, ptr->file[f].norm[0], f);
 
         order = data[0] >> 4;
         order2 = ptr->pawns[1] ? (data[1] >> 4) : 0x0f;
-        for (i = 0; i < ptr->num; i++)
-            ptr->file[f].pieces[1][i] = data[i + j] >> 4;
+        for (i = 0; i < ptr->num; i++) ptr->file[f].pieces[1][i] = data[i + j] >> 4;
         set_norm_pawn(ptr, ptr->file[f].norm[1], ptr->file[f].pieces[1]);
         tb_size[1] = calc_factors_pawn(ptr->file[f].factor[1], ptr->num, order, order2, ptr->file[f].norm[1], f);
     }
@@ -277,8 +268,7 @@ namespace TableBase {
         j = 1 + (ptr->pawns[1] > 0);
         order = data[0] & 0x0f;
         order2 = ptr->pawns[1] ? (data[1] & 0x0f) : 0x0f;
-        for (i = 0; i < ptr->num; i++)
-            ptr->file[f].pieces[i] = data[i + j] & 0x0f;
+        for (i = 0; i < ptr->num; i++) ptr->file[f].pieces[i] = data[i + j] & 0x0f;
         set_norm_pawn((TBEntry_pawn*)ptr, ptr->file[f].norm, ptr->file[f].pieces);
         tb_size[0] = calc_factors_pawn(ptr->file[f].factor, ptr->num, order, order2, ptr->file[f].norm, f);
     }
@@ -288,8 +278,7 @@ namespace TableBase {
 
         int w = *(int*)(d->sympat + 3 * s);
         s2 = (w >> 12) & 0x0fff;
-        if (s2 == 0x0fff)
-            d->symlen[s] = 0;
+        if (s2 == 0x0fff) d->symlen[s] = 0;
         else {
             s1 = w & 0x0fff;
             if (!tmp[s1]) calc_symlen(d, s1, tmp);
@@ -307,10 +296,8 @@ namespace TableBase {
         if (data[0] & 0x80) {
             d = (PairsData*)malloc(sizeof(PairsData));
             d->idxbits = 0;
-            if (wdl)
-                d->min_len = data[1];
-            else
-                d->min_len = 0;
+            if (wdl) d->min_len = data[1];
+            else d->min_len = 0;
             *next = data + 2;
             size[0] = size[1] = size[2] = 0;
             return d;
@@ -340,18 +327,14 @@ namespace TableBase {
 
         // char tmp[num_syms];
         char tmp[4096];
+        for (i = 0; i < num_syms; i++) tmp[i] = 0;
         for (i = 0; i < num_syms; i++)
-            tmp[i] = 0;
-        for (i = 0; i < num_syms; i++)
-            if (!tmp[i])
-                calc_symlen(d, i, tmp);
+            if (!tmp[i]) calc_symlen(d, i, tmp);
 
         d->base[h - 1] = 0;
-        for (i = h - 2; i >= 0; i--)
-            d->base[i] = (d->base[i + 1] + d->offset[i] - d->offset[i + 1]) / 2;
+        for (i = h - 2; i >= 0; i--) d->base[i] = (d->base[i + 1] + d->offset[i] - d->offset[i + 1]) / 2;
 
-        for (i = 0; i < h; i++)
-            d->base[i] <<= 32 - (min_len + i);
+        for (i = 0; i < h; i++) d->base[i] <<= 32 - (min_len + i);
 
         d->offset -= d->min_len;
 
@@ -359,7 +342,6 @@ namespace TableBase {
     }
 
     static FD Open_TB(const char* str, const char* suffix) {
-
         char file[256];
         strcpy(file, s_Path.c_str());
         strcat(file, "/");
@@ -375,8 +357,7 @@ namespace TableBase {
     // *mapping receives the mapped length, which munmap needs back.
     static char* Map_TB(const char* name, const char* suffix, uint64* mapping) {
         FD fd = Open_TB(name, suffix);
-        if (fd == FD_ERR)
-            return NULL;
+        if (fd == FD_ERR) return NULL;
 
         struct stat statbuf;
         if (fstat(fd, &statbuf) != 0) {
@@ -436,8 +417,7 @@ namespace TableBase {
             if (split) {
                 ptr->precomp[1] = setup_pairs(data, tb_size[1], &size[3], &next, &flags, 1);
                 data = next;
-            } else
-                ptr->precomp[1] = NULL;
+            } else ptr->precomp[1] = NULL;
 
             ptr->precomp[0]->indextable = (char*)data;
             data += size[0];
@@ -475,8 +455,7 @@ namespace TableBase {
                 if (split) {
                     ptr->file[f].precomp[1] = setup_pairs(data, tb_size[2 * f + 1], &size[6 * f + 3], &next, &flags, 1);
                     data = next;
-                } else
-                    ptr->file[f].precomp[1] = NULL;
+                } else ptr->file[f].precomp[1] = NULL;
             }
 
             for (f = 0; f < files; f++) {
@@ -519,8 +498,7 @@ namespace TableBase {
         uint64 tb_size[4];
         uint64 size[4 * 3];
 
-        if (!data)
-            return 0;
+        if (!data) return 0;
 
         if (((uint32*)data)[0] != DTZ_MAGIC) {
             printf("Corrupted table.\n");
@@ -605,10 +583,9 @@ namespace TableBase {
         return 1;
     }
 
-    void load_dtz_table(char* str, uint64 key1, uint64 key2)
-    {
+    void load_dtz_table(char* str, uint64 key1, uint64 key2) {
         int i;
-        struct TBEntry* ptr, * ptr3;
+        struct TBEntry *ptr, *ptr3;
         struct TBHashEntry* ptr2;
 
         DTZ_table[0].key1 = key1;
@@ -622,9 +599,7 @@ namespace TableBase {
         if (i == HSHMAX) return;
         ptr = ptr2[i].ptr;
 
-        ptr3 = (struct TBEntry*)malloc(ptr->has_pawns
-            ? sizeof(struct DTZEntry_pawn)
-            : sizeof(struct DTZEntry_piece));
+        ptr3 = (struct TBEntry*)malloc(ptr->has_pawns ? sizeof(struct DTZEntry_pawn) : sizeof(struct DTZEntry_piece));
 
         ptr3->data = Map_TB(str, DTZSUFFIX, &ptr3->mapping);
         ptr3->key = ptr->key;
@@ -639,33 +614,27 @@ namespace TableBase {
             struct DTZEntry_piece* entry = (struct DTZEntry_piece*)ptr3;
             entry->enc_type = ((struct TBEntry_piece*)ptr)->enc_type;
         }
-        if (!Load_DTZ(ptr3))
-            free(ptr3);
-        else
-            DTZ_table[0].entry = ptr3;
+        if (!Load_DTZ(ptr3)) free(ptr3);
+        else DTZ_table[0].entry = ptr3;
     }
 
-    static void free_wdl_entry(struct TBEntry* entry)
-    {
+    static void free_wdl_entry(struct TBEntry* entry) {
         Unmap_TB(entry->data, entry->mapping);
         if (!entry->has_pawns) {
             struct TBEntry_piece* ptr = (struct TBEntry_piece*)entry;
             free(ptr->precomp[0]);
-            if (ptr->precomp[1])
-                free(ptr->precomp[1]);
+            if (ptr->precomp[1]) free(ptr->precomp[1]);
         } else {
             struct TBEntry_pawn* ptr = (struct TBEntry_pawn*)entry;
             int f;
             for (f = 0; f < 4; f++) {
                 free(ptr->file[f].precomp[0]);
-                if (ptr->file[f].precomp[1])
-                    free(ptr->file[f].precomp[1]);
+                if (ptr->file[f].precomp[1]) free(ptr->file[f].precomp[1]);
             }
         }
     }
 
-    static void free_dtz_entry(struct TBEntry* entry)
-    {
+    static void free_dtz_entry(struct TBEntry* entry) {
         Unmap_TB(entry->data, entry->mapping);
         if (!entry->has_pawns) {
             struct DTZEntry_piece* ptr = (struct DTZEntry_piece*)entry;
@@ -673,8 +642,7 @@ namespace TableBase {
         } else {
             struct DTZEntry_pawn* ptr = (struct DTZEntry_pawn*)entry;
             int f;
-            for (f = 0; f < 4; f++)
-                free(ptr->file[f].precomp);
+            for (f = 0; f < 4; f++) free(ptr->file[f].precomp);
         }
         free(entry);
     }
@@ -687,12 +655,10 @@ namespace TableBase {
 
 
         for (pt = (int)PieceType::PAWN; pt <= (int)PieceType::KING; pt++)
-            for (i = 0; i < pcs[color + pt]; i++)
-                key ^= Lookup::zobrist[i + (int)(pt - 1) * 128];
+            for (i = 0; i < pcs[color + pt]; i++) key ^= Lookup::zobrist[i + (int)(pt - 1) * 128];
         color ^= 8;
         for (pt = (int)PieceType::PAWN; pt <= (int)PieceType::KING; pt++)
-            for (i = 0; i < pcs[color + pt]; i++)
-                key ^= Lookup::zobrist[64 + i + (int)(pt - 1) * 128];
+            for (i = 0; i < pcs[color + pt]; i++) key ^= Lookup::zobrist[64 + i + (int)(pt - 1) * 128];
 
         return key;
     }
@@ -716,7 +682,7 @@ namespace TableBase {
 
     static void InitTB(std::string tablebase) {
         int pcs[16];
-        int i,j;
+        int i, j;
 
         // Check if file exists
         FD fd = Open_TB(tablebase.c_str(), WDLSUFFIX);
@@ -729,27 +695,13 @@ namespace TableBase {
         int color = 0;
         for (char& s : tablebase) {
             switch (s) {
-            case 'P':
-                pcs[(int)PieceType::PAWN | color]++;
-                break;
-            case 'N':
-                pcs[(int)PieceType::KNIGHT | color]++;
-                break;
-            case 'B':
-                pcs[(int)PieceType::BISHOP | color]++;
-                break;
-            case 'R':
-                pcs[(int)PieceType::ROOK | color]++;
-                break;
-            case 'Q':
-                pcs[(int)PieceType::QUEEN | color]++;
-                break;
-            case 'K':
-                pcs[(int)PieceType::KING | color]++;
-                break;
-            case 'v':
-                color = 0x08;
-                break;
+            case 'P': pcs[(int)PieceType::PAWN | color]++; break;
+            case 'N': pcs[(int)PieceType::KNIGHT | color]++; break;
+            case 'B': pcs[(int)PieceType::BISHOP | color]++; break;
+            case 'R': pcs[(int)PieceType::ROOK | color]++; break;
+            case 'Q': pcs[(int)PieceType::QUEEN | color]++; break;
+            case 'K': pcs[(int)PieceType::KING | color]++; break;
+            case 'v': color = 0x08; break;
             }
         }
 
@@ -774,8 +726,7 @@ namespace TableBase {
         entry->key = key;
         entry->ready = 0;
         entry->num = 0;
-        for (i = 0; i < 16; i++)
-            entry->num += pcs[i];
+        for (i = 0; i < 16; i++) entry->num += pcs[i];
         entry->symmetric = (key == key2);
         entry->has_pawns = (pcs[(int)PieceType::PAWN] + pcs[(int)PieceType::PAWN | 8] > 0);
 
@@ -797,13 +748,10 @@ namespace TableBase {
         }
         InsertTB(entry, key);
         if (key2 != key) InsertTB(entry, key2);
-
     }
 
-    
 
-    
-
+    // clang-format off
     static const signed char offdiag[] = {
       0,-1,-1,-1,-1,-1,-1,-1,
       1, 0,-1,-1,-1,-1,-1,-1,
@@ -990,6 +938,7 @@ namespace TableBase {
         -1, -1, -1, -1, -1, -1,460,440,
         -1, -1, -1, -1, -1, -1, -1,461 }
     };
+    // clang-format on
 
     static int wdl_to_map[5] = { 1, 3, 0, 2, 0 };
     static uint8 pa_flags[5] = { 8, 0, 0, 0, 4 };
@@ -1000,34 +949,29 @@ namespace TableBase {
         int n = ptr->num;
 
         if (pos[0] & 0x04) {
-            for (i = 0; i < n; i++)
-                pos[i] ^= 0x07;
+            for (i = 0; i < n; i++) pos[i] ^= 0x07;
         }
         if (pos[0] & 0x20) {
-            for (i = 0; i < n; i++)
-                pos[i] ^= 0x38;
+            for (i = 0; i < n; i++) pos[i] ^= 0x38;
         }
 
         for (i = 0; i < n; i++)
             if (offdiag[pos[i]]) break;
         if (i < (ptr->enc_type == 0 ? 3 : 2) && offdiag[pos[i]] > 0)
-            for (i = 0; i < n; i++)
-                pos[i] = flipdiag[pos[i]];
+            for (i = 0; i < n; i++) pos[i] = flipdiag[pos[i]];
 
         switch (ptr->enc_type) {
-
         case 0: /* 111 */
             i = (pos[1] > pos[0]);
             j = (pos[2] > pos[0]) + (pos[2] > pos[1]);
 
-            if (offdiag[pos[0]])
-                idx = triangle[pos[0]] * 63 * 62 + (pos[1] - i) * 62 + (pos[2] - j);
-            else if (offdiag[pos[1]])
-                idx = 6 * 63 * 62 + diag[pos[0]] * 28 * 62 + lower[pos[1]] * 62 + pos[2] - j;
+            if (offdiag[pos[0]]) idx = triangle[pos[0]] * 63 * 62 + (pos[1] - i) * 62 + (pos[2] - j);
+            else if (offdiag[pos[1]]) idx = 6 * 63 * 62 + diag[pos[0]] * 28 * 62 + lower[pos[1]] * 62 + pos[2] - j;
             else if (offdiag[pos[2]])
                 idx = 6 * 63 * 62 + 4 * 28 * 62 + (diag[pos[0]]) * 7 * 28 + (diag[pos[1]] - i) * 28 + lower[pos[2]];
             else
-                idx = 6 * 63 * 62 + 4 * 28 * 62 + 4 * 7 * 28 + (diag[pos[0]] * 7 * 6) + (diag[pos[1]] - i) * 6 + (diag[pos[2]] - j);
+                idx = 6 * 63 * 62 + 4 * 28 * 62 + 4 * 7 * 28 + (diag[pos[0]] * 7 * 6) + (diag[pos[1]] - i) * 6
+                      + (diag[pos[2]] - j);
             i = 3;
             break;
 
@@ -1046,8 +990,7 @@ namespace TableBase {
             int s = 0;
             for (m = i; m < i + t; m++) {
                 p = pos[m];
-                for (l = 0, j = 0; l < i; l++)
-                    j += (p > pos[l]);
+                for (l = 0, j = 0; l < i; l++) j += (p > pos[l]);
                 s += binomial[m - i][p - j];
             }
             idx += ((uint64)s) * ((uint64)factor[i]);
@@ -1062,8 +1005,7 @@ namespace TableBase {
         int i;
 
         for (i = 1; i < ptr->pawns[0]; i++)
-            if (flap[pos[0]] > flap[pos[i]])
-                std::swap(pos[0], pos[i]);
+            if (flap[pos[0]] > flap[pos[i]]) std::swap(pos[0], pos[i]);
 
         return file_to_file[pos[0] & 0x07];
     }
@@ -1074,18 +1016,15 @@ namespace TableBase {
         int n = ptr->num;
 
         if (pos[0] & 0x04)
-            for (i = 0; i < n; i++)
-                pos[i] ^= 0x07;
+            for (i = 0; i < n; i++) pos[i] ^= 0x07;
 
         for (i = 1; i < ptr->pawns[0]; i++)
             for (j = i + 1; j < ptr->pawns[0]; j++)
-                if (ptwist[pos[i]] < ptwist[pos[j]])
-                    std::swap(pos[i], pos[j]);
+                if (ptwist[pos[i]] < ptwist[pos[j]]) std::swap(pos[i], pos[j]);
 
         t = ptr->pawns[0] - 1;
         idx = pawnidx[t][flap[pos[0]]];
-        for (i = t; i > 0; i--)
-            idx += binomial[t - i][ptwist[pos[i]]];
+        for (i = t; i > 0; i--) idx += binomial[t - i][ptwist[pos[i]]];
         idx *= factor[0];
 
         // remaining pawns
@@ -1098,8 +1037,7 @@ namespace TableBase {
             s = 0;
             for (m = i; m < t; m++) {
                 int p = pos[m];
-                for (k = 0, j = 0; k < i; k++)
-                    j += (p > pos[k]);
+                for (k = 0, j = 0; k < i; k++) j += (p > pos[k]);
                 s += binomial[m - i][p - j - 8];
             }
             idx += ((uint64)s) * ((uint64)factor[i]);
@@ -1114,8 +1052,7 @@ namespace TableBase {
             s = 0;
             for (m = i; m < i + t; m++) {
                 int p = pos[m];
-                for (k = 0, j = 0; k < i; k++)
-                    j += (p > pos[k]);
+                for (k = 0, j = 0; k < i; k++) j += (p > pos[k]);
                 s += binomial[m - i][p - j];
             }
             idx += ((uint64)s) * ((uint64)factor[i]);
@@ -1126,8 +1063,7 @@ namespace TableBase {
     }
 
     static uint8 decompress_pairs(struct PairsData* d, uint64 idx) {
-        if (!d->idxbits)
-            return d->min_len;
+        if (!d->idxbits) return d->min_len;
 
         uint32 mainidx = idx >> d->idxbits;
         int litidx = (idx & ((1 << d->idxbits) - 1)) - (1 << (d->idxbits - 1));
@@ -1138,8 +1074,7 @@ namespace TableBase {
                 litidx += d->sizetable[--block] + 1;
             } while (litidx < 0);
         } else {
-            while (litidx > d->sizetable[block])
-                litidx -= d->sizetable[block++] + 1;
+            while (litidx > d->sizetable[block]) litidx -= d->sizetable[block++] + 1;
         }
 
         uint32* ptr = (uint32*)(d->data + (block << d->blocksize));
@@ -1177,8 +1112,7 @@ namespace TableBase {
         while (symlen[sym] != 0) {
             int w = *(int*)(sympat + 3 * sym);
             int s1 = w & 0x0fff;
-            if (litidx < (int)symlen[s1] + 1)
-                sym = s1;
+            if (litidx < (int)symlen[s1] + 1) sym = s1;
             else {
                 litidx -= (int)symlen[s1] + 1;
                 sym = (w >> 12) & 0x0fff;
@@ -1293,8 +1227,7 @@ namespace TableBase {
             board.UndoMove(move);
             if (*success == 0) return 0;
             if (v > alpha) {
-                if (v >= beta)
-                    return v;
+                if (v >= beta) return v;
                 alpha = v;
             }
         }
@@ -1310,7 +1243,6 @@ namespace TableBase {
     // 1: win but 50-move rule draw
     // 2: win
     int Probe_WDL(Position& board, int* success) {
-
         *success = 1;
 
         int man = CountBits(board.m_Board);
@@ -1337,10 +1269,8 @@ namespace TableBase {
                     *success = 2;
                     return 2;
                 }
-                if (!EnPassant(move))
-                    best_cap = v;
-                else if (v > best_ep)
-                    best_ep = v;
+                if (!EnPassant(move)) best_cap = v;
+                else if (v > best_ep) best_ep = v;
             }
         }
 
@@ -1363,9 +1293,7 @@ namespace TableBase {
         return v;
     }
 
-    static int wdl_to_dtz[] = {
-        -1, -101, 0, 101, 1
-    };
+    static int wdl_to_dtz[] = { -1, -101, 0, 101, 1 };
 
     int Probe_DTZ_Table(Position& board, int wdl, int* success) {
         *success = 1;
@@ -1383,8 +1311,7 @@ namespace TableBase {
                 if (DTZ_table[i].key1 == key || DTZ_table[i].key2 == key) break;
             if (i < DTZ_ENTRIES) {
                 struct DTZTableEntry table_entry = DTZ_table[i];
-                for (; i > 0; i--)
-                    DTZ_table[i] = DTZ_table[i - 1];
+                for (; i > 0; i--) DTZ_table[i] = DTZ_table[i - 1];
                 DTZ_table[0] = table_entry;
             } else {
                 struct TBHashEntry* ptr2 = TB_hash[key >> (64 - TBHASHBITS)];
@@ -1398,10 +1325,8 @@ namespace TableBase {
                 char str[16];
                 int mirror = (ptr->key != key);
                 TB_Str(board, str, mirror);
-                if (DTZ_table[DTZ_ENTRIES - 1].entry)
-                    free_dtz_entry(DTZ_table[DTZ_ENTRIES - 1].entry);
-                for (i = DTZ_ENTRIES - 1; i > 0; i--)
-                    DTZ_table[i] = DTZ_table[i - 1];
+                if (DTZ_table[DTZ_ENTRIES - 1].entry) free_dtz_entry(DTZ_table[DTZ_ENTRIES - 1].entry);
+                for (i = DTZ_ENTRIES - 1; i > 0; i--) DTZ_table[i] = DTZ_table[i - 1];
                 load_dtz_table(str, Calc_Key(board, mirror), Calc_Key(board, !mirror));
             }
         }
@@ -1444,11 +1369,9 @@ namespace TableBase {
             idx = encode_piece((TBEntry_piece*)entry, entry->norm, p, entry->factor);
             res = decompress_pairs(entry->precomp, idx);
 
-            if (entry->flags & 2)
-                res = entry->map[entry->map_idx[wdl_to_map[wdl + 2]] + res];
+            if (entry->flags & 2) res = entry->map[entry->map_idx[wdl_to_map[wdl + 2]] + res];
 
-            if (!(entry->flags & pa_flags[wdl + 2]) || (wdl & 1))
-                res *= 2;
+            if (!(entry->flags & pa_flags[wdl + 2]) || (wdl & 1)) res *= 2;
         } else {
             DTZEntry_pawn* entry = (DTZEntry_pawn*)ptr;
             int k = entry->file[0].pieces[0] ^ cmirror;
@@ -1472,11 +1395,9 @@ namespace TableBase {
             idx = encode_pawn((TBEntry_pawn*)entry, entry->file[f].norm, p, entry->file[f].factor);
             res = decompress_pairs(entry->file[f].precomp, idx);
 
-            if (entry->flags[f] & 2)
-                res = entry->map[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
+            if (entry->flags[f] & 2) res = entry->map[entry->map_idx[f][wdl_to_map[wdl + 2]] + res];
 
-            if (!(entry->flags[f] & pa_flags[wdl + 2]) || (wdl & 1))
-                res *= 2;
+            if (!(entry->flags[f] & pa_flags[wdl + 2]) || (wdl & 1)) res *= 2;
         }
 
         return res;
@@ -1490,27 +1411,25 @@ namespace TableBase {
         if (wdl == 0) return 0;
 
         // Winning capture
-        if (*success == 2)
-            return wdl_to_dtz[wdl + 2];
+        if (*success == 2) return wdl_to_dtz[wdl + 2];
 
         // Check for winning pawn move
         if (wdl > 0) {
             MoveGen gen(board, 0, false); // Generates all legal moves
             Move move;
             while ((move = gen.Next()) != 0) {
-                if (!(MovePieceType(move) == WPAWN || MovePieceType(move) == WPAWN) || (CaptureType(move) > 0)) continue;
+                if (!(MovePieceType(move) == WPAWN || MovePieceType(move) == WPAWN) || (CaptureType(move) > 0))
+                    continue;
                 board.MovePiece(move);
                 int v = -Probe_WDL(board, success);
                 board.UndoMove(move);
                 if (*success == 0) return 0;
-                if (v == wdl)
-                    return wdl_to_dtz[wdl + 2];
+                if (v == wdl) return wdl_to_dtz[wdl + 2];
             }
         }
 
         int dtz = Probe_DTZ_Table(board, wdl, success);
-        if (*success >= 0)
-            return wdl_to_dtz[wdl + 2] + ((wdl > 0) ? dtz : -dtz);
+        if (*success >= 0) return wdl_to_dtz[wdl + 2] + ((wdl > 0) ? dtz : -dtz);
 
         // if success < 0 then we need to probe DTZ for the other side to move.
 
@@ -1525,11 +1444,9 @@ namespace TableBase {
             board.UndoMove(move);
             if (*success == 0) return 0;
             if (wdl > 0) {
-                if (v > 0 && v + 1 < best)
-                    best = v + 1;
+                if (v > 0 && v + 1 < best) best = v + 1;
             } else {
-                if (v - 1 < best)
-                    best = v - 1;
+                if (v - 1 < best) best = v - 1;
             }
         }
         return best;
@@ -1538,7 +1455,7 @@ namespace TableBase {
     void Init(std::string path) {
         s_Path = path;
         char str[16];
-        int i, j, k,l;
+        int i, j, k, l;
 
         // binomial[k-1][n] = Bin(n, k)
         for (i = 0; i < 5; i++) {

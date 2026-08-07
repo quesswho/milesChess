@@ -2,8 +2,8 @@
 
 
 MoveGen::MoveGen(Position& position, Move hashmove, bool quiescence)
-    : m_Position(position), m_HashMove(hashmove), m_Current(&m_Moves[0]), m_End(&m_Moves[0]), m_Stage(quiescence ? QUIESCENCE_TT : TT_MOVE)
-{}
+    : m_Position(position), m_HashMove(hashmove), m_Current(&m_Moves[0]), m_End(&m_Moves[0]),
+      m_Stage(quiescence ? QUIESCENCE_TT : TT_MOVE) {}
 
 static bool movecomp(const ScoreMove& a, const ScoreMove& b) {
     return a.score > b.score;
@@ -58,10 +58,10 @@ Move MoveGen::Next() {
             return 0; // Finished
         case QUIESCENCE_INIT:
             //if (m_Position.m_InCheck) {
-              //  GenerateMoves<ALL>(); // Generates all evasions
+            //  GenerateMoves<ALL>(); // Generates all evasions
             //} else {
-                GenerateMoves<QUIESCENCE>();
-           // }
+            GenerateMoves<QUIESCENCE>();
+            // }
             // sort
             if (m_Current != m_End) std::sort(m_Current, m_End - 1, movecomp);
             m_Stage++;

@@ -3,16 +3,16 @@
 #include "Move.h"
 #include "LookupTables.h"
 
-#define CASTLE_WHITEKING 0b1
+#define CASTLE_WHITEKING  0b1
 #define CASTLE_WHITEQUEEN 0b10
-#define CASTLE_BLACKKING 0b100
+#define CASTLE_BLACKKING  0b100
 #define CASTLE_BLACKQUEEN 0b1000
 
 struct IrreversibleState {
     uint8 m_CastleRights; // bitfield 0: WhiteKing, 1: WhiteQueen, 2: BlackKing, 3: BlackQueen
     uint8 m_HalfMoves;
     BitBoard m_EnPassant; // Todo: Maybe make this to position instead of bitboard to save bytes
-    uint64 m_Hash; // Stored here for the sake of counting repetition
+    uint64 m_Hash;        // Stored here for the sake of counting repetition
 };
 
 class Position {
@@ -41,7 +41,6 @@ public:
             BitBoard m_BlackKing;
         };
         BitBoard m_Pieces[7][2]; // 6 pieces for each color: 0 for white and 1 for black
-
     };
 
     BitBoard m_Board;
@@ -79,6 +78,7 @@ public:
     BitBoard BishopXray(int pos, BitBoard occ) const;
 
     std::string ToFen() const;
+
 private:
     void SetState(const std::string& FEN);
 
@@ -87,13 +87,12 @@ private:
         constexpr Color enemy = !white;
         BoardPos kingsq = GetSquare(King<white>());
 
-        if (
-            (Lookup::knight_attacks[kingsq] & Knight<enemy>())                                         // Knight check
-            || (PawnRight<enemy>() & King<white>())                                               // Pawn check
-            || (PawnLeft<enemy>() & King<white>())                                                // Pawn check
-            || (BishopAttack(kingsq, m_Board) & (Bishop<enemy>() | Queen<enemy>()))   // Bishop check
-            || (RookAttack(kingsq, m_Board) & (Rook<enemy>() | Queen<enemy>()))       // Rook check
-            ) {
+        if ((Lookup::knight_attacks[kingsq] & Knight<enemy>())                      // Knight check
+            || (PawnRight<enemy>() & King<white>())                                 // Pawn check
+            || (PawnLeft<enemy>() & King<white>())                                  // Pawn check
+            || (BishopAttack(kingsq, m_Board) & (Bishop<enemy>() | Queen<enemy>())) // Bishop check
+            || (RookAttack(kingsq, m_Board) & (Rook<enemy>() | Queen<enemy>()))     // Rook check
+        ) {
             return true;
         }
 

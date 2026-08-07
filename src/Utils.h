@@ -21,13 +21,9 @@ static inline constexpr int CountBits(BitBoard val) {
 }
 
 struct Score {
-    Score()
-        : mg(0), eg(0)
-    {}
+    Score() : mg(0), eg(0) {}
 
-    Score(int mg, int eg)
-        : mg(mg), eg(eg)
-    {}
+    Score(int mg, int eg) : mg(mg), eg(eg) {}
 
     int mg;
     int eg;
@@ -97,15 +93,9 @@ static BoardInfo FenToBoardInfo(const std::string& FEN) {
 
     char ac = FEN[i++]; // Active color
     switch (ac) {
-    case 'w':
-        info.m_WhiteMove = WHITE;
-        break;
-    case 'b':
-        info.m_WhiteMove = BLACK;
-        break;
-    default:
-        printf("Invalid FEN for active color\n");
-        return info;
+    case 'w': info.m_WhiteMove = WHITE; break;
+    case 'b': info.m_WhiteMove = BLACK; break;
+    default: printf("Invalid FEN for active color\n"); return info;
     }
 
     i++;
@@ -120,18 +110,10 @@ static BoardInfo FenToBoardInfo(const std::string& FEN) {
         }
 
         switch (c) {
-        case 'K':
-            info.m_WhiteCastleKing = true;
-            break;
-        case 'Q':
-            info.m_WhiteCastleQueen = true;
-            break;
-        case 'k':
-            info.m_BlackCastleKing = true;
-            break;
-        case 'q':
-            info.m_BlackCastleQueen = true;
-            break;
+        case 'K': info.m_WhiteCastleKing = true; break;
+        case 'Q': info.m_WhiteCastleQueen = true; break;
+        case 'k': info.m_BlackCastleKing = true; break;
+        case 'q': info.m_BlackCastleQueen = true; break;
         }
     }
 
@@ -165,8 +147,7 @@ static void PrintBitBoard(BitBoard map) {
     for (int i = 63; i >= 0; i--) {
         if ((map & (1ull << i)) > 0) {
             printf("X ");
-        }
-        else {
+        } else {
             printf("O ");
         }
         if (i % 8 == 0) printf("\n");
@@ -200,19 +181,28 @@ private:
     std::chrono::time_point<std::chrono::high_resolution_clock> m_Start;
 
     float m_LastElapsed;
+
 public:
-    Timer()
-        : m_LastElapsed(0.0f)
-    {}
+    Timer() : m_LastElapsed(0.0f) {}
 
     void Start() { m_Start = std::chrono::high_resolution_clock::now(); }
-    float End() { return std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - m_Start).count(); } // Returns x seconds after Start() was called
-    float EndMs() { return std::chrono::duration_cast<std::chrono::milliseconds > (std::chrono::high_resolution_clock::now() - m_Start).count(); }
+    float End() {
+        return std::chrono::duration<float>(std::chrono::high_resolution_clock::now() - m_Start).count();
+    } // Returns x seconds after Start() was called
+    float EndMs() {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()
+                                                                     - m_Start)
+            .count();
+    }
 };
 
 // All squares below / above sq.
-static inline constexpr BitBoard GetLower(int sq) { return (1ull << sq) - 1; }
-static inline constexpr BitBoard GetUpper(int sq) { return 0xFFFFFFFFFFFFFFFFull << sq; }
+static inline constexpr BitBoard GetLower(int sq) {
+    return (1ull << sq) - 1;
+}
+static inline constexpr BitBoard GetUpper(int sq) {
+    return 0xFFFFFFFFFFFFFFFFull << sq;
+}
 
 struct lineEx {
     BitBoard lower;
@@ -229,10 +219,8 @@ struct lineEx {
         return GetUpper(sq) & lineEx;
     }
 
-    constexpr lineEx() : lower(0), upper(0), uni(0) {
+    constexpr lineEx() : lower(0), upper(0), uni(0) {}
 
-    }
-
-    constexpr lineEx(int sq, BitBoard line) : lower(init_low(sq, line)), upper(init_up(sq, line)), uni(init_low(sq, line) | init_up(sq, line))
-    {}
+    constexpr lineEx(int sq, BitBoard line)
+        : lower(init_low(sq, line)), upper(init_up(sq, line)), uni(init_low(sq, line) | init_up(sq, line)) {}
 };

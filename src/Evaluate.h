@@ -13,7 +13,8 @@ static Score Pawn(const Position& board, int pos, int rpos) {
     int endgame = pawnBaseVal + Lookup::eg_pawn_table[pos];
     if ((Lookup::pawn_passed<white>(rpos) & Pawn<!white>(board)) == 0) { // pawn is passed
         int64 bit = 1ull << rpos;
-        if ((PawnAttackRight<white>(bit) & Pawn<white>(board)) || (PawnAttackLeft<white>(bit) & Pawn<white>(board))) { // If passed pawn is defended too
+        if ((PawnAttackRight<white>(bit) & Pawn<white>(board))
+            || (PawnAttackLeft<white>(bit) & Pawn<white>(board))) { // If passed pawn is defended too
             endgame += Lookup::passed_pawn_table[pos] * 1.3;
             middlegame += 20 * 1.3;
         } else {
@@ -51,11 +52,11 @@ static Score Pawns(const Position& board) {
 
 // Relative static evaluation
 static int64 Evaluate(const Position& board, PawnTable* table) {
-
     int64 middlegame = 0, endgame = 0, result = 0;
     Score score = { 0, 0 };
-    BitBoard wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook, wq = board.m_WhiteQueen, wk = board.m_WhiteKing,
-        bp = board.m_BlackPawn, bkn = board.m_BlackKnight, bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
+    BitBoard wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook,
+             wq = board.m_WhiteQueen, wk = board.m_WhiteKing, bp = board.m_BlackPawn, bkn = board.m_BlackKnight,
+             bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
 
     const int64 pawnVal = 100, knightVal = 350, bishopVal = 350, rookVal = 525, queenVal = 1000, kingVal = 10000;
 
@@ -71,10 +72,12 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
     for (int i = PieceType::PAWN; i < PieceType::QUEEN; i++) {
         for (int j = PieceType::PAWN; j < i; j++) {
             // TODO: separate imbalance factor for mg and eg
-            middlegame += Lookup::imbalance_factor[i-1][j-1]*(CountBits(board.m_Pieces[i][0]) * CountBits(board.m_Pieces[j][0])
-                - CountBits(board.m_Pieces[i][1])* CountBits(board.m_Pieces[j][1]));
-            endgame += Lookup::imbalance_factor[i][j] * (CountBits(board.m_Pieces[i][0]) * CountBits(board.m_Pieces[j][0])
-                - CountBits(board.m_Pieces[i][1]) * CountBits(board.m_Pieces[j][1]));
+            middlegame += Lookup::imbalance_factor[i - 1][j - 1]
+                          * (CountBits(board.m_Pieces[i][0]) * CountBits(board.m_Pieces[j][0])
+                             - CountBits(board.m_Pieces[i][1]) * CountBits(board.m_Pieces[j][1]));
+            endgame += Lookup::imbalance_factor[i][j]
+                       * (CountBits(board.m_Pieces[i][0]) * CountBits(board.m_Pieces[j][0])
+                          - CountBits(board.m_Pieces[i][1]) * CountBits(board.m_Pieces[j][1]));
         }
     }
 
@@ -88,7 +91,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         Score pawn = Pawns(board);
         table->Enter(board.m_PawnHash, PTEntry(board.m_PawnHash, pawn));
     }
-    
+
     // Knights
     int wkncnt = 0;
     while (wkn > 0) {

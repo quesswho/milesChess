@@ -13,13 +13,13 @@
 #include <thread>
 #include <cmath>
 
-#define MAX_DEPTH 64 // Maximum depth that the engine will go
-#define MATE_SCORE 32767/2
-#define NONE_SCORE 32766
-#define MIN_ALPHA int64(-32767)
-#define MAX_BETA int64(32767)
+#define MAX_DEPTH       64 // Maximum depth that the engine will go
+#define MATE_SCORE      32767 / 2
+#define NONE_SCORE      32766
+#define MIN_ALPHA       int64(-32767)
+#define MAX_BETA        int64(32767)
 #define DEFAULT_HASH_MB 16ull
-#define PAWN_TABLE_MB 1ull
+#define PAWN_TABLE_MB   1ull
 
 // Quadratic https://www.chessprogramming.org/Triangular_PV-Table
 struct MoveStack {
@@ -32,21 +32,15 @@ struct MoveStack {
 struct RootMove {
     int score;
     Move move;
-    bool operator<(const RootMove& m) const {
-        return m.score < score;
-    }
+    bool operator<(const RootMove& m) const { return m.score < score; }
 };
 
-enum NodeType {
-    ROOT,
-    PV,
-    NON_PV
-};
+enum NodeType { ROOT, PV, NON_PV };
 
 struct SearchLimits {
     int maxDepth = MAX_DEPTH;
-    uint64 maxNodes = 0;   // 0 = unlimited
-    int64 maxTimeMs = -1;  // -1 = unlimited
+    uint64 maxNodes = 0;  // 0 = unlimited
+    int64 maxTimeMs = -1; // -1 = unlimited
     bool useTablebase = true;
 };
 
@@ -60,34 +54,31 @@ struct SearchResult {
 class Search {
 public:
     Position m_Position;
+
 private:
-	//uint64 m_Hash[MAX_DEPTH];
+    //uint64 m_Hash[MAX_DEPTH];
     //uint64 m_PawnHash[MAX_DEPTH];
     //uint64 m_History[256];
     std::vector<std::unique_ptr<std::thread>> m_Threads;
     std::atomic<bool> m_Running;
     std::atomic<bool> m_Stopping;
     Timer m_Timer;
-	int m_Maxdepth; // Maximum depth currently set
+    int m_Maxdepth; // Maximum depth currently set
     uint64 m_NodeCnt;
     std::unique_ptr<TranspositionTable> m_Table;
     std::unique_ptr<PawnTable> m_PawnTable;
     std::vector<RootMove> m_RootMoves;
     int m_RootDelta;
     SearchLimits m_Limits;
-public:
 
-	Search(uint64 hashMB = DEFAULT_HASH_MB)
-        : m_Maxdepth(0), m_Running(false), m_Stopping(false), m_NodeCnt(0)
-	{
+public:
+    Search(uint64 hashMB = DEFAULT_HASH_MB) : m_Maxdepth(0), m_Running(false), m_Stopping(false), m_NodeCnt(0) {
         m_Table = std::make_unique<TranspositionTable>(hashMB * 1024 * 1024);
         m_PawnTable = std::make_unique<PawnTable>(PAWN_TABLE_MB * 1024 * 1024);
         LoadPosition(Lookup::starting_pos);
     }
 
-    ~Search() {
-        Stop();
-    }
+    ~Search() { Stop(); }
 
     void SetHashSize(uint64 hashMB) {
         Stop();
@@ -110,9 +101,7 @@ public:
         m_Stopping = false;
     }
 
-    bool TimeExpired() {
-        return m_Limits.maxTimeMs >= 0 && m_Timer.EndMs() >= m_Limits.maxTimeMs;
-    }
+    bool TimeExpired() { return m_Limits.maxTimeMs >= 0 && m_Timer.EndMs() >= m_Limits.maxTimeMs; }
 
     bool ShouldStop() {
         if (!m_Running || m_Stopping) return true;
@@ -125,13 +114,10 @@ public:
         m_PawnTable->Clear();
     }
 
-	void LoadPosition(std::string fen) {
-        m_Position.SetPosition(fen);
-	}
+    void LoadPosition(std::string fen) { m_Position.SetPosition(fen); }
 
     static void Update_PV(Move* pv, Move move, Move* target) {
-        for (*pv++ = move; target && *target != Move();)
-            *pv++ = *target++;
+        for (*pv++ = move; target && *target != Move();) *pv++ = *target++;
         *pv = Move();
     }
 
@@ -152,7 +138,8 @@ public:
         bool ttPV = PVNode;
         TTEntry* entry = m_Table->Probe(board.m_Hash);
         if (entry != nullptr) {
-            if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Score >= beta ? LOWER_BOUND : UPPER_BOUND))) {
+            if (!PVNode && entry->m_Depth >= depth
+                && (entry->m_Bound & (entry->m_Score >= beta ? LOWER_BOUND : UPPER_BOUND))) {
                 return entry->m_Score;
             }
             hashMove = entry->m_BestMove;
@@ -195,33 +182,28 @@ public:
         // Check for mate or stalemate
         if (!movecnt) {
             if (board.m_InCheck) {
-                std::vector<Move> mate = GenerateMoves<ALL>(board); // TODO: Generate evasions in Quiescense which will give mate or draw if movecnt == 0
-                if(mate.size() == 0) bestScore = -MATE_SCORE + stack->m_Ply;
+                std::vector<Move> mate = GenerateMoves<ALL>(
+                    board); // TODO: Generate evasions in Quiescense which will give mate or draw if movecnt == 0
+                if (mate.size() == 0) bestScore = -MATE_SCORE + stack->m_Ply;
             } else { // Commented out because it yields better performance without it even though it may not be correct
                 //std::vector<Move> mate = GenerateMoves<ALL>(board);
                 //if (mate.size() == 0) bestScore = 0;
             }
         }
 
-        
-        m_Table->Enter(board.m_Hash,
-            TTEntry(board.m_Hash,
-                bestMove,
-                bestScore,
-                bestScore >= beta ? LOWER_BOUND : PVNode ? EXACT_BOUND : UPPER_BOUND,
-                stack->m_Ply,
-                depth,
-                board.m_FullMoves,
-                ttPV
-            ));
-        
+
+        m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore,
+                                             bestScore >= beta ? LOWER_BOUND
+                                             : PVNode          ? EXACT_BOUND
+                                                               : UPPER_BOUND,
+                                             stack->m_Ply, depth, board.m_FullMoves, ttPV));
+
 
         return bestScore;
     }
 
     template<NodeType node>
-	int64 AlphaBeta(Position& board, MoveStack* stack, int alpha, int beta, int depth, bool cutNode) {
-
+    int64 AlphaBeta(Position& board, MoveStack* stack, int alpha, int beta, int depth, bool cutNode) {
         constexpr bool PVNode = node != NON_PV;
         constexpr bool rootNode = node == ROOT;
 
@@ -256,13 +238,14 @@ public:
         bool ttPV = PVNode;
         if (entry != nullptr) {
             // Check for TT cutoff
-            if (!PVNode && entry->m_Depth >= depth && (entry->m_Bound & (entry->m_Score >= beta ? LOWER_BOUND : UPPER_BOUND))) {
+            if (!PVNode && entry->m_Depth >= depth
+                && (entry->m_Bound & (entry->m_Score >= beta ? LOWER_BOUND : UPPER_BOUND))) {
                 return entry->m_Score;
             }
             hashMove = entry->m_BestMove;
-            ttScore  = entry->m_Score;
-            ttDepth  = entry->m_Depth;
-            ttPV    |= entry->m_PV;
+            ttScore = entry->m_Score;
+            ttDepth = entry->m_Depth;
+            ttPV |= entry->m_PV;
         }
 
         // Probe the tablebase
@@ -273,16 +256,14 @@ public:
             if (success) {
                 int value = Signum(v) * (MATE_SCORE - v);
                 // TODO: Store value in hashtable
-                if(!entry) m_Table->Enter(board.m_Hash,
-                    TTEntry(board.m_Hash,
-                        0, // No move
-                        value,
-                        v > 0 ? LOWER_BOUND : v < 0 ? UPPER_BOUND : EXACT_BOUND,
-                        stack->m_Ply,
-                        depth,
-                        board.m_FullMoves,
-                        ttPV
-                    ));
+                if (!entry)
+                    m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash,
+                                                         0, // No move
+                                                         value,
+                                                         v > 0   ? LOWER_BOUND
+                                                         : v < 0 ? UPPER_BOUND
+                                                                 : EXACT_BOUND,
+                                                         stack->m_Ply, depth, board.m_FullMoves, ttPV));
                 return value;
             }
         }
@@ -307,8 +288,8 @@ public:
                 return nullscore;
             }
         }
-        
-		    int64 bestScore = -MATE_SCORE;
+
+        int64 bestScore = -MATE_SCORE;
         int64 old_alpha = alpha;
         Move bestMove = 0;
 
@@ -318,7 +299,7 @@ public:
 
         MoveGen moveGen(board, hashMove, false);
         Move move;
-		while ((move = moveGen.Next()) != 0) {
+        while ((move = moveGen.Next()) != 0) {
             movecnt++;
             stack->m_CurrentMove = move;
             int newDepth = depth - 1;
@@ -326,9 +307,11 @@ public:
             int delta = beta - alpha;
             bool capture = CaptureType(move) != NOPIECE;
             // Singular extension
-            if (!rootNode && stack->m_Ply < 2 * m_Maxdepth && depth >= 6 && move == hashMove && ttScore < MATE_SCORE && (entry->m_Bound & LOWER_BOUND)) {
+            if (!rootNode && stack->m_Ply < 2 * m_Maxdepth && depth >= 6 && move == hashMove && ttScore < MATE_SCORE
+                && (entry->m_Bound & LOWER_BOUND)) {
                 int64 singularBeta = ttScore - depth;
-                int64 extScore = -AlphaBeta<NON_PV>(board, stack + 1, singularBeta - 1, singularBeta, newDepth / 2, cutNode);
+                int64 extScore =
+                    -AlphaBeta<NON_PV>(board, stack + 1, singularBeta - 1, singularBeta, newDepth / 2, cutNode);
                 if (extScore < singularBeta) {
                     extension = 1;
                 } else if (singularBeta >= beta) { // Multi-cut pruning
@@ -366,8 +349,8 @@ public:
                 // Reduce expected cut node
                 if (cutNode) reduction += 1;
 
-                int reducedDepth = std::min(std::max(1, newDepth - reduction), newDepth+1);
-                score = -AlphaBeta<NON_PV>(board, stack + 1, -alpha-1, -alpha, reducedDepth, true);
+                int reducedDepth = std::min(std::max(1, newDepth - reduction), newDepth + 1);
+                score = -AlphaBeta<NON_PV>(board, stack + 1, -alpha - 1, -alpha, reducedDepth, true);
                 if (score > alpha && reducedDepth < newDepth) {
                     // newdepth is different so search it again att full depth
                     if (reducedDepth < newDepth) {
@@ -382,22 +365,22 @@ public:
                 score = -AlphaBeta<PV>(board, stack + 1, -beta, -alpha, newDepth, false);
             }
 
-            
+
             board.UndoMove(move);
-			if (score > bestScore) {
-				bestScore = score;
+            if (score > bestScore) {
+                bestScore = score;
                 bestMove = move;
-				if (score > alpha) {
+                if (score > alpha) {
                     if (PVNode) {
                         Update_PV(stack->m_PV, bestMove, (stack + 1)->m_PV);
                     }
-					alpha = score;
-				}
-			}
-			if (alpha >= beta) { // Exit out early
-				break;
-			}
-		}
+                    alpha = score;
+                }
+            }
+            if (alpha >= beta) { // Exit out early
+                break;
+            }
+        }
 
         // Check for mate or stalemate
         if (!movecnt) {
@@ -408,21 +391,15 @@ public:
             }
         }
 
-        m_Table->Enter(board.m_Hash, 
-            TTEntry(board.m_Hash, 
-            bestMove, 
-            bestScore, 
-            bestScore >= beta ? LOWER_BOUND : PVNode ? EXACT_BOUND : UPPER_BOUND, 
-            stack->m_Ply, 
-            depth, 
-            board.m_FullMoves,
-            ttPV
-        ));
+        m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore,
+                                             bestScore >= beta ? LOWER_BOUND
+                                             : PVNode          ? EXACT_BOUND
+                                                               : UPPER_BOUND,
+                                             stack->m_Ply, depth, board.m_FullMoves, ttPV));
 
-		return bestScore;
-	}
+        return bestScore;
+    }
 
-    
 
     // Calculate time to allocate for a move
     void MoveTimed(int64 wtime, int64 btime, int64 winc, int64 binc, int depth = MAX_DEPTH) {
@@ -435,9 +412,10 @@ public:
         int64 est_movesleft = std::max(60 - (int64)m_Position.m_FullMoves, int64(20));
         int64 est_timeleft = timeleft + est_movesleft * timeinc;
 
-        int64 target = std::max(std::min(est_timeleft / est_movesleft - 20, timeleft/2), int64(20)); // Don't let the time run out and - overhead
-        float x = (m_Position.m_FullMoves - 20.0f)/30.0f;
-        float factor = exp(-x*x);   // Bell curve
+        int64 target = std::max(std::min(est_timeleft / est_movesleft - 20, timeleft / 2),
+                                int64(20)); // Don't let the time run out and - overhead
+        float x = (m_Position.m_FullMoves - 20.0f) / 30.0f;
+        float factor = exp(-x * x); // Bell curve
         int64 result = (target * factor);
         sync_printf("info movetime %" PRId64 "\n", result);
         UCIMove(result, depth);
@@ -509,14 +487,14 @@ public:
             while (true) {
                 alpha = rootAlpha;
                 beta = rootBeta;
-                bestScore = AlphaBeta<ROOT>(m_Position, stack, rootAlpha, rootBeta, std::max(1, m_Maxdepth - failHigh), false);
+                bestScore =
+                    AlphaBeta<ROOT>(m_Position, stack, rootAlpha, rootBeta, std::max(1, m_Maxdepth - failHigh), false);
 
                 if (bestScore <= rootAlpha) { // Failed low
                     rootBeta = (rootAlpha + rootBeta) / 2;
                     rootAlpha = std::max(bestScore - m_RootDelta, MIN_ALPHA);
                     failHigh = 0;
-                }
-                else if (bestScore >= rootBeta) { // Failed high
+                } else if (bestScore >= rootBeta) { // Failed high
                     rootBeta = std::min(bestScore + m_RootDelta, MAX_BETA);
                     failHigh++;
                 } else {
@@ -528,7 +506,8 @@ public:
             if (ShouldStop()) break;
 
             // Print pv and search info
-            sync_printf("info depth %i score cp %" PRId64 " time %" PRId64 " nodes %" PRIu64 " tps %" PRIu64 "\n", m_Maxdepth, bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
+            sync_printf("info depth %i score cp %" PRId64 " time %" PRId64 " nodes %" PRIu64 " tps %" PRIu64 "\n",
+                        m_Maxdepth, bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
             std::ostringstream oss;
             oss << "info pv";
             for (int i = 0; i < MAX_DEPTH && stack->m_PV[i] != Move(); i++) {
@@ -538,20 +517,15 @@ public:
             sync_printf("%s", oss.str().c_str());
 
             finalMove = stack->m_PV[0];
-            
-            m_Table->Enter(m_Position.m_Hash,
-                TTEntry(m_Position.m_Hash,
-                    bestMove,
-                    bestScore,
-                    bestScore >= beta ? LOWER_BOUND : EXACT_BOUND,
-                    0,
-                    m_Maxdepth,
-                    m_Position.m_FullMoves,
-                    true
-                ));
-            
-            if (m_Limits.maxTimeMs >= 0 && m_Timer.EndMs() * 2 >= m_Limits.maxTimeMs) break; // We won't have enough time to calculate more depth anyway
-            if (bestScore >= MATE_SCORE - MAX_DEPTH || bestScore <= -MATE_SCORE + MAX_DEPTH) break; // Position is solved so exit out
+
+            m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore,
+                                                      bestScore >= beta ? LOWER_BOUND : EXACT_BOUND, 0, m_Maxdepth,
+                                                      m_Position.m_FullMoves, true));
+
+            if (m_Limits.maxTimeMs >= 0 && m_Timer.EndMs() * 2 >= m_Limits.maxTimeMs)
+                break; // We won't have enough time to calculate more depth anyway
+            if (bestScore >= MATE_SCORE - MAX_DEPTH || bestScore <= -MATE_SCORE + MAX_DEPTH)
+                break; // Position is solved so exit out
         }
         delete[] stack;
 
@@ -599,13 +573,10 @@ public:
         return danger;
     }
 
-    Move GetMove(std::string str) {
-        return m_Position.m_WhiteMove ? TGetMove<WHITE>(str) : TGetMove<BLACK>(str);
-    }
+    Move GetMove(std::string str) { return m_Position.m_WhiteMove ? TGetMove<WHITE>(str) : TGetMove<BLACK>(str); }
 
     template<Color white>
     Move TGetMove(std::string str) {
-        
         const BoardPos fromPos = ('h' - str[0] + (str[1] - '1') * 8);
         const BitBoard from = 1ull << fromPos;
         const BoardPos toPos = ('h' - str[2] + (str[3] - '1') * 8);
@@ -617,18 +588,10 @@ public:
         ColoredPieceType type = NOPIECE;
         if (str.size() > 4) {
             switch (str[4]) {
-            case 'n':
-                flags |= 0b100;
-                break;
-            case 'b':
-                flags |= 0b1000;
-                break;
-            case 'r':
-                flags |= 0b10000;
-                break;
-            case 'q':
-                flags |= 0b100000;
-                break;
+            case 'n': flags |= 0b100; break;
+            case 'b': flags |= 0b1000; break;
+            case 'r': flags |= 0b10000; break;
+            case 'q': flags |= 0b100000; break;
             }
         }
         if (Pawn<white>(m_Position) & from) {
@@ -637,38 +600,26 @@ public:
                 flags |= 0b1;
                 capture = GetColoredPiece<!white>(PAWN);
             }
-        }
-        else if (Knight<white>(m_Position) & from) {
+        } else if (Knight<white>(m_Position) & from) {
             type = GetColoredPiece<white>(KNIGHT);
-        }
-        else if (Bishop<white>(m_Position) & from) {
+        } else if (Bishop<white>(m_Position) & from) {
             type = GetColoredPiece<white>(BISHOP);
-        }
-        else if (Rook<white>(m_Position) & from) {
+        } else if (Rook<white>(m_Position) & from) {
             type = GetColoredPiece<white>(ROOK);
-        }
-        else if (Queen<white>(m_Position) & from) {
+        } else if (Queen<white>(m_Position) & from) {
             type = GetColoredPiece<white>(QUEEN);
-        }
-        else if (King<white>(m_Position) & from) {
+        } else if (King<white>(m_Position) & from) {
             type = GetColoredPiece<white>(KING);
-            if (((from & 0b1000) && (to & 0b10)) 
-                || ((from & (0b1000ull << 56)) && (to & (0b10ull << 56)))
-                || ((from & 0b1000) && (to & 0b100000)) 
-                || ((from & (0b1000ull << 56)) && (to & (0b100000ull << 56)))) {
-
+            if (((from & 0b1000) && (to & 0b10)) || ((from & (0b1000ull << 56)) && (to & (0b10ull << 56)))
+                || ((from & 0b1000) && (to & 0b100000)) || ((from & (0b1000ull << 56)) && (to & (0b100000ull << 56)))) {
                 flags |= 0b10;
-            } 
+            }
         }
 
-        
 
         assert(type != NOPIECE && "Could not read move");
         return fromPos | toPos << 6 | type << 12 | capture << 16 | flags << 20;
     }
 
-    std::string GetFen() const {
-        return m_Position.ToFen();
-    }
+    std::string GetFen() const { return m_Position.ToFen(); }
 };
-

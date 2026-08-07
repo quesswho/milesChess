@@ -2,7 +2,6 @@
 #include "Position.h"
 
 
-
 namespace TableBase {
 
     // Change this for more tablebase pieces
@@ -11,8 +10,8 @@ namespace TableBase {
 #define TBHASHBITS 10
 
 #define TBMAX_PIECE 254
-#define TBMAX_PAWN 256
-#define HSHMAX 5
+#define TBMAX_PAWN  256
+#define HSHMAX      5
 
 #define WDL_MAGIC 0x5d23e871
 #define DTZ_MAGIC 0xa50c66d7
@@ -127,7 +126,7 @@ namespace TableBase {
         struct TBEntry* entry;
     };
 
-	void Init(std::string path);
+    void Init(std::string path);
 
     int Probe_WDL(Position& board, int* success);
     int Probe_DTZ(Position& board, int* success);
