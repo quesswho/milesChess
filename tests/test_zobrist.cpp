@@ -32,14 +32,11 @@ static Snapshot Capture(const Position& pos) {
 }
 
 static bool Same(const Snapshot& a, const Snapshot& b) {
-    return std::memcmp(a.pieces, b.pieces, sizeof(a.pieces)) == 0
-        && a.board == b.board && a.whiteMove == b.whiteMove
-        && a.fullMoves == b.fullMoves && a.ply == b.ply
-        && a.state.m_CastleRights == b.state.m_CastleRights
-        && a.state.m_HalfMoves == b.state.m_HalfMoves
-        && a.state.m_EnPassant == b.state.m_EnPassant
-        && a.state.m_Hash == b.state.m_Hash
-        && a.hash == b.hash && a.pawnHash == b.pawnHash && a.inCheck == b.inCheck;
+    return std::memcmp(a.pieces, b.pieces, sizeof(a.pieces)) == 0 && a.board == b.board && a.whiteMove == b.whiteMove
+           && a.fullMoves == b.fullMoves && a.ply == b.ply && a.state.m_CastleRights == b.state.m_CastleRights
+           && a.state.m_HalfMoves == b.state.m_HalfMoves && a.state.m_EnPassant == b.state.m_EnPassant
+           && a.state.m_Hash == b.state.m_Hash && a.hash == b.hash && a.pawnHash == b.pawnHash
+           && a.inCheck == b.inCheck;
 }
 
 static void Walk(Position& pos, int depth, const char* name) {
@@ -57,8 +54,8 @@ static void Walk(Position& pos, int depth, const char* name) {
         pos.UndoMove(move);
         Snapshot after = Capture(pos);
         if (!Same(before, after)) {
-            printf("  make/unmake mismatch at %s: move %s, fen %s\n",
-                   name, MoveToString(move).c_str(), pos.ToFen().c_str());
+            printf("  make/unmake mismatch at %s: move %s, fen %s\n", name, MoveToString(move).c_str(),
+                   pos.ToFen().c_str());
         }
         CHECK(Same(before, after));
     }

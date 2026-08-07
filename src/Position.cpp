@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include "Position.h"
 
 void Position::SetPosition(const std::string& FEN) {

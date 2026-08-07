@@ -18,8 +18,8 @@ static void RunTable(const PerftCase* cases, size_t count) {
         uint64 bulk = Perft<PerftGen::Bulk>(pos, c.depth);
 
         if (staged != c.nodes || bulk != c.nodes) {
-            printf("  %s depth %d: staged=%" PRIu64 " bulk=%" PRIu64 " expected=%" PRIu64 "\n",
-                   c.name, c.depth, staged, bulk, c.nodes);
+            printf("  %s depth %d: staged=%" PRIu64 " bulk=%" PRIu64 " expected=%" PRIu64 "\n", c.name, c.depth, staged,
+                   bulk, c.nodes);
         }
         CHECK_EQ(staged, c.nodes);
         CHECK_EQ(bulk, c.nodes);

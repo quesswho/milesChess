@@ -24,8 +24,7 @@ int main() {
             std::string str = MoveToString(move);
             Move parsed = search.GetMove(str);
             if (parsed != move) {
-                printf("  %s: '%s' generated %08x, parsed %08x\n",
-                       names[i], str.c_str(), move, parsed);
+                printf("  %s: '%s' generated %08x, parsed %08x\n", names[i], str.c_str(), move, parsed);
             }
             CHECK_EQ(parsed, move);
         }

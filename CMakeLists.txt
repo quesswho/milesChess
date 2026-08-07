@@ -38,6 +38,12 @@ target_link_libraries(milesChess_core PUBLIC Threads::Threads milesChess_flags)
 add_executable(engine src/main.cpp)
 target_link_libraries(engine PRIVATE milesChess_core)
 
+# Offline regenerator for the constexpr tables in src/LookupTables.h. Not built
+# by default; see `make gen-tables` and `make check-tables`.
+add_executable(gen_tables EXCLUDE_FROM_ALL tools/gen_tables.cpp)
+target_link_libraries(gen_tables PRIVATE milesChess_flags)
+target_include_directories(gen_tables PRIVATE src)
+
 include(CTest)
 if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
     add_subdirectory(tests)

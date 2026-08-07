@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "Movelist.h"
 
 enum Bound { NO_BOUND = 0, UPPER_BOUND = 1, LOWER_BOUND = 2, EXACT_BOUND = UPPER_BOUND | LOWER_BOUND };
