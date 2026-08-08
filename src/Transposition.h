@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 
 #include "Movelist.h"
@@ -8,29 +9,29 @@ enum Bound { NO_BOUND = 0, UPPER_BOUND = 1, LOWER_BOUND = 2, EXACT_BOUND = UPPER
 
 // Transposition table entry
 struct TTEntry {
-    TTEntry() : m_Hash(0), m_Moves(0), m_Ply(0), m_Score(0) {}
+    TTEntry() = default;
 
     TTEntry(uint64 hash, Move bestmove, int64 eval, Bound bound, int ply, int depth, int moves, bool pv)
-        : m_Hash(hash), m_BestMove(bestmove), m_Bound(bound), m_Ply(ply), m_Depth(depth), m_Moves(moves), m_Score(eval),
+        : m_BestMove(bestmove), m_Ply(ply), m_Depth(depth), m_Moves(moves), m_Hash(hash), m_Score(eval), m_Bound(bound),
           m_PV(pv) {}
 
-    Move m_BestMove;
-    short m_Ply;
-    short m_Depth;
-    short m_Moves;
-    uint64 m_Hash;
-    int64 m_Score;
-    Bound m_Bound;
-    bool m_PV;
+    Move m_BestMove = 0;
+    short m_Ply = 0;
+    short m_Depth = 0;
+    short m_Moves = 0;
+    uint64 m_Hash = 0;
+    int64 m_Score = 0;
+    Bound m_Bound = NO_BOUND;
+    bool m_PV = false;
 };
 
 
 struct PTEntry {
-    PTEntry() : m_Hash(0) {}
+    PTEntry() = default;
 
     PTEntry(uint64 hash, Score eval) : m_Hash(hash), m_Score(eval) {}
 
-    uint64 m_Hash;
+    uint64 m_Hash = 0;
     Score m_Score;
 };
 
@@ -68,13 +69,7 @@ struct HashTable {
             m_Table[hash & m_Indexer] = entry;
         }
     }
-    void Clear() {
-        // TODO: Why are we not doing memset instead??
-        for (uint64 i = 0; i < m_Count; i++) {
-            m_Table[i].m_Hash = 0;
-            //m_Table[i].m_Moves = 0;
-        }
-    }
+    void Clear() { std::fill(m_Table, m_Table + m_Count, T()); }
 
     T* Probe(uint64 hash) {
         uint64 index = hash & m_Indexer;

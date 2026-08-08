@@ -281,7 +281,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
     middlegame += score.mg;
     endgame += score.eg;
 
-    phase = (phase * 256) / 16;
+    phase = (phase * 256) / 24;
     result += (middlegame * (256 - phase) + endgame * phase) / 256;
     return board.m_WhiteMove ? result : -result;
 }

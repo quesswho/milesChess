@@ -419,7 +419,7 @@ public:
         int64 target = std::max(std::min(est_timeleft / est_movesleft - 20, timeleft / 2),
                                 int64(20)); // Don't let the time run out and - overhead
         float x = (m_Position.m_FullMoves - 20.0f) / 30.0f;
-        float factor = exp(-x * x); // Bell curve
+        float factor = 0.5 + 0.5 * exp(-x * x); // const + Bell curve, bounded [0.5,1]
         int64 result = (target * factor);
         sync_printf("info movetime %" PRId64 "\n", result);
         UCIMove(result, depth);
