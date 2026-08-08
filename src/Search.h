@@ -42,6 +42,7 @@ struct SearchLimits {
     uint64 maxNodes = 0;  // 0 = unlimited
     int64 maxTimeMs = -1; // -1 = unlimited
     bool useTablebase = true;
+    bool silent = false; // Skip the per depth info lines, for searches nobody is watching
 };
 
 struct SearchResult {
@@ -536,15 +537,18 @@ public:
             if (ShouldStop()) break;
 
             // Print pv and search info
-            sync_printf("info depth %i score cp %" PRId64 " time %" PRId64 " nodes %" PRIu64 " tps %" PRIu64 "\n",
-                        m_Maxdepth, bestScore, (int64)m_Timer.EndMs(), m_NodeCnt, (uint64)(m_NodeCnt / m_Timer.End()));
-            std::ostringstream oss;
-            oss << "info pv";
-            for (int i = 0; i < MAX_DEPTH && stack->m_PV[i] != Move(); i++) {
-                oss << " " << MoveToString(stack->m_PV[i]);
+            if (!m_Limits.silent) {
+                sync_printf("info depth %i score cp %" PRId64 " time %" PRId64 " nodes %" PRIu64 " tps %" PRIu64 "\n",
+                            m_Maxdepth, bestScore, (int64)m_Timer.EndMs(), m_NodeCnt,
+                            (uint64)(m_NodeCnt / m_Timer.End()));
+                std::ostringstream oss;
+                oss << "info pv";
+                for (int i = 0; i < MAX_DEPTH && stack->m_PV[i] != Move(); i++) {
+                    oss << " " << MoveToString(stack->m_PV[i]);
+                }
+                oss << "\n";
+                sync_printf("%s", oss.str().c_str());
             }
-            oss << "\n";
-            sync_printf("%s", oss.str().c_str());
 
             if (stack->m_PV[0] != Move()) finalMove = stack->m_PV[0];
 
