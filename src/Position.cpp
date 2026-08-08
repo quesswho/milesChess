@@ -27,7 +27,7 @@ void Position::SetPosition(const std::string& FEN) {
 
 void Position::SetState(const std::string& FEN) {
     m_Ply = 0;
-    int i = 0;
+    size_t i = 0;
     while (FEN[i++] != ' ') {
         // Skip piece placement
     }
@@ -318,6 +318,7 @@ void Position::MovePiece(Move move) {
             m_Hash ^= Lookup::zobrist[64 * 11 + tPos] ^ Lookup::zobrist[64 * 11 + fPos];
         }
         break;
+    case NOPIECE: assert(false && "Move has no moving piece"); break;
     }
 
     const ColoredPieceType capture = CaptureType(move);
@@ -384,6 +385,8 @@ void Position::MovePiece(Move move) {
     case NOPIECE:
         // No capture
         break;
+    case WKING:
+    case BKING: break; // Kings are never captured
     }
     m_Black = (m_BlackPawn | m_BlackKnight | m_BlackBishop | m_BlackRook | m_BlackQueen | m_BlackKing);
     m_White = (m_WhitePawn | m_WhiteKnight | m_WhiteBishop | m_WhiteRook | m_WhiteQueen | m_WhiteKing);
@@ -501,6 +504,7 @@ void Position::UndoMove(Move move) {
             }
         }
         break;
+    case NOPIECE: assert(false && "Move has no moving piece"); break;
     }
 
     const ColoredPieceType capture = CaptureType(move);
@@ -539,6 +543,8 @@ void Position::UndoMove(Move move) {
     case NOPIECE:
         // No capture
         break;
+    case WKING:
+    case BKING: break; // Kings are never captured
     }
 
     m_Black = (m_BlackPawn | m_BlackKnight | m_BlackBishop | m_BlackRook | m_BlackQueen | m_BlackKing);

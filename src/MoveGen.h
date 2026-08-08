@@ -112,8 +112,8 @@ static BitBoard TCheck(const Position& board, BitBoard& danger, BitBoard& active
     return enPassantCheck;
 }
 
-static BitBoard Check(Color white, const Position& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin,
-                      BitBoard& bishopPin, BitBoard& enPassant) {
+static inline BitBoard Check(Color white, const Position& board, BitBoard& danger, BitBoard& active, BitBoard& rookPin,
+                             BitBoard& bishopPin, BitBoard& enPassant) {
     return white ? TCheck<WHITE>(board, danger, active, rookPin, bishopPin, enPassant)
                  : TCheck<BLACK>(board, danger, active, rookPin, bishopPin, enPassant);
 }
