@@ -4,6 +4,10 @@
 
 #define TEMPO 20
 
+// Flips rank only. Must not flip the file too.
+static inline int MirrorSquare(int square) {
+    return square ^ 56;
+}
 
 template<Color white>
 static Score Pawn(const Position& board, int pos, int rpos) {
@@ -22,11 +26,11 @@ static Score Pawn(const Position& board, int pos, int rpos) {
             middlegame += 20;
         }
     }
-    if ((Lookup::pawn_forward<white>(pos) & Pawn<white>(board)) != 0) { // if doubled
+    if ((Lookup::pawn_forward<white>(rpos) & Pawn<white>(board)) != 0) { // if doubled
         endgame -= 50;
         middlegame -= 15;
     }
-    if ((Lookup::isolated_mask[pos] & Pawn<white>(board)) == 0) {
+    if ((Lookup::isolated_mask[rpos] & Pawn<white>(board)) == 0) {
         middlegame -= 3;
         endgame -= 15;
     }
@@ -40,7 +44,7 @@ static Score Pawns(const Position& board) {
 
     while (wp > 0) {
         int rpos = PopPos(wp);
-        score += Pawn<WHITE>(board, 63 - rpos, rpos);
+        score += Pawn<WHITE>(board, MirrorSquare(rpos), rpos);
     }
 
     while (bp > 0) {
@@ -97,7 +101,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
     int wkncnt = 0;
     while (wkn > 0) {
         int rpos = PopPos(wkn);
-        int pos = 63 - rpos;
+        int pos = MirrorSquare(rpos);
         middlegame += knightVal + Lookup::knight_table[pos];
         endgame += knightVal + Lookup::knight_table[pos];
         if (uint64 temp = Lookup::b_king_safety[blackking] & Lookup::knight_attacks[rpos]) {
@@ -138,7 +142,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
     int wbcnt = 0;
     while (wb > 0) {
         int rpos = PopPos(wb);
-        int pos = 63 - rpos;
+        int pos = MirrorSquare(rpos);
         middlegame += bishopVal + Lookup::bishop_table[pos];
         endgame += bishopVal + Lookup::bishop_table[pos];
         BitBoard bish_atk = board.BishopAttack(rpos, board.m_Board);
@@ -182,7 +186,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
     int wrcnt = 0;
     while (wr > 0) {
         int rpos = PopPos(wr);
-        int pos = 63 - rpos;
+        int pos = MirrorSquare(rpos);
         middlegame += rookVal + Lookup::rook_table[pos];
         endgame += rookVal + Lookup::eg_rook_table[pos];
         BitBoard rook_atk = board.RookAttack(rpos, board.m_Board);
@@ -224,7 +228,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
     // Queens
     while (wq > 0) {
         int rpos = PopPos(wq);
-        int pos = 63 - rpos;
+        int pos = MirrorSquare(rpos);
         middlegame += queenVal + Lookup::queen_table[pos];
         endgame += queenVal + Lookup::eg_queen_table[pos];
         BitBoard queen_atk = board.QueenAttack(rpos, board.m_Board);
@@ -251,7 +255,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         endgame -= queenVal + Lookup::eg_queen_table[pos];
         phase -= 4;
         BitBoard queen_atk = board.QueenAttack(pos, board.m_Board);
-        if (uint64 temp = Lookup::king_attacks[whiteking] & queen_atk) {
+        if (uint64 temp = Lookup::w_king_safety[whiteking] & queen_atk) {
             blackAttack += 5 * CountBits(temp);
         }
         int queen_mobility = CountBits(queen_atk & ~board.m_Black);
@@ -259,16 +263,16 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
 
         // Don't develop queen on starting pos too early
         if (pos == 60) {
-            if (board.m_BlackKnight & 0b10ull << 56) middlegame -= 2;
-            if (board.m_BlackKnight & 0b1000000ull << 56) middlegame -= 2;
-            if (board.m_BlackBishop & 0b100ull << 56) middlegame -= 2;
-            if (board.m_BlackBishop & 0b100000ull << 56) middlegame -= 2;
+            if (board.m_BlackKnight & 0b10ull << 56) middlegame -= 4;
+            if (board.m_BlackKnight & 0b1000000ull << 56) middlegame -= 4;
+            if (board.m_BlackBishop & 0b100ull << 56) middlegame -= 4;
+            if (board.m_BlackBishop & 0b100000ull << 56) middlegame -= 4;
         }
     }
 
     // Kings
     if (wk > 0) {
-        int pos = 63 - whiteking;
+        int pos = MirrorSquare(whiteking);
         middlegame += kingVal + Lookup::king_table[pos] + Lookup::king_safetyindex[whiteAttack];
         endgame += kingVal + Lookup::eg_king_table[pos];
     }
