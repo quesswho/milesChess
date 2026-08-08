@@ -100,10 +100,11 @@ inline const PuzzleCase kPuzzles[] = {
     { .name = "mate-smother-3",  .fen = kMateSmother3,       .depth = 12, .best = "f7h6",           .mate =  1 },
     { .name = "mated-only-move", .fen = kMatedOnlyMove,      .depth =  4, .best = "h8g8",           .mate = -1 },
 
-    { .name = "fork-queen",      .fen = kTacticFork,       .depth =  6, .best = "e6g7",  .minScore =  200 },
+    // Both forks win the queen but land in KNvK, which is a dead draw.
+    { .name = "fork-queen",      .fen = kTacticFork,       .depth =  6, .best = "e6g7",  .minScore = -50, .maxScore = 50 },
     { .name = "hanging-rook",    .fen = kTacticHangRook,   .depth =  6, .best = "h1h5",  .minScore =  300 },
     { .name = "poisoned-pawn",   .fen = kTacticPoison,     .depth =  6, .avoid = "b3d5", .minScore = -200, .maxScore = 200 },
-    { .name = "underpromotion",  .fen = kTacticUnderPromo, .depth =  8, .best = "e7e8n", .minScore =  100 },
+    { .name = "underpromotion",  .fen = kTacticUnderPromo, .depth =  8, .best = "e7e8n", .minScore = -50, .maxScore = 50 },
     { .name = "avoid-stalemate", .fen = kTacticStalemate,  .depth =  6, .avoid = "f2b6", .minScore =  500 },
     { .name = "promotion",       .fen = kTacticPromote,    .depth =  8, .best = "g7g8q", .minScore =  500 },
     { .name = "en-passant",      .fen = kTacticEnPassant,  .depth = 10, .best = "c5b6",  .minScore =  500 },

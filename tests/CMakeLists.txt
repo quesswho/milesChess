@@ -11,9 +11,10 @@ miles_test(test_perft)
 miles_test(test_uci_parse)
 miles_test(test_puzzles)
 miles_test(test_eval_symmetry)
+miles_test(test_endgame)
 miles_test(test_perft_deep)
 
-set_tests_properties(test_fen test_zobrist test_perft test_uci_parse test_puzzles test_eval_symmetry
+set_tests_properties(test_fen test_zobrist test_perft test_uci_parse test_puzzles test_eval_symmetry test_endgame
                      PROPERTIES LABELS fast)
 set_tests_properties(test_perft_deep PROPERTIES LABELS slow TIMEOUT 3600)
 
