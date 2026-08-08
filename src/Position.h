@@ -77,6 +77,12 @@ public:
     BitBoard RookXray(int pos, BitBoard occ) const;
     BitBoard BishopXray(int pos, BitBoard occ) const;
 
+    // Whether the side to move has anything but pawns
+    inline constexpr bool HasNonPawnMaterial() const {
+        return m_WhiteMove ? (m_WhiteKnight | m_WhiteBishop | m_WhiteRook | m_WhiteQueen) != 0
+                           : (m_BlackKnight | m_BlackBishop | m_BlackRook | m_BlackQueen) != 0;
+    }
+
     std::string ToFen() const;
 
 private:

@@ -203,7 +203,8 @@ public:
     }
 
     template<NodeType node>
-    int64 AlphaBeta(Position& board, MoveStack* stack, int alpha, int beta, int depth, bool cutNode) {
+    int64 AlphaBeta(Position& board, MoveStack* stack, int alpha, int beta, int depth, bool cutNode,
+                    Move excluded = 0) {
         constexpr bool PVNode = node != NON_PV;
         constexpr bool rootNode = node == ROOT;
 
@@ -230,11 +231,12 @@ public:
         depth = std::min(depth, MAX_DEPTH - 1);
 
 
-        // Probe Transposition table
+        // Probe Transposition table.
         Move hashMove = Move();
-        TTEntry* entry = m_Table->Probe(board.m_Hash);
+        TTEntry* entry = excluded == 0 ? m_Table->Probe(board.m_Hash) : nullptr;
         int64 ttScore = NONE_SCORE;
-        int ttDepth;
+        int ttDepth = 0;
+        Bound ttBound = NO_BOUND;
         bool ttPV = PVNode;
         if (entry != nullptr) {
             // Check for TT cutoff
@@ -245,11 +247,12 @@ public:
             hashMove = entry->m_BestMove;
             ttScore = entry->m_Score;
             ttDepth = entry->m_Depth;
+            ttBound = entry->m_Bound;
             ttPV |= entry->m_PV;
         }
 
-        // Probe the tablebase
-        if (!rootNode && m_Limits.useTablebase) {
+        // Probe the tablebase. It scores the position, which excluding a move does not change
+        if (!rootNode && excluded == 0 && m_Limits.useTablebase) {
             int success;
             //printf("%s\n", board.ToFen().c_str());
             int v = TableBase::Probe_DTZ(board, &success);
@@ -280,16 +283,19 @@ public:
 
         // Null move pruning
         // Never null move while in check (the reply could capture our king) and never twice in a row,
-        // which the parent signals by leaving its m_CurrentMove at 0
-        if (!PVNode && !board.m_InCheck && stack->m_Ply >= 1 && (stack - 1)->m_CurrentMove != 0
-            && stack->m_Eval >= beta && stack->m_Eval + 40 * depth - 200 >= beta) {
-            int reduction = std::min((stack->m_Eval - beta), 7) + depth / 3 + 5;
+        // which we signal by leaving its m_CurrentMove at 0. Passing is also a bad idea in
+        // zugzwang, so require a piece on the board.
+        if (!PVNode && !board.m_InCheck && excluded == 0 && stack->m_Ply >= 1 && (stack - 1)->m_CurrentMove != 0
+            && stack->m_Eval >= beta && stack->m_Eval + 40 * depth - 200 >= beta && board.HasNonPawnMaterial()) {
+            // The margin is in centipawns, so scale it before spending it as plies
+            int reduction = (int)std::min<int64>((stack->m_Eval - beta) / 200, 6) + depth / 3 + 4;
             stack->m_CurrentMove = 0;
             board.NullMove();
             int nullscore = -AlphaBeta<NON_PV>(board, stack + 1, -beta, -beta + 1, depth - reduction, !cutNode);
             board.UndoNullMove();
             if (nullscore >= beta) {
-                return nullscore;
+                // A mate found by passing a move is not a real mate
+                return nullscore >= MATE_SCORE - MAX_DEPTH ? beta : nullscore;
             }
         }
 
@@ -304,19 +310,28 @@ public:
         MoveGen moveGen(board, hashMove, false);
         Move move;
         while ((move = moveGen.Next()) != 0) {
+            if (move == excluded) continue;
             movecnt++;
             stack->m_CurrentMove = move;
             int newDepth = depth - 1;
             int reduction = 0, extension = 0;
             int delta = beta - alpha;
             bool capture = CaptureType(move) != NOPIECE;
-            // Singular extension
-            if (!rootNode && stack->m_Ply < 2 * m_Maxdepth && depth >= 6 && move == hashMove && ttScore < MATE_SCORE
-                && (entry->m_Bound & LOWER_BOUND)) {
+            // Singular extension. Re-searches this node without the hash move, so it runs before the
+            // move is made and is not negated: the score is ours, not the opponent's reply.
+            if (!rootNode && excluded == 0 && stack->m_Ply < 2 * m_Maxdepth && depth >= 6 && move == hashMove
+                && (ttBound & LOWER_BOUND) && ttDepth >= depth - 3 && ttScore < MATE_SCORE - MAX_DEPTH
+                && ttScore > -MATE_SCORE + MAX_DEPTH) {
                 int64 singularBeta = ttScore - depth;
-                int64 extScore =
-                    -AlphaBeta<NON_PV>(board, stack + 1, singularBeta - 1, singularBeta, newDepth / 2, cutNode);
-                if (extScore < singularBeta) {
+                // The child reuses this ply's stack slot
+                int64 savedEval = stack->m_Eval;
+                Move savedMove = stack->m_CurrentMove;
+                int64 singularScore =
+                    AlphaBeta<NON_PV>(board, stack, singularBeta - 1, singularBeta, (depth - 1) / 2, cutNode, move);
+                stack->m_Eval = savedEval;
+                stack->m_CurrentMove = savedMove;
+
+                if (singularScore < singularBeta) {
                     extension = 1;
                 } else if (singularBeta >= beta) { // Multi-cut pruning
                     return singularBeta;
@@ -388,18 +403,22 @@ public:
 
         // Check for mate or stalemate
         if (!movecnt) {
-            if (board.m_InCheck) {
+            if (excluded != 0) {
+                bestScore = alpha; // The excluded move was the only one
+            } else if (board.m_InCheck) {
                 bestScore = -MATE_SCORE + stack->m_Ply;
             } else {
                 bestScore = 0;
             }
         }
 
-        m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore,
-                                             bestScore >= beta ? LOWER_BOUND
-                                             : PVNode          ? EXACT_BOUND
-                                                               : UPPER_BOUND,
-                                             stack->m_Ply, depth, board.m_FullMoves, ttPV));
+        if (excluded == 0) {
+            m_Table->Enter(board.m_Hash, TTEntry(board.m_Hash, bestMove, bestScore,
+                                                 bestScore >= beta ? LOWER_BOUND
+                                                 : PVNode          ? EXACT_BOUND
+                                                                   : UPPER_BOUND,
+                                                 stack->m_Ply, depth, board.m_FullMoves, ttPV));
+        }
 
         return bestScore;
     }
