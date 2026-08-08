@@ -124,6 +124,10 @@ public:
     template<NodeType node>
     int64 Quiesce(Position& board, MoveStack* stack, int64 alpha, int64 beta, int depth) {
         constexpr bool PVNode = node != NON_PV;
+
+        // Quiescence does not build a PV, so the line ends here.
+        if (PVNode) stack->m_PV[0] = Move();
+
         m_NodeCnt++;
 
         // Check for repetition
@@ -207,6 +211,10 @@ public:
                     Move excluded = 0) {
         constexpr bool PVNode = node != NON_PV;
         constexpr bool rootNode = node == ROOT;
+
+        // The parent copies this PV once the node returns, so it must not still
+        // hold a line from an unrelated subtree.
+        if (PVNode) stack->m_PV[0] = Move();
 
         m_NodeCnt++;
         if (ShouldStop()) return 0;
@@ -538,7 +546,7 @@ public:
             oss << "\n";
             sync_printf("%s", oss.str().c_str());
 
-            finalMove = stack->m_PV[0];
+            if (stack->m_PV[0] != Move()) finalMove = stack->m_PV[0];
 
             m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, finalMove, bestScore,
                                                       bestScore >= beta ? LOWER_BOUND : EXACT_BOUND, 0, m_Maxdepth,
