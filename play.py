@@ -70,7 +70,13 @@ class Engine:
             bufsize=1,
             cwd=HERE,
         )
-        threading.Thread(target=self._reader, daemon=True).start()
+        # Each process gets its own queue, handed to its reader. A restart leaves
+        # the previous reader draining a queue nobody listens to, so its "engine
+        # died" sentinel cannot land in front of the new process's uciok.
+        self.lines = queue.Queue()
+        threading.Thread(
+            target=self._reader, args=(self.proc, self.lines), daemon=True
+        ).start()
         self.send("uci")
         self.expect("uciok")
         if self.hash_mb:
@@ -81,14 +87,13 @@ class Engine:
         self.send("isready")
         self.expect("readyok")
 
-    def _reader(self):
-        proc = self.proc
+    def _reader(self, proc, lines):
         for line in proc.stdout:
             line = line.rstrip("\n")
             if line.startswith("info "):
                 self._note_info(line)
-            self.lines.put(line)
-        self.lines.put(None)  # engine died
+            lines.put(line)
+        lines.put(None)  # engine died
 
     def _note_info(self, line):
         parts = line.split()[1:]
@@ -166,10 +171,10 @@ class Engine:
             if self.proc is not None:
                 try:
                     self.proc.kill()
-                except OSError:
+                    self.proc.wait(timeout=3)
+                except (OSError, subprocess.TimeoutExpired):
                     pass
-            self.lines = queue.Queue()
-            self.start()
+            self.start()  # start() installs the new queue
 
     def position(self, fen, moves):
         cmd = "position " + ("startpos" if fen == START_FEN else f"fen {fen}")

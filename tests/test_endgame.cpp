@@ -16,9 +16,10 @@
 // tests pin down the two halves of that: the shape of the static score, and the
 // search actually walking down it to a mate.
 //
-// Known gaps, deliberately not asserted here: KNN vs K and same coloured KBB vs
-// K are scored as wins even though neither can force mate, and the search does
-// not convert KBB vs K within a reasonable number of moves.
+// What is asserted is what chess says, not what the engine currently manages:
+// a forced win has to be scored as one and delivered inside the fifty move
+// rule, and material that cannot mate has to score nothing. Cases the engine
+// fails today are left failing.
 
 // -- position helpers ----------------------------------------------------
 
@@ -61,12 +62,12 @@ static bool Adjacent(int a, int b) {
 
 // clang-format off
 enum Square {
-    A1 = 0, B1 = 1, C1 = 2, G1 = 6, H1 = 7,
+    A1 = 0, B1 = 1, C1 = 2, E1 = 4, G1 = 6, H1 = 7,
     A2 = 8, C2 = 10, G2 = 14,
-    D4 = 27,
+    D4 = 27, F4 = 29,
     E5 = 36,
     A7 = 48,
-    A8 = 56, C8 = 58, H8 = 63,
+    A8 = 56, C8 = 58, E8 = 60, G8 = 62, H8 = 63,
 };
 // clang-format on
 
@@ -122,6 +123,13 @@ static void InsufficientMaterial() {
         if (weak == A1 || weak == C1 || Adjacent(weak, A1)) continue;
         CHECK_EQ(EvalWhite(Fen({ { A1, 'K' }, { C1, 'B' }, { weak, 'k' } })), 0);
     }
+
+    // Two knights cannot force mate either, nor can two bishops that share a
+    // square colour, however much material the count says they are worth.
+    CHECK_EQ(EvalWhite(Fen({ { A1, 'K' }, { C1, 'N' }, { G1, 'N' }, { E5, 'k' } })), 0);
+    CHECK_EQ(EvalWhite(Fen({ { A1, 'K' }, { E5, 'k' }, { C8, 'n' }, { G8, 'n' } })), 0);
+    CHECK_EQ(EvalWhite(Fen({ { A1, 'K' }, { C1, 'B' }, { E1, 'B' }, { E5, 'k' } })), 0);
+    CHECK_EQ(EvalWhite(Fen({ { A1, 'K' }, { E5, 'k' }, { C8, 'b' }, { E8, 'b' } })), 0);
 
     // The same minor with a pawn is a different game, and must not be zeroed.
     CHECK(EvalWhite(Fen({ { A1, 'K' }, { C1, 'B' }, { A2, 'P' }, { E5, 'k' } })) > 0);
@@ -223,23 +231,26 @@ static void DriveToCorner() {
 // Bishop and knight can only mate in a corner the bishop covers, so the score
 // has to prefer that corner over the other one.
 static void BishopKnightCorner() {
-    // From d4 both corners are the same distance away, so the only difference
-    // between the two positions is the corner the bishop can reach.
-    const int strong = D4, knight = G2;
+    // Each pair is compared from a white king that is the same distance from
+    // both corners, so the king distance term cancels and the corner the
+    // bishop covers is the only thing left to separate them.
+    const int knight = G2;
     struct {
         const char* name;
         int bishop; // c1 is dark, b1 is light
+        int strong; // equidistant from both corners below
         int good, bad;
     } cases[] = {
-        { "dark bishop", C1, H8, A8 },
-        { "dark bishop", C1, A1, A8 },
-        { "light bishop", B1, A8, H8 },
-        { "light bishop", B1, H1, H8 },
+        { "dark bishop", C1, D4, H8, A8 },
+        { "dark bishop", C1, F4, A1, A8 },
+        { "light bishop", B1, D4, A8, H8 },
+        { "light bishop", B1, D4, H1, H8 },
     };
 
     for (auto& c : cases) {
-        int64 good = EvalWhite(Fen({ { strong, 'K' }, { c.bishop, 'B' }, { knight, 'N' }, { c.good, 'k' } }));
-        int64 bad = EvalWhite(Fen({ { strong, 'K' }, { c.bishop, 'B' }, { knight, 'N' }, { c.bad, 'k' } }));
+        CHECK_EQ(SquareDistance(c.strong, c.good), SquareDistance(c.strong, c.bad));
+        int64 good = EvalWhite(Fen({ { c.strong, 'K' }, { c.bishop, 'B' }, { knight, 'N' }, { c.good, 'k' } }));
+        int64 bad = EvalWhite(Fen({ { c.strong, 'K' }, { c.bishop, 'B' }, { knight, 'N' }, { c.bad, 'k' } }));
         if (good <= bad) {
             printf("  %s: %s scores %" PRId64 ", not better than %s at %" PRId64 "\n", c.name,
                    SquareName(c.good).c_str(), good, SquareName(c.bad).c_str(), bad);
@@ -247,11 +258,33 @@ static void BishopKnightCorner() {
         CHECK(good > bad);
     }
 
-    // The wrong corner must not look better than the middle of the board
-    // either, or the king gets herded to a corner where there is no mate.
-    int64 wrongCorner = EvalWhite(Fen({ { strong, 'K' }, { C1, 'B' }, { knight, 'N' }, { A8, 'k' } }));
-    int64 centre = EvalWhite(Fen({ { A1, 'K' }, { C2, 'B' }, { knight, 'N' }, { E5, 'k' } }));
-    CHECK(wrongCorner < centre + BISHOP_VALUE);
+    // The best square of all has to be one of the two corners the bishop
+    // covers, not merely better than the one corner it was compared against.
+    for (int bishop : { C1, B1 }) {
+        int best = -1;
+        int64 bestScore = 0;
+        for (int weak = 0; weak < 64; weak++) {
+            if (weak == D4 || weak == bishop || weak == knight || Adjacent(weak, D4)) continue;
+            int64 score = EvalWhite(Fen({ { D4, 'K' }, { bishop, 'B' }, { knight, 'N' }, { weak, 'k' } }));
+            if (best < 0 || score > bestScore) best = weak, bestScore = score;
+        }
+        // IsDarkSquare() is what the evaluation keys off; a1 and h8 share its
+        // colour, a8 and h1 the other one.
+        bool wantsA1H8 = !IsDarkSquare(bishop);
+        printf("  bishop on %s drives the king to %s\n", SquareName(bishop).c_str(), SquareName(best).c_str());
+        CHECK_EQ(IsDarkSquare(best), IsDarkSquare(bishop));
+        CHECK(best == (wantsA1H8 ? A1 : A8) || best == (wantsA1H8 ? H8 : H1));
+    }
+
+    // A king already stuck in the wrong corner still has to be walked to a
+    // right one along the edge, so every step of that walk must pay.
+    int64 previous = 0;
+    for (int file = 0; file < 8; file++) {
+        int weak = A8 + file; // a8, the wrong corner for a dark bishop, out to h8
+        int64 score = EvalWhite(Fen({ { D4, 'K' }, { C1, 'B' }, { knight, 'N' }, { weak, 'k' } }));
+        if (file > 0) CHECK(score > previous);
+        previous = score;
+    }
 }
 
 // -- the search has to walk down that gradient to a mate ------------------
@@ -270,43 +303,56 @@ struct ConversionCase {
     const char* name;
     const char* fen;
     int depth;
-    int maxPlies; // generous: this is a regression bound, not a distance to mate
+    int maxPlies; // generous: a regression bound, not a distance to mate
 };
 
-// Play both sides at a fixed depth and see the mate arrive. The defending side
-// is played by the same search, so it puts up the best fight it knows.
-static void Convert(Search& search, const ConversionCase& conversion) {
+enum ConversionResult {
+    NO_MATE = -1,
+    STALEMATE = -2,
+};
+
+// Play both sides at a fixed depth and see whether the mate arrives. The
+// defending side is played by the same search, so it puts up the best fight it
+// knows. Returns the ply the mate landed on, or one of the results above.
+static int Convert(Search& search, const ConversionCase& conversion, int64& finalScore) {
     search.LoadPosition(conversion.fen);
     Position& position = search.m_Position;
 
-    int64 finalScore = 0;
-    for (int ply = 0; ply <= conversion.maxPlies; ply++) {
-        if (GenerateMoves<ALL>(position).empty()) {
-            if (!position.m_InCheck) {
-                printf("  %s: stalemate after %d plies (%s)\n", conversion.name, ply, position.ToFen().c_str());
-            }
-            CHECK(position.m_InCheck);
-            printf("  %-10s mate in %d plies\n", conversion.name, ply);
-            // The move that mated has to have been played as a mate, not as a
-            // material grab that happened to walk into one.
-            CHECK(finalScore >= MATE_SCORE - MAX_DEPTH);
-            return;
-        }
-        if (ply == conversion.maxPlies) break;
+    finalScore = 0;
+    for (int ply = 0; ply < conversion.maxPlies; ply++) {
+        if (GenerateMoves<ALL>(position).empty()) return position.m_InCheck ? ply : STALEMATE;
 
         SearchResult result = Go(search, conversion.depth);
         if (result.best == Move()) {
             printf("  %s: no move in %s\n", conversion.name, position.ToFen().c_str());
             CHECK(result.best != Move());
-            return;
+            return NO_MATE;
         }
         finalScore = result.score;
         position.MovePiece(result.best);
     }
-
-    printf("  %s: no mate within %d plies (%s)\n", conversion.name, conversion.maxPlies, position.ToFen().c_str());
-    CHECK(false);
+    return GenerateMoves<ALL>(position).empty() ? (position.m_InCheck ? conversion.maxPlies : STALEMATE) : NO_MATE;
 }
+
+// The endings the engine is expected to win. A failure here is a regression.
+static void MustConvert(Search& search, const ConversionCase& conversion) {
+    int64 finalScore = 0;
+    int plies = Convert(search, conversion, finalScore);
+
+    if (plies == STALEMATE) {
+        printf("  %-12s stalemate (%s)\n", conversion.name, search.m_Position.ToFen().c_str());
+    } else if (plies == NO_MATE) {
+        printf("  %-12s no mate within %d plies (%s)\n", conversion.name, conversion.maxPlies,
+               search.m_Position.ToFen().c_str());
+    } else {
+        printf("  %-12s mate in %d plies\n", conversion.name, plies);
+    }
+    CHECK(plies >= 0);
+    // The move that mated has to have been played as a mate, not as a material
+    // grab that happened to walk into one.
+    if (plies >= 0) CHECK(finalScore >= MATE_SCORE - MAX_DEPTH);
+}
+
 
 // The search must never think it is winning when it cannot mate.
 static void DrawnMaterialStaysDrawn(Search& search) {
@@ -390,7 +436,21 @@ int main() {
         { "KR corner", "8/8/4k3/8/8/8/8/R3K3 w - - 0 1", 10, 60 },
         { "KRR centre", "8/8/8/4k3/8/8/8/K5RR w - - 0 1", 8, 30 },
     };
-    for (const ConversionCase& conversion : kConversions) Convert(search, conversion);
+    for (const ConversionCase& conversion : kConversions) MustConvert(search, conversion);
+
+    // Bishop and knight is a forced win too, so the same bound applies: it has
+    // to be delivered inside the fifty moves the rule allows. The bishop below
+    // stands on an IsDarkSquare() square throughout, so a8 and h1 are the
+    // corners to head for.
+    printf("-- the search converts bishop and knight\n");
+    const ConversionCase kBishopKnight[] = {
+        { "KBN corner", "k7/2K5/8/8/8/8/2B5/3N4 w - - 0 1", 12, 30 },
+        { "KBN edge", "k7/8/1K6/8/8/8/2B5/3N4 w - - 0 1", 12, 30 },
+        { "KBN near", "3k4/8/3K4/8/8/8/2B5/3N4 w - - 0 1", 12, 100 },
+        { "KBN wide", "4k3/8/5K2/8/8/8/2B5/3N4 w - - 0 1", 12, 100 },
+        { "KBN centre", "8/8/8/4k3/8/8/8/KBN5 w - - 0 1", 12, 100 },
+    };
+    for (const ConversionCase& conversion : kBishopKnight) MustConvert(search, conversion);
 
     return TestSummary("test_endgame");
 }

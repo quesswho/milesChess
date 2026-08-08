@@ -189,6 +189,10 @@
         <button id="hint">Hint</button>
         <button id="fen">Copy FEN</button>
       </div>
+      <div class="field">
+        <button id="restart" style="width:100%"
+                title="Re-spawn build/engine so a rebuild takes effect. Starts a new game.">Restart engine</button>
+      </div>
     </div>
   </div>
 </div>
@@ -264,6 +268,7 @@ function render() {
   $("side").textContent = state.humanWhite ? "— you are White" : "— you are Black";
   $("undo").disabled = !state.moves.length || state.thinking;
   $("hint").disabled = !myTurn;
+  $("restart").disabled = state.thinking;  // killing the process mid-search confuses the reader
   highlight();
   renderStatus(myTurn);
   renderInfo(state.info);
@@ -502,6 +507,32 @@ $("hint").onclick = async () => {
     stopPolling();
     btn.disabled = false;
   }
+};
+
+/* Re-spawns build/engine from disk, so a `make engine` since the server
+   started actually takes effect. The server resets to the initial position. */
+$("restart").onclick = async () => {
+  if (state.moves.length &&
+      !confirm("Restart the engine? This starts a new game from the initial position.")) return;
+  const btn = $("restart");
+  btn.disabled = true;
+  stopPolling();
+  selected = null;
+  $("status").className = "status";
+  $("status").textContent = "Restarting the engine…";
+  try {
+    state = await api("/api/restart-engine", {});
+  } catch (err) {
+    $("status").className = "status alert";
+    $("status").textContent = err.message;
+    return;
+  } finally {
+    btn.disabled = false;
+  }
+  flipped = !state.humanWhite;
+  render();
+  $("status").textContent = "Engine restarted";
+  if (state.engineTurn) await engineMove();
 };
 
 $("fen").onclick = async () => {
