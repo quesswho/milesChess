@@ -58,7 +58,7 @@ static inline int Signum(int val) {
     return (0 < val) - (val < 0);
 }
 
-static BitBoard FenToMap(const std::string& FEN, char p) {
+static inline BitBoard FenToMap(const std::string& FEN, char p) {
     int i = 0;
     char c = {};
     int pos = 63;
@@ -84,9 +84,9 @@ static BitBoard FenToMap(const std::string& FEN, char p) {
     return result;
 }
 
-static BoardInfo FenToBoardInfo(const std::string& FEN) {
+static inline BoardInfo FenToBoardInfo(const std::string& FEN) {
     BoardInfo info = {};
-    int i = 0;
+    size_t i = 0;
     while (FEN[i++] != ' ') {
         // Skip piece placement
     }
@@ -143,7 +143,7 @@ static BoardInfo FenToBoardInfo(const std::string& FEN) {
     return info;
 }
 
-static void PrintBitBoard(BitBoard map) {
+static inline void PrintBitBoard(BitBoard map) {
     for (int i = 63; i >= 0; i--) {
         if ((map & (1ull << i)) > 0) {
             printf("X ");
@@ -154,7 +154,7 @@ static void PrintBitBoard(BitBoard map) {
     }
 }
 
-static int sync_printf(const char* format, ...) {
+static inline int sync_printf(const char* format, ...) {
     static std::mutex lock;
     std::lock_guard guard{ lock };
     va_list args;
@@ -164,7 +164,7 @@ static int sync_printf(const char* format, ...) {
 }
 
 // Remove double whitespaces and \t characters from command
-static std::string trim_str(std::string str) {
+static inline std::string trim_str(std::string str) {
     std::string result;
     result.reserve(str.size());
     for (size_t i = 0; i < str.size(); i++) {
