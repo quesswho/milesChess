@@ -75,7 +75,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
             middlegame += Lookup::imbalance_factor[i - 1][j - 1]
                           * (CountBits(board.m_Pieces[i][0]) * CountBits(board.m_Pieces[j][0])
                              - CountBits(board.m_Pieces[i][1]) * CountBits(board.m_Pieces[j][1]));
-            endgame += Lookup::imbalance_factor[i][j]
+            endgame += Lookup::imbalance_factor[i - 1][j - 1]
                        * (CountBits(board.m_Pieces[i][0]) * CountBits(board.m_Pieces[j][0])
                           - CountBits(board.m_Pieces[i][1]) * CountBits(board.m_Pieces[j][1]));
         }
@@ -89,6 +89,7 @@ static int64 Evaluate(const Position& board, PawnTable* table) {
         score += pawnStructure->m_Score;
     } else {
         Score pawn = Pawns(board);
+        score += pawn;
         table->Enter(board.m_PawnHash, PTEntry(board.m_PawnHash, pawn));
     }
 

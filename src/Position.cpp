@@ -562,6 +562,7 @@ void Position::NullMove() {
     m_PawnHash ^= Lookup::zobrist[64 * 12];
     m_WhiteMove = !m_WhiteMove;
     m_States[m_Ply].m_Hash = m_Hash;
+    m_InCheck = m_WhiteMove ? UpdateChecks<WHITE>() : UpdateChecks<BLACK>();
 }
 void Position::UndoNullMove() {
     m_Ply--;
@@ -569,6 +570,7 @@ void Position::UndoNullMove() {
     if (m_WhiteMove) m_FullMoves--;
     m_PawnHash ^= Lookup::zobrist[64 * 12];
     m_WhiteMove = !m_WhiteMove;
+    m_InCheck = m_WhiteMove ? UpdateChecks<WHITE>() : UpdateChecks<BLACK>();
 }
 
 uint64 Zobrist_Hash(const Position& position) {

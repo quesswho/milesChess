@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MilesBot</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1d2027;
+    --line: #2c313b;
+    --text: #e6e8ec;
+    --muted: #8b93a1;
+    --accent: #7aa2f7;
+    --light: #ebecd0;
+    --dark: #779556;
+    --move: #f6f669;
+    --check: #e35d5d;
+    --square: min(9vh, 68px);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: var(--bg); color: var(--text);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; justify-content: center;
+  }
+  .app { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* Board */
+  .board-wrap { position: relative; }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(8, var(--square));
+    grid-template-rows: repeat(8, var(--square));
+    border-radius: 6px; overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0,0,0,.45);
+    user-select: none;
+  }
+  .sq {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    font-size: calc(var(--square) * .78); line-height: 1; cursor: default;
+  }
+  .sq.light { background: var(--light); }
+  .sq.dark  { background: var(--dark); }
+  .sq.last::after {
+    content: ""; position: absolute; inset: 0; background: var(--move); opacity: .38;
+  }
+  .sq.sel::after {
+    content: ""; position: absolute; inset: 0; background: var(--move); opacity: .55;
+  }
+  .sq.check { background: radial-gradient(circle, var(--check) 12%, transparent 72%), var(--dark); }
+  .sq.light.check { background: radial-gradient(circle, var(--check) 12%, transparent 72%), var(--light); }
+  .piece {
+    position: relative; z-index: 2; pointer-events: none;
+    font-family: "DejaVu Sans", "Segoe UI Symbol", "Noto Sans Symbols 2", sans-serif;
+  }
+  .piece.w { color: #fff; text-shadow: 0 0 1px #000, 0 1px 0 #4a4a4a, 1px 0 0 #333, -1px 0 0 #333, 0 -1px 0 #333; }
+  .piece.b { color: #14161a; text-shadow: 0 1px 0 rgba(255,255,255,.25); }
+  .sq.movable { cursor: grab; }
+  .sq.dragging .piece { opacity: .35; }
+  .hint::before {
+    content: ""; position: absolute; z-index: 3; inset: 0; margin: auto;
+    width: 28%; height: 28%; border-radius: 50%;
+    background: rgba(20,22,26,.32);
+  }
+  .hint.capture::before {
+    width: 92%; height: 92%; background: none;
+    border: calc(var(--square) * .08) solid rgba(20,22,26,.32);
+  }
+  .coord { position: absolute; z-index: 4; font-size: 11px; font-weight: 700; opacity: .6; }
+  .coord.file { right: 3px; bottom: 1px; }
+  .coord.rank { left: 3px; top: 1px; }
+  .light .coord { color: var(--dark); }
+  .dark .coord { color: var(--light); }
+
+  /* Promotion picker */
+  .promo {
+    position: absolute; inset: 0; z-index: 10;
+    background: rgba(10,11,14,.72);
+    display: none; align-items: center; justify-content: center; gap: 8px;
+  }
+  .promo.show { display: flex; }
+  .promo button {
+    width: var(--square); height: var(--square);
+    font-size: calc(var(--square) * .7); line-height: 1;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  }
+  .promo button:hover { border-color: var(--accent); }
+
+  /* Panel */
+  .panel { width: 300px; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  h1 { margin: 0; font-size: 18px; letter-spacing: .2px; }
+  h1 span { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .status { margin-top: 6px; color: var(--muted); font-size: 13px; min-height: 20px; }
+  .status.alert { color: #f0a35e; }
+  .status.over { color: var(--accent); font-weight: 600; }
+
+  .rows { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+  .rows dt { color: var(--muted); }
+  .rows dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .pv { margin-top: 10px; font-size: 12px; color: var(--muted); word-break: break-word; min-height: 32px; }
+
+  .moves {
+    max-height: 190px; overflow-y: auto; font-size: 13px;
+    font-variant-numeric: tabular-nums; display: grid;
+    grid-template-columns: 2.2em 1fr 1fr; gap: 2px 8px; align-content: start;
+  }
+  .moves .no { color: var(--muted); }
+  .moves .m.latest { color: var(--accent); font-weight: 600; }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  select, button, input {
+    font: inherit; color: var(--text); background: #262a33;
+    border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; cursor: pointer;
+  }
+  select, input { width: 100%; }
+  input { cursor: text; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .field + .field { margin-top: 10px; }
+  .primary { background: var(--accent); color: #10131a; border-color: var(--accent); font-weight: 600; }
+
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f4f5f7; --panel: #fff; --line: #e2e5ea; --text: #1b1f27; --muted: #6b7280; --accent: #3b6fd4; }
+    .piece.b { color: #1b1f27; text-shadow: none; }
+  }
+  @media (max-width: 900px) { body { padding: 12px; } .app { flex-direction: column; } .panel { width: min(100%, 8 * var(--square)); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+    <div class="promo" id="promo"></div>
+  </div>
+
+  <div class="panel">
+    <div class="card">
+      <h1>MilesBot <span id="side"></span></h1>
+      <div class="status" id="status">Loading…</div>
+    </div>
+
+    <div class="card">
+      <dl class="rows">
+        <dt>depth</dt><dd id="depth">–</dd>
+        <dt>score</dt><dd id="score">–</dd>
+        <dt>nodes</dt><dd id="nodes">–</dd>
+        <dt>speed</dt><dd id="tps">–</dd>
+      </dl>
+      <div class="pv" id="pv"></div>
+    </div>
+
+    <div class="card">
+      <div class="moves" id="movelist"></div>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <label for="color">New game as</label>
+        <select id="color">
+          <option value="white">White</option>
+          <option value="black">Black</option>
+          <option value="random">Random</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="movetime">Engine thinking time</label>
+        <select id="movetime">
+          <option value="200">0.2 s — blitz sparring</option>
+          <option value="1000">1 s</option>
+          <option value="3000" selected>3 s</option>
+          <option value="10000">10 s</option>
+          <option value="30000">30 s — it will hurt</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="startfen">Start from FEN (optional)</label>
+        <input id="startfen" type="text" placeholder="paste a position, or leave empty">
+      </div>
+      <div class="field"><button class="primary" id="new" style="width:100%">New game</button></div>
+      <div class="field grid2">
+        <button id="undo">Undo</button>
+        <button id="flip">Flip</button>
+        <button id="hint">Hint</button>
+        <button id="fen">Copy FEN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const GLYPH = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+const boardEl = document.getElementById("board");
+const promoEl = document.getElementById("promo");
+
+let state = null;
+let flipped = false;
+let selected = null;
+let pendingPromo = null;
+let poll = null;
+
+const $ = (id) => document.getElementById(id);
+const sqName = (f, r) => "abcdefgh"[f] + (r + 1);
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "request failed");
+  return data;
+}
+
+function render() {
+  if (!state) return;
+  const rows = state.fen.split(" ")[0].split("/");
+  const board = {};
+  rows.forEach((row, i) => {
+    let f = 0;
+    for (const ch of row) {
+      if (ch >= "1" && ch <= "8") f += +ch;
+      else board[sqName(f++, 7 - i)] = ch;
+    }
+  });
+
+  const last = state.lastMove ? [state.lastMove.slice(0, 2), state.lastMove.slice(2, 4)] : [];
+  const myTurn = !state.result && !state.thinking && (state.turn === "w") === state.humanWhite;
+
+  boardEl.replaceChildren();
+  for (let i = 0; i < 64; i++) {
+    const rank = flipped ? i >> 3 : 7 - (i >> 3);
+    const file = flipped ? 7 - (i & 7) : i & 7;
+    const name = sqName(file, rank);
+    const piece = board[name];
+
+    const sq = document.createElement("div");
+    sq.className = "sq " + ((file + rank) % 2 ? "light" : "dark");
+    sq.dataset.sq = name;
+    if (last.includes(name)) sq.classList.add("last");
+    if (name === state.check) sq.classList.add("check");
+
+    if (piece) {
+      const el = document.createElement("span");
+      el.className = "piece " + (piece === piece.toUpperCase() ? "w" : "b");
+      el.textContent = GLYPH[piece.toLowerCase()];
+      sq.appendChild(el);
+      if (myTurn && state.legal[name]) {
+        sq.classList.add("movable");
+        sq.draggable = true;
+      }
+    }
+    if (file === (flipped ? 7 : 0)) sq.appendChild(coord("rank", rank + 1));
+    if (rank === (flipped ? 7 : 0)) sq.appendChild(coord("file", "abcdefgh"[file]));
+    boardEl.appendChild(sq);
+  }
+
+  $("side").textContent = state.humanWhite ? "— you are White" : "— you are Black";
+  $("undo").disabled = !state.moves.length || state.thinking;
+  $("hint").disabled = !myTurn;
+  highlight();
+  renderStatus(myTurn);
+  renderInfo(state.info);
+  renderMoves();
+}
+
+/* Selection changes only touch classes: rebuilding the board mid-drag would
+   cancel the drag, and the squares are already in place. */
+function highlight() {
+  const targets = selected && state.legal[selected]
+    ? state.legal[selected].map(m => m.slice(2, 4)) : [];
+  for (const sq of boardEl.children) {
+    const isTarget = targets.includes(sq.dataset.sq);
+    sq.classList.toggle("sel", sq.dataset.sq === selected);
+    sq.classList.toggle("hint", isTarget);
+    sq.classList.toggle("capture", isTarget && sq.firstElementChild !== null
+                                   && sq.firstElementChild.classList.contains("piece"));
+  }
+}
+
+function coord(kind, text) {
+  const el = document.createElement("span");
+  el.className = "coord " + kind;
+  el.textContent = text;
+  return el;
+}
+
+function renderStatus(myTurn) {
+  const el = $("status");
+  el.className = "status";
+  if (state.error) { el.classList.add("alert"); el.textContent = state.error; return; }
+  if (state.resultText) { el.classList.add("over"); el.textContent = state.resultText; return; }
+  if (state.thinking) { el.textContent = "MilesBot is thinking…"; return; }
+  el.textContent = (myTurn ? "Your move" : "MilesBot to move") + (state.check ? " — check!" : "");
+}
+
+function renderInfo(info) {
+  info = info || {};
+  $("depth").textContent = info.depth ?? "–";
+  $("nodes").textContent = info.nodes ? info.nodes.toLocaleString() : "–";
+  $("tps").textContent = info.tps ? Math.round(info.tps / 1000).toLocaleString() + "k n/s" : "–";
+  if (info.score === undefined) {
+    $("score").textContent = "–";
+  } else if (info.whiteScore !== undefined) {
+    $("score").textContent = formatScore(info.whiteScore);
+  } else {
+    // A live search reports from the side to move; show it from White's side.
+    $("score").textContent = formatScore(state && state.turn === "b" ? -info.score : info.score);
+  }
+  $("pv").textContent = info.pv ? "pv " + info.pv.join(" ") : "";
+}
+
+const MATE = 32767 / 2;  // MATE_SCORE in Search.h
+
+function formatScore(cp) {
+  if (Math.abs(cp) > MATE - 200) {
+    const moves = Math.max(1, Math.ceil((MATE - Math.abs(cp)) / 2));
+    return (cp > 0 ? "+#" : "-#") + moves;
+  }
+  return (cp > 0 ? "+" : "") + (cp / 100).toFixed(2);
+}
+
+function renderMoves() {
+  const list = $("movelist");
+  list.replaceChildren();
+  for (let i = 0; i < state.moves.length; i += 2) {
+    const no = document.createElement("div");
+    no.className = "no";
+    no.textContent = (i / 2 + 1) + ".";
+    list.appendChild(no);
+    for (const j of [i, i + 1]) {
+      const el = document.createElement("div");
+      el.className = "m" + (j === state.moves.length - 1 ? " latest" : "");
+      el.textContent = state.moves[j] || "";
+      list.appendChild(el);
+    }
+  }
+  list.scrollTop = list.scrollHeight;
+}
+
+/* --- moving ------------------------------------------------------------ */
+
+function tryMove(from, to) {
+  const options = (state.legal[from] || []).filter(m => m.slice(2, 4) === to);
+  if (!options.length) return false;
+  if (options.length > 1 && options[0].length === 5) {
+    askPromotion(options);
+    return true;
+  }
+  submit(options[0]);
+  return true;
+}
+
+function askPromotion(options) {
+  pendingPromo = options;
+  promoEl.replaceChildren();
+  const white = state.turn === "w";
+  for (const kind of ["q", "r", "b", "n"]) {
+    const move = options.find(m => m[4] === kind);
+    if (!move) continue;
+    const btn = document.createElement("button");
+    btn.innerHTML = `<span class="piece ${white ? "w" : "b"}">${GLYPH[kind]}</span>`;
+    btn.onclick = () => { promoEl.classList.remove("show"); pendingPromo = null; submit(move); };
+    promoEl.appendChild(btn);
+  }
+  promoEl.classList.add("show");
+}
+
+async function submit(uci) {
+  selected = null;
+  try {
+    state = await api("/api/move", { uci });
+    render();
+    if (state.engineTurn) await engineMove();
+  } catch (err) {
+    $("status").className = "status alert";
+    $("status").textContent = err.message;
+  }
+}
+
+async function engineMove() {
+  state.thinking = true;
+  render();
+  startPolling();
+  try {
+    state = await api("/api/go", {});
+  } catch (err) {
+    state.thinking = false;
+    state.error = err.message;
+  } finally {
+    stopPolling();
+    render();
+  }
+}
+
+function startPolling() {
+  stopPolling();
+  poll = setInterval(async () => {
+    try {
+      const live = await api("/api/info");
+      if (live.info && live.info.depth !== undefined) renderInfo(live.info);
+    } catch (err) { /* the search will report for itself */ }
+  }, 300);
+}
+
+function stopPolling() {
+  if (poll) clearInterval(poll);
+  poll = null;
+}
+
+/* --- input ------------------------------------------------------------- */
+
+boardEl.addEventListener("click", (ev) => {
+  const sq = ev.target.closest(".sq");
+  if (!sq || !state || state.thinking || state.result) return;
+  const name = sq.dataset.sq;
+  if (selected && tryMove(selected, name)) return;
+  selected = state.legal[name] && name !== selected ? name : null;
+  highlight();
+});
+
+boardEl.addEventListener("dragstart", (ev) => {
+  const sq = ev.target.closest(".sq");
+  if (!sq || !sq.draggable) return ev.preventDefault();
+  selected = sq.dataset.sq;
+  sq.classList.add("dragging");
+  ev.dataTransfer.setData("text/plain", selected);
+  ev.dataTransfer.effectAllowed = "move";
+  highlight();
+});
+
+boardEl.addEventListener("dragend", (ev) => {
+  const sq = ev.target.closest(".sq");
+  if (sq) sq.classList.remove("dragging");
+});
+
+boardEl.addEventListener("dragover", (ev) => ev.preventDefault());
+
+boardEl.addEventListener("drop", (ev) => {
+  ev.preventDefault();
+  const sq = ev.target.closest(".sq");
+  const from = ev.dataTransfer.getData("text/plain");
+  if (!sq || !from) return;
+  if (!tryMove(from, sq.dataset.sq)) {
+    selected = null;
+    highlight();
+  }
+});
+
+/* --- controls ---------------------------------------------------------- */
+
+$("new").onclick = async () => {
+  stopPolling();
+  selected = null;
+  try {
+    state = await api("/api/new", {
+      color: $("color").value,
+      movetime: +$("movetime").value,
+      fen: $("startfen").value.trim(),
+    });
+  } catch (err) {
+    $("status").className = "status alert";
+    $("status").textContent = err.message;
+    return;
+  }
+  flipped = !state.humanWhite;
+  render();
+  if (state.engineTurn) await engineMove();
+};
+
+$("movetime").onchange = async () => {
+  state = await api("/api/movetime", { movetime: +$("movetime").value });
+  render();
+};
+
+$("undo").onclick = async () => {
+  selected = null;
+  state = await api("/api/undo", {});
+  render();
+};
+
+$("flip").onclick = () => { flipped = !flipped; render(); };
+
+$("hint").onclick = async () => {
+  const btn = $("hint");
+  btn.disabled = true;
+  $("status").textContent = "Looking for a move for you…";
+  startPolling();
+  try {
+    const { move, info } = await api("/api/hint", {});
+    selected = move.slice(0, 2);
+    render();
+    renderInfo(info);
+    $("status").textContent = "Try " + move;
+  } finally {
+    stopPolling();
+    btn.disabled = false;
+  }
+};
+
+$("fen").onclick = async () => {
+  await navigator.clipboard.writeText(state.fen);
+  $("status").textContent = "FEN copied";
+};
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+  if (ev.key === "Escape") { selected = null; promoEl.classList.remove("show"); highlight(); }
+  if (ev.key === "f") { flipped = !flipped; render(); }
+});
+
+/* The board is shared, so pick up moves other people made. */
+setInterval(async () => {
+  if (!state || state.thinking || poll || promoEl.classList.contains("show")) return;
+  try {
+    const fresh = await api("/api/state");
+    if (fresh.fen === state.fen && fresh.moves.length === state.moves.length) return;
+    state = fresh;
+    selected = null;
+    render();
+    if (state.engineTurn) await engineMove();
+  } catch (err) { /* transient */ }
+}, 1500);
+
+(async function init() {
+  state = await api("/api/state");
+  flipped = !state.humanWhite;
+  $("movetime").value = String(state.movetime);
+  render();
+  if (state.thinking) { startPolling(); }
+  else if (state.engineTurn) await engineMove();
+})();
+</script>
+</body>
+</html>

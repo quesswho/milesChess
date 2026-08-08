@@ -139,6 +139,8 @@ void UCI::Start() {
             }
 
             SetPosition(fen, moves);
+        } else if (token == "d") {
+            sync_printf("Fen: %s\n", m_Search.m_Position.ToFen().c_str());
         } else if (token == "stop") {
             m_Search.Stop();
         } else if (token == "perft") {

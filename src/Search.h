@@ -24,9 +24,9 @@
 // Quadratic https://www.chessprogramming.org/Triangular_PV-Table
 struct MoveStack {
     Move m_PV[MAX_DEPTH] = {};
-    int m_Ply;
+    int m_Ply = 0;
     int m_Eval = NONE_SCORE;
-    Move m_CurrentMove;
+    Move m_CurrentMove = 0; // 0 also marks a null move, so the child won't null move again
 };
 
 struct RootMove {
@@ -279,8 +279,12 @@ public:
         }
 
         // Null move pruning
-        if (!PVNode && stack->m_CurrentMove != 0 && stack->m_Eval >= beta && stack->m_Eval + 40 * depth - 200 >= beta) {
+        // Never null move while in check (the reply could capture our king) and never twice in a row,
+        // which the parent signals by leaving its m_CurrentMove at 0
+        if (!PVNode && !board.m_InCheck && stack->m_Ply >= 1 && (stack - 1)->m_CurrentMove != 0
+            && stack->m_Eval >= beta && stack->m_Eval + 40 * depth - 200 >= beta) {
             int reduction = std::min((stack->m_Eval - beta), 7) + depth / 3 + 5;
+            stack->m_CurrentMove = 0;
             board.NullMove();
             int nullscore = -AlphaBeta<NON_PV>(board, stack + 1, -beta, -beta + 1, depth - reduction, !cutNode);
             board.UndoNullMove();
@@ -458,8 +462,7 @@ public:
         const int depthCap = std::min(m_Limits.maxDepth, (int)MAX_DEPTH);
 
         // Start timer
-        Move bestMove = 0;
-        Move finalMove = bestMove;
+        Move finalMove = 0;
         int64 bestScore = -MATE_SCORE;
         int64 rootAlpha = MIN_ALPHA;
         int64 rootBeta = MAX_BETA;
@@ -518,7 +521,7 @@ public:
 
             finalMove = stack->m_PV[0];
 
-            m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, bestMove, bestScore,
+            m_Table->Enter(m_Position.m_Hash, TTEntry(m_Position.m_Hash, finalMove, bestScore,
                                                       bestScore >= beta ? LOWER_BOUND : EXACT_BOUND, 0, m_Maxdepth,
                                                       m_Position.m_FullMoves, true));
 

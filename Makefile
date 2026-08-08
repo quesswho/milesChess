@@ -2,11 +2,16 @@ BUILD_TYPE ?= Release
 CLANG_FORMAT ?= clang-format
 SOURCES := $(wildcard src/*.h src/*.cpp tests/*.h tests/*.cpp tools/*.cpp)
 
-.PHONY: engine test gen-tables check-tables format format-check clean
+.PHONY: engine play test gen-tables check-tables format format-check clean
 
 engine:
 	cmake -S . -B build -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
 	cmake --build build --target engine -j
+
+# Play against the engine in a browser. Pass flags through PLAY_ARGS, e.g.
+# `make play PLAY_ARGS="--host 0.0.0.0 --hash 256"`; see `./play.py --help`.
+play: engine
+	python3 play.py $(PLAY_ARGS)
 
 test:
 	cmake -S . -B build -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
