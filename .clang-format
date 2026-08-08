@@ -48,6 +48,6 @@ SortIncludes: false
 IncludeBlocks: Preserve
 
 FixNamespaceComments: false
-ReflowComments: Never
+ReflowComments: false
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 2
