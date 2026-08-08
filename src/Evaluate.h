@@ -1,12 +1,79 @@
 #pragma once
 
+#include <algorithm>
+#include <cstdlib>
+
 #include "Movelist.h"
 
 #define TEMPO 20
 
+static constexpr int64 PAWN_VALUE = 100, KNIGHT_VALUE = 350, BISHOP_VALUE = 350, ROOK_VALUE = 525, QUEEN_VALUE = 1000,
+                       KING_VALUE = 10000;
+
 // Flips rank only. Must not flip the file too.
 static inline int MirrorSquare(int square) {
     return square ^ 56;
+}
+
+static inline int SquareDistance(int a, int b) {
+    return std::max(std::abs(a / 8 - b / 8), std::abs(a % 8 - b % 8));
+}
+
+// 0 in the centre, 6 in a corner.
+static inline int CenterDistance(int square) {
+    int rank = square / 8, col = square % 8;
+    return std::max(3 - rank, rank - 4) + std::max(3 - col, col - 4);
+}
+
+static inline bool IsDarkSquare(int square) {
+    return ((square / 8 + square % 8) & 1) != 0;
+}
+
+// Distance to the nearer of the two corners of the given colour.
+static inline int CornerDistance(int square, bool dark) {
+    int rank = square / 8, col = square % 8;
+    return dark ? std::min(std::max(rank, 7 - col), std::max(7 - rank, col))
+                : std::min(std::max(rank, col), std::max(7 - rank, 7 - col));
+}
+
+// Compute a gradient for bare king positions. This moves the position towards
+// and easy checkmate.
+static bool BareKingScore(const Position& board, int64& score) {
+    if (board.m_WhitePawn || board.m_BlackPawn) return false;
+
+    BitBoard whiteMen = board.m_White & ~board.m_WhiteKing;
+    BitBoard blackMen = board.m_Black & ~board.m_BlackKing;
+    if ((whiteMen != 0) == (blackMen != 0)) return false;
+
+    bool whiteStrong = whiteMen != 0;
+    BitBoard knights = whiteStrong ? board.m_WhiteKnight : board.m_BlackKnight;
+    BitBoard bishops = whiteStrong ? board.m_WhiteBishop : board.m_BlackBishop;
+    BitBoard rooks = whiteStrong ? board.m_WhiteRook : board.m_BlackRook;
+    BitBoard queens = whiteStrong ? board.m_WhiteQueen : board.m_BlackQueen;
+
+    // A lone minor cannot mate.
+    if (!rooks && !queens && CountBits(knights | bishops) < 2) {
+        score = 0;
+        return true;
+    }
+
+    int strongKing = GetSquare(whiteStrong ? board.m_WhiteKing : board.m_BlackKing);
+    int weakKing = GetSquare(whiteStrong ? board.m_BlackKing : board.m_WhiteKing);
+
+    int64 drive = 20 * CenterDistance(weakKing) + 12 * (7 - SquareDistance(strongKing, weakKing));
+
+    if (!rooks && !queens && CountBits(knights) == 1 && CountBits(bishops) == 1) {
+        // Only corners the bishop covers mate. Added on top of the edge push,
+        // so the wrong corner still beats the centre.
+        bool dark = IsDarkSquare(GetSquare(bishops));
+        drive += 24 * (7 - CornerDistance(weakKing, dark)) + 6 * (7 - CornerDistance(strongKing, dark));
+    }
+
+    int64 material = KNIGHT_VALUE * CountBits(knights) + BISHOP_VALUE * CountBits(bishops)
+                     + ROOK_VALUE * CountBits(rooks) + QUEEN_VALUE * CountBits(queens);
+
+    score = whiteStrong ? material + drive : -(material + drive);
+    return true;
 }
 
 template<Color white>
@@ -56,13 +123,17 @@ static Score Pawns(const Position& board) {
 
 // Relative static evaluation
 static int64 Evaluate(const Position& board, PawnTable* table) {
+    int64 bareKing = 0;
+    if (BareKingScore(board, bareKing)) return board.m_WhiteMove ? bareKing : -bareKing;
+
     int64 middlegame = 0, endgame = 0, result = 0;
     Score score = { 0, 0 };
     BitBoard wp = board.m_WhitePawn, wkn = board.m_WhiteKnight, wb = board.m_WhiteBishop, wr = board.m_WhiteRook,
              wq = board.m_WhiteQueen, wk = board.m_WhiteKing, bp = board.m_BlackPawn, bkn = board.m_BlackKnight,
              bb = board.m_BlackBishop, br = board.m_BlackRook, bq = board.m_BlackQueen, bk = board.m_BlackKing;
 
-    const int64 pawnVal = 100, knightVal = 350, bishopVal = 350, rookVal = 525, queenVal = 1000, kingVal = 10000;
+    const int64 pawnVal = PAWN_VALUE, knightVal = KNIGHT_VALUE, bishopVal = BISHOP_VALUE, rookVal = ROOK_VALUE,
+                queenVal = QUEEN_VALUE, kingVal = KING_VALUE;
 
     int64 phase = 4 + 4 + 8 + 8;
 
