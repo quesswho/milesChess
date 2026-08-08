@@ -1,0 +1,40 @@
+# The positions from tests/Puzzles.h in EPD form, so scripts/tactics.py can
+# score them the way it scores a published suite. Same positions, different
+# question: tests/test_puzzles.cpp asks "does a depth N search still find this",
+# this file asks "does a one second search still find this", which is the
+# constraint the engine plays under.
+#
+# A healthy build solves all of these, so the useful reading is a drop. As a
+# strength measure it is far too small and far too easy to say anything; for
+# that, run a real suite (scripts/setup_tools.sh fetches several into
+# .tools/suites/) or, properly, a match with scripts/sprt.sh.
+#
+# Moves are in the engine's own UCI notation. Keep this in step with
+# tests/Puzzles.h when puzzles are added there.
+
+# -- mates in one --------------------------------------------------------
+6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1 ; bm a1a8 ; id mate-back-rank
+r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4 ; bm f3f7 ; id mate-scholar
+7k/R7/8/8/8/8/8/1R5K w - - 0 1 ; bm b1b8 ; id mate-ladder
+r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1 ; bm a8a1 ; id mate-black-rank
+4r1k1/5ppp/2Q5/8/8/8/8/4R1K1 w - - 0 1 ; bm c6e8 e1e8 ; id mate-deflect
+4r1k1/5ppp/2Q5/q7/8/8/8/4R1K1 w - - 0 1 ; bm c6e8 e1e8 ; id mate-over-material
+
+# -- mates in two --------------------------------------------------------
+6rk/6pp/7N/8/8/1Q6/8/6K1 w - - 0 1 ; bm b3g8 ; id mate-smother-2
+7k/8/5K2/8/8/8/8/Q7 w - - 0 1 ; bm f6g6 a1g1 ; id mate-quiet-2
+
+# -- mate in three -------------------------------------------------------
+5rk1/5Npp/8/8/8/1Q6/8/6K1 w - - 0 1 ; bm f7h6 ; id mate-smother-3
+
+# -- being mated ---------------------------------------------------------
+7k/8/6KQ/8/8/8/8/8 b - - 0 1 ; bm h8g8 ; id mated-only-move
+
+# -- tactics -------------------------------------------------------------
+4k3/8/4N3/7q/8/8/8/4K3 w - - 0 1 ; bm e6g7 ; id fork-queen
+4k3/8/8/7r/8/8/8/4K2R w K - 0 1 ; bm h1h5 ; id hanging-rook
+4k3/8/2p1p3/3p4/8/1B6/8/4K3 w - - 0 1 ; am b3d5 ; id poisoned-pawn
+8/4P1q1/3k4/8/8/8/8/7K w - - 0 1 ; bm e7e8n ; id underpromotion
+k7/8/8/8/8/8/5Q2/6K1 w - - 0 1 ; am f2b6 ; id avoid-stalemate
+8/6P1/8/8/8/8/8/K6k w - - 0 1 ; bm g7g8q ; id promotion
+8/8/8/1pP5/8/8/8/4K2k w - b6 0 2 ; bm c5b6 ; id en-passant

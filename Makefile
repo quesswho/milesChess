@@ -2,7 +2,7 @@ BUILD_TYPE ?= Release
 CLANG_FORMAT ?= clang-format
 SOURCES := $(wildcard src/*.h src/*.cpp tests/*.h tests/*.cpp tools/*.cpp)
 
-.PHONY: engine play test gen-tables check-tables format format-check clean
+.PHONY: engine play test bench benchcmp tactics sprt setup-tools gen-tables check-tables format format-check clean
 
 engine:
 	cmake -S . -B build -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
@@ -17,6 +17,21 @@ test:
 	cmake -S . -B build -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
 	cmake --build build -j
 	ctest --test-dir build -L fast --output-on-failure
+
+bench: engine
+	./build/engine bench $(BENCH_ARGS)
+
+benchcmp:
+	python3 scripts/benchcmp.py $(REF) $(NEW) $(BENCHCMP_ARGS)
+
+tactics:
+	python3 scripts/tactics.py $(TACTICS_ARGS)
+
+sprt:
+	./scripts/sprt.sh $(REF) $(NEW)
+
+setup-tools:
+	./scripts/setup_tools.sh
 
 # Build the offline table generator. Run it as `./build/gen_tables <table>` and
 # paste the output over the matching array in src/LookupTables.h; `gen_tables`

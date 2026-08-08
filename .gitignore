@@ -2,3 +2,6 @@ build/
 build-debug/
 games/
 __pycache__/
+.tools/
+.claude/
+config.json

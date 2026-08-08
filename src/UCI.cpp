@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include "UCI.h"
+#include "Bench.h"
 #include "Perft.h"
 
 static void GetToken(std::istringstream& uip, std::string& token) {
@@ -147,6 +148,18 @@ void UCI::Start() {
             GetToken(istream, token);
             int depth = std::atoi(token.c_str());
             if (depth > 0) PerftDivide(m_Search.m_Position, depth, true);
+        } else if (token == "bench") {
+            // Runs in this thread, so the caller can pipe `bench` and `quit` in
+            // one go without `quit` cutting the search short.
+            m_Search.Stop();
+            std::string first, second;
+            GetToken(istream, first);
+            GetToken(istream, second);
+            BenchMode mode;
+            int limit;
+            ParseBenchArgs(first, second, mode, limit);
+            RunBench(mode, limit);
+            NewGame();
         } else if (token == "go") {
             int64 time = 1000;
             int64 wtime = -1;
